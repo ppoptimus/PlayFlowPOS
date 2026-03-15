@@ -51,6 +51,15 @@ class PlayFlowController extends Controller
         ]);
     }
 
+    public function comingSoon(): View
+    {
+        $moduleName = (string) request()->segment(1);
+
+        return view('coming-soon', [
+            'module' => ucfirst($moduleName),
+        ]);
+    }
+
     public function staff(): View
     {
         return view('staff.index', [

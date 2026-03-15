@@ -43,12 +43,9 @@ class PlayFlowController extends Controller
 
     public function comingSoon(): View
     {
-        // ดึงชื่อโมดูลจาก URL มาแสดงผล เช่น /customers ก็จะดึงคำว่า customers ออกมา
+        // ดึงชื่อโมดูลจาก URL มาแสดงผล
         $moduleName = request()->segment(1);
-
-        return view('coming-soon', [
-            'module' => ucfirst($moduleName)
-        ]);
+        return view('coming-soon', ['module' => ucfirst($moduleName)]);
     }
 
     public function staff(): View
