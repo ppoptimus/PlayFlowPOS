@@ -1,3 +1,13 @@
+<style>
+    .pf-sidebar .nav-link.link-dark { color: #2e3f55 !important; }
+    .pf-sidebar .nav-link.link-dark:hover {
+        color: #1f73e0 !important;
+        background-color: rgba(31, 115, 224, 0.08) !important;
+    }
+    .pf-sidebar .text-muted { color: #5c728a !important; }
+</style>
+
+<div class="pf-sidebar">
 <div class="mb-4 px-2">
     <h4 class="fw-bold text-primary mb-0"><i class="bi bi-flower1"></i> PlayFlow</h4>
     <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">Spa Management System</small>
@@ -31,4 +41,6 @@
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">ตั้งค่าระบบ</small>
     <a href="{{ route('branches') }}" class="nav-link link-dark"><i class="bi bi-building-fill me-2"></i> จัดการสาขา</a>
     <a href="{{ route('users') }}" class="nav-link link-dark"><i class="bi bi-shield-lock-fill me-2"></i> จัดการผู้ใช้งาน</a>
+</div>
+
 </div>
