@@ -1,84 +1,140 @@
 @extends('layouts.main')
 
-@section('title', 'Dashboard | PlayFlow Spa POS')
-@section('page_title', 'Dashboard')
-@section('page_subtitle', 'ภาพรวมสาขาแบบ Real-time (Mock Data)')
+@section('title', 'Dashboard | PlayFlow POS')
+@section('page_title', 'Dashboard สรุปภาพรวม')
+@section('page_subtitle', 'ข้อมูลประจำสาขา สุขุมวิท')
 
 @section('content')
-<div class="row g-3 mb-3">
+<div class="row g-4">
     <div class="col-12 col-md-4">
-        <section class="pf-card h-100">
-            <div class="d-flex justify-content-between align-items-center mb-1">
-                <h3 class="pf-section-title">ยอดขายวันนี้</h3>
-                <span class="pf-badge">วันนี้</span>
+        <div class="card border-0 shadow-sm rounded-4 h-100 bg-primary text-white">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="mb-0 opacity-75">ยอดขายรวมวันนี้</h6>
+                    <i class="bi bi-currency-dollar fs-4"></i>
+                </div>
+                <h2 class="fw-bold mb-1">{{ number_format($stats['today_sales']) }} ฿</h2>
+                <p class="small mb-0"><i class="bi bi-clock-history"></i> {{ $stats['last_sync'] }}</p>
             </div>
-            <div class="display-6 fw-bold text-primary">{{ number_format($stats['today_sales']) }} ฿</div>
-            <div class="small text-success fw-semibold">+12% เทียบเมื่อวาน</div>
-        </section>
+        </div>
     </div>
-    <div class="col-12 col-md-4">
-        <section class="pf-card h-100">
-            <h3 class="pf-section-title mb-2">ลูกค้าที่รับบริการ</h3>
-            <div class="display-6 fw-bold" style="color:#1b8fbc;">{{ $stats['today_clients'] }} คน</div>
-            <div class="small text-secondary">Walk-in และ Booking รวมกัน</div>
-        </section>
-    </div>
-    <div class="col-12 col-md-4">
-        <section class="pf-card h-100" style="background:linear-gradient(135deg, rgba(49,184,233,.2), rgba(28,201,182,.2));">
-            <h3 class="pf-section-title mb-2">ยอดรวมเดือนนี้</h3>
-            <div class="display-6 fw-bold" style="color:#17739e;">{{ number_format($stats['monthly_sales']) }} ฿</div>
-            <div class="small text-secondary">{{ $stats['last_sync'] }}</div>
-        </section>
-    </div>
-</div>
 
-<div class="row g-3">
-    <div class="col-12 col-lg-7">
-        <section class="pf-card h-100">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h3 class="pf-section-title">Top Earner หมอนวด</h3>
-                <span class="small text-secondary">Top 3</span>
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100 bg-white">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 text-secondary">
+                    <h6 class="mb-0">จำนวนลูกค้าวันนี้</h6>
+                    <i class="bi bi-people fs-4"></i>
+                </div>
+                <h2 class="fw-bold mb-1 text-dark">{{ $stats['today_clients'] }} คน</h2>
+                <p class="small mb-0 text-success"><i class="bi bi-arrow-up"></i> +12% จากเมื่อวาน</p>
             </div>
-            @foreach($stats['top_masseuses'] as $index => $m)
-            <article class="d-flex align-items-center justify-content-between py-2 {{ !$loop->last ? 'border-bottom' : '' }}" style="border-color:rgba(39,130,175,.15)!important;">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="rounded-circle text-white d-inline-flex align-items-center justify-content-center fw-bold" style="width:30px;height:30px;background:{{ $index === 0 ? '#1fbba6' : ($index === 1 ? '#31b8e9' : '#5fc5ff') }};">
-                        {{ $index + 1 }}
-                    </span>
-                    <img src="{{ $m['avatar'] }}" alt="{{ $m['name'] }}" width="38" height="38" class="rounded-circle" style="object-fit:cover;">
+        </div>
+    </div>
+
+    <div class="col-12 col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100 bg-white border-start border-4 border-info">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 text-secondary">
+                    <h6 class="mb-0">ยอดขายเดือนนี้</h6>
+                    <i class="bi bi-graph-up fs-4"></i>
+                </div>
+                <h2 class="fw-bold mb-1 text-dark">{{ number_format($stats['monthly_sales']) }} ฿</h2>
+                <p class="small mb-0 text-muted">เป้าหมาย: 150,000 ฿</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-8">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4">แนวโน้มยอดขายรายสัปดาห์</h5>
+                <canvas id="salesChart" style="max-height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4">บริการยอดฮิต</h5>
+                <div class="d-flex flex-column gap-3">
+                    @foreach($stats['top_services'] as $service)
                     <div>
-                        <div class="fw-semibold">{{ $m['name'] }} <span class="small text-secondary">({{ $m['id'] }})</span></div>
-                        <div class="small text-secondary">{{ $m['queue_count'] }} คิววันนี้</div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="small fw-semibold">{{ $service['icon'] }} {{ $service['name'] }}</span>
+                            <span class="small text-muted">{{ $service['count'] }} ครั้ง</span>
+                        </div>
+                        <div class="progress rounded-pill" style="height: 8px;">
+                            <div class="progress-bar bg-primary rounded-pill" style="width: {{ $service['percent'] }}%"></div>
+                        </div>
                     </div>
+                    @endforeach
                 </div>
-                <div class="text-end">
-                    <div class="fw-bold text-primary">{{ number_format($m['amount']) }} ฿</div>
-                    <div class="small text-secondary">คอมมิชชั่นประมาณ {{ number_format($m['amount'] * 0.3) }} ฿</div>
-                </div>
-            </article>
-            @endforeach
-        </section>
+            </div>
+        </div>
     </div>
 
-    <div class="col-12 col-lg-5">
-        <section class="pf-card h-100">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h3 class="pf-section-title">บริการขายดี</h3>
-                <span class="small text-secondary">รายวัน/รายเดือน</span>
-            </div>
-            @foreach($stats['top_services'] as $s)
-            <div class="mb-3">
-                <div class="d-flex justify-content-between align-items-center mb-1">
-                    <div class="fw-semibold">{{ $s['icon'] }} {{ $s['name'] }}</div>
-                    <div class="small fw-semibold text-secondary">{{ $s['percent'] }}%</div>
+    <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h5 class="fw-bold mb-4">พนักงานทำยอดสูงสุด (Top Earner)</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle border-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="border-0">พนักงาน</th>
+                                <th class="border-0 text-center">จำนวนคิว</th>
+                                <th class="border-0 text-end">ยอดรวม</th>
+                                <th class="border-0"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($stats['top_masseuses'] as $m)
+                            <tr>
+                                <td class="border-0">
+                                    <div class="d-flex align-items-center">
+                                        <img src="{{ $m['avatar'] }}" class="rounded-circle me-3" width="40" height="40">
+                                        <span class="fw-bold">{{ $m['name'] }}</span>
+                                    </div>
+                                </td>
+                                <td class="border-0 text-center">{{ $m['queue_count'] }} คิว</td>
+                                <td class="border-0 text-end fw-bold text-primary">{{ number_format($m['amount']) }} ฿</td>
+                                <td class="border-0 text-end">
+                                    <span class="badge bg-light text-primary rounded-pill">Top {{ $loop->iteration }}</span>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-                <div class="progress" style="height:10px;border-radius:999px;background:#e8f6fc;">
-                    <div class="progress-bar" style="width:{{ $s['percent'] }}%;background:linear-gradient(120deg,#31b8e9,#1cc9b6);"></div>
-                </div>
-                <div class="small text-secondary mt-1">{{ $s['count'] }} ครั้ง | {{ number_format($s['price']) }} ฿</div>
             </div>
-            @endforeach
-        </section>
+        </div>
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    const ctx = document.getElementById('salesChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'],
+            datasets: [{
+                label: 'ยอดขาย (บาท)',
+                data: [12000, 15000, 11000, 18000, 22000, 25000, 28000],
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+</script>
+@endpush

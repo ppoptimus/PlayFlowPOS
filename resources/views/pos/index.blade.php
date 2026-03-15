@@ -1,317 +1,242 @@
 @extends('layouts.main')
 
-@section('title', 'POS | PlayFlow Spa POS')
-@section('page_title', 'POS ขายบริการ')
-@section('page_subtitle', 'Mockup: เพิ่มบริการ+สินค้า, ส่วนลด, วิธีชำระ, ผูกหมอนวด')
+@section('title', 'POS - PlayFlow POS')
+@section('page_title', 'หน้าจอขายหน้าร้าน (POS)')
+@section('page_subtitle', 'สาขา: สุขุมวิท | พนักงาน: Manager')
 
 @section('content')
 <div class="row g-3">
-    <div class="col-12 col-xl-7">
-        <section class="pf-card">
-            <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-2">
-                <h3 class="pf-section-title mb-0">รายการขาย</h3>
-                <div class="d-flex gap-2">
-                    <button class="btn btn-sm rounded-pill active tab-filter" data-filter="all">ทั้งหมด</button>
-                    <button class="btn btn-sm rounded-pill tab-filter" data-filter="service">บริการนวด</button>
-                    <button class="btn btn-sm rounded-pill tab-filter" data-filter="product">สินค้าขายปลีก</button>
+    <div class="col-12 col-lg-2">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-3">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small">ค้นหา</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" id="item-search" class="form-control border-start-0" placeholder="ชื่อ/SKU...">
+                    </div>
+                </div>
+                
+                <label class="form-label fw-bold small">หมวดหมู่</label>
+                <div class="list-group list-group-flush gap-2 border-0" id="category-filter">
+                    <button class="list-group-item list-group-item-action rounded-3 border-0 active tab-filter" data-filter="all">
+                        <i class="bi bi-grid-fill me-2"></i> ทั้งหมด
+                    </button>
+                    <button class="list-group-item list-group-item-action rounded-3 border-0 tab-filter" data-filter="service">
+                        <i class="bi bi-person-walking me-2"></i> บริการนวด
+                    </button>
+                    <button class="list-group-item list-group-item-action rounded-3 border-0 tab-filter" data-filter="product">
+                        <i class="bi bi-box-seam me-2"></i> สินค้าปลีก
+                    </button>
                 </div>
             </div>
-            <input id="item-search" class="form-control rounded-pill mb-3" placeholder="ค้นหาเมนู / SKU">
-
-            <div class="row g-2" id="item-grid">
-                @foreach($items as $item)
-                <div class="col-12 col-md-6 item-card-wrap" data-type="{{ $item['type'] }}" data-name="{{ strtolower($item['name']) }}">
-                    <article class="item-card p-3 rounded-4 h-100" style="background:linear-gradient(120deg, {{ $item['color'] }}24, #ffffff); border:1px solid {{ $item['color'] }}44; cursor:pointer;"
-                             data-id="{{ $item['id'] }}"
-                             data-type="{{ $item['type'] }}"
-                             data-name="{{ $item['name'] }}"
-                             data-price="{{ $item['price'] }}"
-                             data-duration="{{ $item['duration'] }}">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <div class="small text-secondary">{{ $item['id'] }}</div>
-                                <div class="fw-semibold">{{ $item['name'] }}</div>
-                            </div>
-                            <span class="badge rounded-pill text-bg-light">{{ $item['type'] === 'service' ? 'บริการ' : 'สินค้า' }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between align-items-end mt-2">
-                            <div class="small text-secondary">
-                                @if($item['duration'])
-                                {{ $item['duration'] }} นาที
-                                @else
-                                Retail
-                                @endif
-                            </div>
-                            <div class="fw-bold text-primary">{{ number_format($item['price']) }} ฿</div>
-                        </div>
-                    </article>
-                </div>
-                @endforeach
-            </div>
-        </section>
+        </div>
     </div>
 
-    <div class="col-12 col-xl-5">
-        <section class="pf-card">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h3 class="pf-section-title mb-0">บิลปัจจุบัน</h3>
-                <span class="pf-badge">Mock</span>
-            </div>
-
-            <div class="row g-2 mb-2">
-                <div class="col-12 col-md-6">
-                    <label class="small fw-semibold text-secondary mb-1">ลูกค้า</label>
-                    <select id="customer-select" class="form-select">
-                        @foreach($customers as $customer)
-                        <option value="{{ $customer['id'] }}" data-points="{{ $customer['points'] }}">
-                            {{ $customer['name'] }} ({{ $customer['phone'] }})
-                        </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="col-12 col-md-6">
-                    <label class="small fw-semibold text-secondary mb-1">หมอนวด</label>
-                    <select id="masseuse-select" class="form-select">
-                        @foreach($staff as $s)
-                        <option value="{{ $s['id'] }}">{{ $s['name'] }} - {{ $s['role'] }}</option>
-                        @endforeach
-                    </select>
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
+            <div class="card-body p-3 overflow-auto" style="max-height: 75vh;">
+                <div class="row g-2" id="item-grid">
+                    @foreach($items as $item)
+                    <div class="col-6 col-md-4 item-card-wrap" data-type="{{ $item['type'] }}" data-name="{{ strtolower($item['name']) }}">
+                        <div class="card h-100 border shadow-none rounded-4 item-card" 
+                             style="cursor: pointer;"
+                             onclick="addToCart('{{ $item['id'] }}', '{{ $item['name'] }}', {{ $item['price'] }}, '{{ $item['type'] }}')">
+                            <div class="card-body p-3">
+                                <span class="badge {{ $item['type'] == 'service' ? 'bg-info-subtle text-info' : 'bg-success-subtle text-success' }} mb-2 rounded-pill">
+                                    {{ $item['type'] == 'service' ? 'Service' : 'Product' }}
+                                </span>
+                                <h6 class="fw-bold mb-1 text-truncate">{{ $item['name'] }}</h6>
+                                <div class="d-flex justify-content-between align-items-end mt-3">
+                                    <small class="text-muted">{{ $item['duration'] ? $item['duration'].' นาที' : 'Retail' }}</small>
+                                    <span class="fw-bold text-primary">{{ number_format($item['price']) }}฿</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div class="table-responsive mb-2">
-                <table class="table align-middle table-sm">
-                    <thead>
-                        <tr>
-                            <th>รายการ</th>
-                            <th class="text-center">จำนวน</th>
-                            <th class="text-end">ราคา</th>
-                            <th class="text-end">รวม</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody id="cart-body">
-                        <tr><td colspan="5" class="text-center text-secondary py-3">ยังไม่มีรายการในบิล</td></tr>
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="row g-2 mb-2">
-                <div class="col-6">
-                    <label class="small fw-semibold text-secondary mb-1">ส่วนลด</label>
-                    <select id="discount-type" class="form-select">
-                        <option value="none">ไม่ใช้ส่วนลด</option>
-                        <option value="percent">เปอร์เซ็นต์ (%)</option>
-                        <option value="fixed">จำนวนเงิน (฿)</option>
-                    </select>
+    <div class="col-12 col-lg-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-body p-3 d-flex flex-column">
+                <h5 class="fw-bold mb-3"><i class="bi bi-receipt me-2"></i> รายการปัจจุบัน</h5>
+                
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted">ลูกค้า (CRM)</label>
+                        <select id="customer-select" class="form-select form-select-sm rounded-3">
+                            @foreach($customers as $customer)
+                            <option value="{{ $customer['id'] }}">{{ $customer['name'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="small fw-bold text-muted">หมอนวด/ผู้ขาย</label>
+                        <select id="staff-select" class="form-select form-select-sm rounded-3">
+                            @foreach($staff as $s)
+                            <option value="{{ $s['id'] }}">{{ $s['name'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
-                <div class="col-6">
-                    <label class="small fw-semibold text-secondary mb-1">มูลค่าส่วนลด</label>
-                    <input type="number" id="discount-value" class="form-control" min="0" value="0">
+
+                <div class="flex-grow-1 overflow-auto border-top border-bottom py-2" style="max-height: 35vh;" id="cart-list">
+                    <div class="text-center text-muted py-5" id="empty-cart-msg">ยังไม่มีรายการในบิล</div>
+                </div>
+
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted">รวมเงิน</span>
+                        <span class="fw-bold" id="subtotal">0.00 ฿</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3 align-items-center">
+                        <span class="text-muted">ส่วนลด</span>
+                        <div class="input-group input-group-sm w-50">
+                            <input type="number" id="discount-input" class="form-control text-end" value="0">
+                            <span class="input-group-text bg-light">฿</span>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-primary-subtle p-3 rounded-4 mb-3 text-primary d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 fw-bold">ยอดสุทธิ</h5>
+                        <h4 class="mb-0 fw-bold" id="grand-total">0.00 ฿</h4>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-4 text-center">
+                            <button class="btn btn-outline-secondary w-100 rounded-3 py-2 active payment-btn" data-pay="cash">
+                                <i class="bi bi-cash d-block fs-4"></i> เงินสด
+                            </button>
+                        </div>
+                        <div class="col-4 text-center">
+                            <button class="btn btn-outline-secondary w-100 rounded-3 py-2 payment-btn" data-pay="transfer">
+                                <i class="bi bi-qr-code-scan d-block fs-4"></i> โอนเงิน
+                            </button>
+                        </div>
+                        <div class="col-4 text-center">
+                            <button class="btn btn-outline-secondary w-100 rounded-3 py-2 payment-btn" data-pay="card">
+                                <i class="bi bi-credit-card d-block fs-4"></i> บัตร
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary w-100 btn-lg rounded-pill mt-3 py-3 fw-bold shadow-sm" onclick="checkout()">
+                        <i class="bi bi-check-circle-fill me-2"></i> ชำระเงิน (Mock)
+                    </button>
                 </div>
             </div>
-
-            <div class="mb-3">
-                <label class="small fw-semibold text-secondary mb-1 d-block">วิธีชำระเงิน</label>
-                <div class="d-flex gap-2 flex-wrap" id="payment-methods">
-                    <button type="button" class="btn btn-outline-primary rounded-pill payment-btn active" data-payment="cash">เงินสด</button>
-                    <button type="button" class="btn btn-outline-primary rounded-pill payment-btn" data-payment="promptpay">โอนเงิน/QR PromptPay</button>
-                    <button type="button" class="btn btn-outline-primary rounded-pill payment-btn" data-payment="card">บัตรเครดิต</button>
-                </div>
-            </div>
-
-            <div class="rounded-4 p-3" style="background:linear-gradient(120deg, rgba(49,184,233,.14), rgba(28,201,182,.14)); border:1px solid rgba(49,184,233,.22);">
-                <div class="d-flex justify-content-between"><span>Subtotal</span><strong id="subtotal">0 ฿</strong></div>
-                <div class="d-flex justify-content-between"><span>Discount</span><strong id="discount-amount">0 ฿</strong></div>
-                <div class="d-flex justify-content-between fs-5 mt-1"><span>ยอดชำระสุทธิ</span><strong id="grand-total" class="text-primary">0 ฿</strong></div>
-                <div class="small text-secondary mt-1">ผูกบิลกับหมอนวด: <span id="bill-masseuse">-</span></div>
-                <button class="btn btn-lg w-100 mt-3 text-white fw-semibold" style="background:linear-gradient(120deg,#31b8e9,#1cc9b6); border:none;">
-                    🔥 ชำระเงิน (Mock)
-                </button>
-            </div>
-        </section>
+        </div>
     </div>
 </div>
 @endsection
 
-@push('head')
-<style>
-    .tab-filter {
-        border: 1px solid rgba(49, 184, 233, 0.25);
-        background: rgba(255, 255, 255, 0.8);
-        color: #2b648c;
-        font-weight: 500;
-    }
-    .tab-filter.active {
-        color: #fff;
-        background: linear-gradient(120deg, #31b8e9, #1cc9b6);
-        border-color: transparent;
-    }
-    .payment-btn.active {
-        color: #fff;
-        border-color: transparent;
-        background: linear-gradient(120deg, #31b8e9, #1cc9b6);
-    }
-    .qty-btn {
-        width: 26px;
-        height: 26px;
-        border: 1px solid rgba(49, 184, 233, 0.4);
-        border-radius: 50%;
-        background: #fff;
-        color: #2f78a4;
-        font-weight: 700;
-    }
-</style>
-@endpush
-
 @push('scripts')
 <script>
-    (() => {
-        const items = @json($items);
-        const cart = new Map();
-        let activeFilter = "all";
-        let paymentMethod = "cash";
+    let cart = [];
 
-        const itemGrid = document.getElementById("item-grid");
-        const itemSearch = document.getElementById("item-search");
-        const cartBody = document.getElementById("cart-body");
-        const discountType = document.getElementById("discount-type");
-        const discountValue = document.getElementById("discount-value");
-        const subtotalEl = document.getElementById("subtotal");
-        const discountEl = document.getElementById("discount-amount");
-        const grandTotalEl = document.getElementById("grand-total");
-        const masseuseSelect = document.getElementById("masseuse-select");
-        const billMasseuse = document.getElementById("bill-masseuse");
-
-        function formatCurrency(value) {
-            return `${Number(value).toLocaleString()} ฿`;
+    function addToCart(id, name, price, type) {
+        const index = cart.findIndex(item => item.id === id);
+        if (index > -1) {
+            cart[index].qty++;
+        } else {
+            cart.push({ id, name, price, type, qty: 1 });
         }
-
-        function getDiscountAmount(subtotal) {
-            const type = discountType.value;
-            const value = Math.max(Number(discountValue.value || 0), 0);
-            if (type === "percent") {
-                return Math.min((subtotal * value) / 100, subtotal);
-            }
-            if (type === "fixed") {
-                return Math.min(value, subtotal);
-            }
-            return 0;
-        }
-
-        function renderCart() {
-            if (cart.size === 0) {
-                cartBody.innerHTML = '<tr><td colspan="5" class="text-center text-secondary py-3">ยังไม่มีรายการในบิล</td></tr>';
-            } else {
-                const rows = [];
-                cart.forEach((line) => {
-                    const lineTotal = line.price * line.qty;
-                    rows.push(`
-                        <tr>
-                            <td>
-                                <div class="fw-semibold">${line.name}</div>
-                                <div class="small text-secondary">${line.type === "service" ? "บริการ" : "สินค้า"}</div>
-                            </td>
-                            <td class="text-center">
-                                <button class="qty-btn" data-action="dec" data-id="${line.id}">-</button>
-                                <span class="mx-2 fw-semibold">${line.qty}</span>
-                                <button class="qty-btn" data-action="inc" data-id="${line.id}">+</button>
-                            </td>
-                            <td class="text-end">${formatCurrency(line.price)}</td>
-                            <td class="text-end fw-semibold">${formatCurrency(lineTotal)}</td>
-                            <td class="text-end"><button class="btn btn-sm btn-link text-danger p-0" data-action="remove" data-id="${line.id}">ลบ</button></td>
-                        </tr>
-                    `);
-                });
-                cartBody.innerHTML = rows.join("");
-            }
-
-            const subtotal = [...cart.values()].reduce((sum, line) => sum + (line.price * line.qty), 0);
-            const discount = getDiscountAmount(subtotal);
-            const total = Math.max(subtotal - discount, 0);
-            subtotalEl.textContent = formatCurrency(subtotal);
-            discountEl.textContent = `- ${formatCurrency(discount)}`;
-            grandTotalEl.textContent = formatCurrency(total);
-            billMasseuse.textContent = masseuseSelect.options[masseuseSelect.selectedIndex]?.text || "-";
-        }
-
-        function upsertItem(itemId) {
-            const found = items.find((i) => i.id === itemId);
-            if (!found) return;
-            const current = cart.get(itemId);
-            if (current) {
-                current.qty += 1;
-                cart.set(itemId, current);
-            } else {
-                cart.set(itemId, {
-                    id: found.id,
-                    type: found.type,
-                    name: found.name,
-                    price: Number(found.price),
-                    qty: 1,
-                });
-            }
-            renderCart();
-        }
-
-        function applyFilter() {
-            const keyword = itemSearch.value.trim().toLowerCase();
-            [...document.querySelectorAll(".item-card-wrap")].forEach((cardWrap) => {
-                const typeOk = activeFilter === "all" || cardWrap.dataset.type === activeFilter;
-                const nameOk = cardWrap.dataset.name.includes(keyword);
-                cardWrap.style.display = typeOk && nameOk ? "" : "none";
-            });
-        }
-
-        itemGrid.addEventListener("click", (e) => {
-            const itemCard = e.target.closest(".item-card");
-            if (itemCard) {
-                upsertItem(itemCard.dataset.id);
-            }
-        });
-
-        cartBody.addEventListener("click", (e) => {
-            const target = e.target;
-            const action = target.dataset.action;
-            const id = target.dataset.id;
-            if (!action || !id || !cart.has(id)) return;
-
-            const line = cart.get(id);
-            if (action === "inc") line.qty += 1;
-            if (action === "dec") line.qty -= 1;
-            if (action === "remove" || line.qty <= 0) {
-                cart.delete(id);
-            } else {
-                cart.set(id, line);
-            }
-            renderCart();
-        });
-
-        [...document.querySelectorAll(".tab-filter")].forEach((btn) => {
-            btn.addEventListener("click", () => {
-                activeFilter = btn.dataset.filter;
-                document.querySelectorAll(".tab-filter").forEach((x) => x.classList.remove("active"));
-                btn.classList.add("active");
-                applyFilter();
-            });
-        });
-
-        itemSearch.addEventListener("input", applyFilter);
-        discountType.addEventListener("change", renderCart);
-        discountValue.addEventListener("input", renderCart);
-        masseuseSelect.addEventListener("change", renderCart);
-
-        [...document.querySelectorAll(".payment-btn")].forEach((btn) => {
-            btn.addEventListener("click", () => {
-                paymentMethod = btn.dataset.payment;
-                document.querySelectorAll(".payment-btn").forEach((x) => x.classList.remove("active"));
-                btn.classList.add("active");
-                btn.closest("#payment-methods").dataset.selectedPayment = paymentMethod;
-            });
-        });
-
-        applyFilter();
         renderCart();
-    })();
+    }
+
+    function remove(id) {
+        cart = cart.filter(item => item.id !== id);
+        renderCart();
+    }
+
+    function updateQty(id, delta) {
+        const item = cart.find(i => i.id === id);
+        if (item) {
+            item.qty += delta;
+            if (item.qty <= 0) remove(id);
+            else renderCart();
+        }
+    }
+
+    function renderCart() {
+        const cartList = document.getElementById('cart-list');
+        const emptyMsg = document.getElementById('empty-cart-msg');
+        
+        if (cart.length === 0) {
+            cartList.innerHTML = '<div class="text-center text-muted py-5" id="empty-cart-msg">ยังไม่มีรายการในบิล</div>';
+            calculate();
+            return;
+        }
+
+        cartList.innerHTML = cart.map(item => `
+            <div class="d-flex justify-content-between align-items-center mb-3 p-2 bg-light rounded-3">
+                <div class="flex-grow-1">
+                    <div class="fw-bold small">${item.name}</div>
+                    <small class="text-muted">${item.price.toLocaleString()} ฿</small>
+                </div>
+                <div class="d-flex align-items-center me-2">
+                    <button class="btn btn-sm btn-white border rounded-circle p-0" style="width:24px;height:24px" onclick="updateQty('${item.id}', -1)">-</button>
+                    <span class="mx-2 fw-bold">${item.qty}</span>
+                    <button class="btn btn-sm btn-white border rounded-circle p-0" style="width:24px;height:24px" onclick="updateQty('${item.id}', 1)">+</button>
+                </div>
+                <div class="fw-bold text-end" style="min-width: 60px;">${(item.price * item.qty).toLocaleString()}</div>
+                <button class="btn btn-sm text-danger ms-2" onclick="remove('${item.id}')"><i class="bi bi-trash"></i></button>
+            </div>
+        `).join('');
+        calculate();
+    }
+
+    function calculate() {
+        const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+        const discount = parseFloat(document.getElementById('discount-input').value) || 0;
+        const total = Math.max(0, subtotal - discount);
+
+        document.getElementById('subtotal').innerText = subtotal.toLocaleString() + ' ฿';
+        document.getElementById('grand-total').innerText = total.toLocaleString() + ' ฿';
+    }
+
+    // ฟิลเตอร์หมวดหมู่
+    document.querySelectorAll('.tab-filter').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-filter').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const filter = btn.dataset.filter;
+            document.querySelectorAll('.item-card-wrap').forEach(item => {
+                item.style.display = (filter === 'all' || item.dataset.type === filter) ? 'block' : 'none';
+            });
+        });
+    });
+
+    // ค้นหา
+    document.getElementById('item-search').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        document.querySelectorAll('.item-card-wrap').forEach(item => {
+            const name = item.dataset.name;
+            item.style.display = name.includes(term) ? 'block' : 'none';
+        });
+    });
+
+    // ปุ่มเลือกวิธีชำระเงิน
+    document.querySelectorAll('.payment-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active', 'btn-primary'));
+            btn.classList.add('active', 'btn-primary');
+            btn.classList.remove('btn-outline-secondary');
+        });
+    });
+
+    document.getElementById('discount-input').addEventListener('input', calculate);
+
+    function checkout() {
+        if (cart.length === 0) return alert('กรุณาเลือกรายการสินค้า');
+        alert('บันทึกรายการสำเร็จ (จำลองการทำงาน)');
+        cart = [];
+        renderCart();
+    }
 </script>
 @endpush
