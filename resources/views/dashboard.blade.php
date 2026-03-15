@@ -125,8 +125,8 @@
             datasets: [{
                 label: 'ยอดขาย (บาท)',
                 data: [12000, 15000, 11000, 18000, 22000, 25000, 28000],
-                borderColor: '#0d6efd',
-                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                borderColor: '#1f73e0',
+                backgroundColor: 'rgba(31, 115, 224, 0.2)',
                 fill: true,
                 tension: 0.4
             }]

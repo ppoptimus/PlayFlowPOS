@@ -58,10 +58,10 @@
         transition: transform 0.2s, box-shadow 0.2s;
     }
     .booking-card:hover { transform: scale(1.02); box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    .state-waiting { background: #e3f2fd; border-color: #90caf9; color: #1976d2; }
-    .state-in_service { background: #e8f5e9; border-color: #a5d6a7; color: #2e7d32; }
-    .state-completed { background: #f5f5f5; border-color: #bdbdbd; color: #616161; opacity: 0.7; }
-    .state-cancelled { background: #ffebee; border-color: #ef9a9a; color: #c62828; text-decoration: line-through; }
+    .state-waiting { background: #e3f8fd; border-color: #a7e7f4; color: #1f8eaa; }
+    .state-in_service { background: #e0f9f2; border-color: #9fe6d6; color: #148f7b; }
+    .state-completed { background: #edf5f9; border-color: #c8dbe5; color: #5e7a89; opacity: 0.7; }
+    .state-cancelled { background: #fff0f0; border-color: #f5b4b4; color: #c84b4b; text-decoration: line-through; }
 </style>
 @endpush
 

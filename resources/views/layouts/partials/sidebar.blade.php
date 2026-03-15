@@ -30,5 +30,5 @@
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">ตั้งค่าระบบ</small>
     <a href="{{ route('branches') }}" class="nav-link link-dark"><i class="bi bi-building-fill me-2"></i> จัดการสาขา</a>
-    <a href="{{ route('users') }}" class="nav-link link-dark"><i class="bi bi-shield-lock-fill me-2"></i> ผู้ใช้งาน</a>
+    <a href="{{ route('users') }}" class="nav-link link-dark"><i class="bi bi-shield-lock-fill me-2"></i> จัดการผู้ใช้งาน</a>
 </div>

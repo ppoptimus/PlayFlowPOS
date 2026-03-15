@@ -10,11 +10,11 @@
     <div class="col-12 col-md-6 col-xl-4">
         <section class="pf-card h-100">
             <div class="d-flex align-items-center gap-2 mb-2">
-                <img src="{{ $s['avatar'] }}" alt="{{ $s['name'] }}" width="56" height="56" class="rounded-circle" style="object-fit:cover; border:2px solid rgba(49,184,233,.35);">
+                <img src="{{ $s['avatar'] }}" alt="{{ $s['name'] }}" width="56" height="56" class="rounded-circle" style="object-fit:cover; border:2px solid rgba(45,187,217,.35);">
                 <div>
                     <h3 class="pf-section-title mb-0">{{ $s['name'] }}</h3>
                     <div class="small text-secondary">{{ $s['id'] }} • {{ $s['role'] }}</div>
-                    <div class="small fw-semibold" style="color:#1e9ec4;">{{ $s['status'] }}</div>
+                    <div class="small fw-semibold" style="color:#1f8eaa;">{{ $s['status'] }}</div>
                 </div>
             </div>
 
@@ -25,7 +25,7 @@
             </div>
             <div class="d-flex justify-content-between py-1">
                 <span>คอมมิชชั่น (Mock)</span>
-                <strong style="color:#13a897;">{{ number_format($s['commission']) }} ฿</strong>
+                <strong style="color:#148f7b;">{{ number_format($s['commission']) }} ฿</strong>
             </div>
             <div class="d-flex justify-content-between py-1">
                 <span>คิวที่ได้รับ</span>
@@ -73,7 +73,7 @@
                             @php
                                 $load = min(100, count($s['queue']) * 30);
                             @endphp
-                            <div class="progress-bar" style="width: {{ $load }}%; background:linear-gradient(120deg,#31b8e9,#1cc9b6);"></div>
+                            <div class="progress-bar" style="width: {{ $load }}%; background:linear-gradient(120deg,#2d8ff0,#14b89a);"></div>
                         </div>
                     </td>
                 </tr>
