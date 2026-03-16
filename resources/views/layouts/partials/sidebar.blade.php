@@ -21,6 +21,9 @@
     <a href="{{ route('pos') }}" class="nav-link {{ request()->routeIs('pos') ? 'active' : 'link-dark' }}">
         <i class="bi bi-cart-fill me-2"></i> POS คิดเงิน
     </a>
+    <a href="{{ route('receipts') }}" class="nav-link {{ request()->routeIs('receipts*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-receipt-cutoff me-2"></i> ใบเสร็จ
+    </a>
     <a href="{{ route('booking') }}" class="nav-link {{ request()->routeIs('booking') ? 'active' : 'link-dark' }}">
         <i class="bi bi-calendar-event-fill me-2"></i> ตารางคิว/จอง
     </a>

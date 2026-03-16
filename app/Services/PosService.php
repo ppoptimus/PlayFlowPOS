@@ -22,6 +22,7 @@ class PosService
         $branchId = $this->resolveAuthorizedBranchId($user, $requestedBranchId);
 
         return [
+            'activeBranchId' => $branchId,
             'items' => $this->getPosItems(),
             'serviceItems' => $this->getServiceItems(),
             'staff' => $this->getStaff($branchId),

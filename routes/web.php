@@ -20,6 +20,8 @@ Route::middleware('auth')->group(function (): void {
 
     Route::get('/pos', 'PosController@index')->name('pos');
     Route::post('/pos/checkout', 'PosController@checkout')->name('pos.checkout');
+    Route::get('/receipts', 'ReceiptController@index')->name('receipts');
+    Route::get('/receipts/{orderId}', 'ReceiptController@show')->name('receipts.show');
     Route::get('/booking', 'BookingController@index')->name('booking');
     Route::get('/booking/data', 'BookingController@data')->name('booking.data');
     Route::post('/booking', 'BookingController@store')->name('booking.store');
@@ -28,7 +30,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/staff', 'StaffController@index')->name('staff');
 
     $modules = [
-        'receipts', 'customers', 'membership', 'packages',
+        'customers', 'membership', 'packages',
         'masseuse', 'commissions', 'products', 'promotions',
         'reports', 'financial', 'branches', 'users',
     ];

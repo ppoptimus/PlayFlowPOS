@@ -37,6 +37,12 @@
             'subtitle' => 'แก้ไขข้อมูลลูกค้า',
         ],
         [
+            'route' => 'receipts',
+            'icon' => 'bi-receipt-cutoff',
+            'title' => 'ใบเสร็จ',
+            'subtitle' => 'ตรวจสอบย้อนหลังและพิมพ์บิล',
+        ],
+        [
             'route' => 'users',
             'icon' => 'bi-shield-check',
             'title' => 'สิทธิ์เข้าใช้',
