@@ -38,8 +38,9 @@
             <div class="card-body p-4">
                 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
                     <h4 class="fw-bold mb-0 section-title">รายงานยอดขาย</h4>
-                    <div class="btn-group" role="group" aria-label="ช่วงเวลารายงานยอดขาย">
-                        <button type="button" class="btn report-range-btn active">เมื่อวาน</button>
+                    <div class="btn-group report-range-group" role="group" aria-label="ช่วงเวลารายงานยอดขาย">
+                        <button type="button" class="btn report-range-btn active">วันนี้</button>
+                        <button type="button" class="btn report-range-btn">เมื่อวาน</button>
                         <button type="button" class="btn report-range-btn">7 วันย้อนหลัง</button>
                     </div>
                 </div>
@@ -135,16 +136,37 @@
         line-height: 1.1;
         word-break: break-word;
     }
-    .report-range-btn {
-        border-color: #8db6d8;
-        color: #174973;
-        background: #ffffff;
+    .report-range-group {
+        background: linear-gradient(145deg, #f7fbff 0%, #edf4fb 58%, #e9f2f9 100%);
+        border: 1px solid rgba(24, 76, 132, 0.16);
+        border-radius: 999px;
+        padding: 0.3rem;
+        box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), 0 6px 14px rgba(20, 74, 126, 0.08);
     }
-    .report-range-btn.active,
+    .report-range-btn {
+        border: 1px solid transparent;
+        color: #2b4f73;
+        background: transparent;
+        border-radius: 999px !important;
+        font-weight: 700;
+        padding: 0.42rem 1.05rem;
+        transition: all 0.2s ease;
+    }
     .report-range-btn:hover {
-        background: linear-gradient(135deg, #1e6fbf, #1aa38f);
+        color: #1c4168;
+        border-color: rgba(27, 93, 157, 0.3);
+        background: rgba(26, 92, 156, 0.08);
+        transform: translateY(-1px);
+    }
+    .report-range-btn.active {
+        background: linear-gradient(135deg, #1a4f87 0%, #2676bf 52%, #129982 100%);
         color: #ffffff;
-        border-color: #1e6fbf;
+        border-color: rgba(19, 69, 115, 0.8);
+        box-shadow: 0 8px 18px rgba(16, 62, 107, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    }
+    .report-range-btn:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 0.22rem rgba(35, 120, 193, 0.25);
     }
     .report-row {
         display: flex;
@@ -197,6 +219,21 @@
             plugins: { legend: { display: false } },
             scales: { y: { beginAtZero: true } }
         }
+    });
+</script>
+<script>
+    const reportRangeButtons = document.querySelectorAll('.report-range-btn');
+    reportRangeButtons.forEach((button) => {
+        button.setAttribute('aria-pressed', button.classList.contains('active') ? 'true' : 'false');
+        button.addEventListener('click', () => {
+            reportRangeButtons.forEach((btn) => {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-pressed', 'false');
+            });
+
+            button.classList.add('active');
+            button.setAttribute('aria-pressed', 'true');
+        });
     });
 </script>
 @endpush
