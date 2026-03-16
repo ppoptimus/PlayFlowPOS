@@ -1,0 +1,1188 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ตารางคิวนวด - PlayFlow</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="http://127.0.0.1:8001/img/icon.png">
+    <style>
+        :root {
+            --bs-primary: #1f73e0;
+            --bs-primary-rgb: 31, 115, 224;
+            --bs-primary-text-emphasis: #154f9b;
+            --bs-primary-bg-subtle: #dfeafe;
+            --bs-primary-border-subtle: #b4cef9;
+
+            --bs-info: #2d8ff0;
+            --bs-info-rgb: 45, 143, 240;
+            --bs-info-text-emphasis: #1b63ad;
+            --bs-info-bg-subtle: #e5f1ff;
+            --bs-info-border-subtle: #b7d9ff;
+
+            --bs-success: #14b89a;
+            --bs-success-rgb: 20, 184, 154;
+            --bs-success-text-emphasis: #0f8a74;
+            --bs-success-bg-subtle: #dcf7f2;
+            --bs-success-border-subtle: #a5eadc;
+
+            --bs-link-color: #1f73e0;
+            --bs-link-hover-color: #165bb3;
+            --bs-body-bg: #eef8fb;
+            --bs-body-color: #25405c;
+        }
+        body { font-family: 'Prompt', sans-serif; background: radial-gradient(circle at top right, #d4edf9 0%, #e4f1f8 45%, #edf5fa 100%); color: #25405c; }
+        .sidebar-desktop { width: 280px; height: 100vh; position: sticky; top: 0; z-index: 1000; overflow-y: auto; }
+        .main-content { flex: 1; min-height: 100vh; background: transparent; }
+        .card { border: none; border-radius: 1rem; box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
+        .nav-link { border-radius: 0.5rem; margin-bottom: 0.2rem; transition: all 0.2s; }
+        .nav-link:hover { background-color: rgba(31, 115, 224, 0.1); }
+        .nav-link.active { background: linear-gradient(135deg, #2d8ff0, #14b89a) !important; color: white !important; }
+        .bg-primary { background: linear-gradient(135deg, #2d8ff0, #14b89a) !important; }
+        .btn-primary { background: linear-gradient(135deg, #2d8ff0, #14b89a); border-color: #1f73e0; }
+        .btn-primary:hover { background: linear-gradient(135deg, #246fd0, #109079); border-color: #246fd0; }
+        .table-light { --bs-table-bg: #edf5ff; --bs-table-color: #265e9a; }
+        .sidebar-desktop.bg-white {
+            background: linear-gradient(180deg, #edf4fa 0%, #e8f1f8 58%, #e9f2f9 100%) !important;
+            border-right-color: rgba(31, 115, 224, 0.14) !important;
+        }
+        .sidebar-desktop.shadow-sm { box-shadow: 2px 0 14px rgba(18, 76, 148, 0.08) !important; }
+        .sidebar-desktop .link-dark { color: #2e3f55 !important; }
+        .sidebar-desktop .link-dark:hover { background-color: rgba(31, 115, 224, 0.08); }
+        .sidebar-desktop .text-muted { color: #5c728a !important; }
+        .fixed-bottom.bg-white { background-color: #f8fbfe !important; }
+        .mobile-bottom-nav {
+            z-index: 1090;
+            box-shadow: 0 -8px 20px rgba(16, 67, 124, 0.12);
+            padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
+        }
+        .navbar.sticky-top {
+            background: linear-gradient(120deg, #1f73e0, #14b89a) !important;
+            border-bottom-color: rgba(255, 255, 255, 0.22) !important;
+            box-shadow: 0 6px 20px rgba(22, 95, 178, 0.2);
+        }
+        .navbar.sticky-top h5,
+        .navbar.sticky-top small,
+        .navbar.sticky-top .text-dark,
+        .navbar.sticky-top .text-muted,
+        .navbar.sticky-top .link-dark,
+        .navbar.sticky-top .dropdown-toggle,
+        .navbar.sticky-top .bi { color: #ffffff !important; }
+        .navbar.sticky-top .dropdown-toggle {
+            background-color: rgba(255, 255, 255, 0.16) !important;
+            border: 1px solid rgba(255, 255, 255, 0.26);
+        }
+        .navbar.sticky-top .dropdown-toggle:hover { background-color: rgba(255, 255, 255, 0.24) !important; }
+        .navbar.sticky-top img.border-primary { border-color: rgba(255, 255, 255, 0.82) !important; }
+        .navbar.sticky-top .mobile-menu-btn {
+            background: linear-gradient(135deg, rgba(23, 120, 214, 0.95), rgba(22, 184, 156, 0.95));
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            box-shadow: 0 8px 18px rgba(14, 82, 153, 0.28);
+            color: #ffffff !important;
+        }
+        .navbar.sticky-top .mobile-menu-btn:hover,
+        .navbar.sticky-top .mobile-menu-btn:focus-visible {
+            background: linear-gradient(135deg, rgba(19, 102, 184, 1), rgba(18, 158, 134, 1));
+            border-color: rgba(255, 255, 255, 0.65);
+            color: #ffffff !important;
+        }
+        .mobile-sidebar-offcanvas .offcanvas-header {
+            background: linear-gradient(120deg, #1f73e0, #14b89a);
+            color: #ffffff;
+        }
+        .mobile-sidebar-offcanvas .offcanvas-title { color: #ffffff; }
+        .mobile-sidebar-offcanvas .btn-close { filter: brightness(0) invert(1); }
+        .mobile-sidebar-offcanvas {
+            width: min(90vw, 360px);
+        }
+        .mobile-sidebar-offcanvas .offcanvas-body {
+            background: linear-gradient(180deg, #f7fbff 0%, #eff8fc 52%, #eefaf6 100%);
+        }
+        .mobile-menu-heading {
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #3a6d9d;
+        }
+        .mobile-menu-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border: 1px solid rgba(29, 111, 178, 0.15);
+            border-radius: 0.9rem;
+            padding: 0.78rem 0.85rem;
+            text-decoration: none;
+            background-color: #ffffff;
+            color: #1d4f7f;
+            box-shadow: 0 6px 16px rgba(14, 68, 126, 0.06);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        }
+        .mobile-menu-link:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(14, 68, 126, 0.1);
+            border-color: rgba(22, 137, 137, 0.35);
+            color: #1d4f7f;
+        }
+        .mobile-menu-link.active {
+            background: linear-gradient(135deg, #1f73e0, #14b89a);
+            color: #ffffff;
+            border-color: rgba(16, 113, 150, 0.9);
+        }
+        .mobile-menu-icon {
+            width: 2rem;
+            height: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.65rem;
+            background: rgba(31, 115, 224, 0.12);
+            color: #1b65bb;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .mobile-menu-link.active .mobile-menu-icon {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+        .mobile-menu-content {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .mobile-menu-title {
+            font-size: 0.98rem;
+            font-weight: 700;
+            line-height: 1.15;
+            word-break: break-word;
+        }
+        .mobile-menu-subtitle {
+            font-size: 0.74rem;
+            opacity: 0.85;
+            margin-top: 0.15rem;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+        .mobile-menu-arrow {
+            margin-left: auto;
+            opacity: 0.72;
+            flex-shrink: 0;
+        }
+        .mobile-menu-link.active .mobile-menu-arrow { opacity: 1; }
+        .form-control:focus, .form-select:focus { border-color: rgba(31, 115, 224, 0.5); box-shadow: 0 0 0 0.25rem rgba(31, 115, 224, 0.16); }
+        @media (max-width: 991.98px) {
+            .sidebar-desktop { display: none; }
+            .mobile-bottom-nav {
+                display: flex !important;
+                position: fixed !important;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+        }
+    </style>
+    <style>
+    .queue-board {
+        --staff-col-width: 190px;
+        --slot-width: 118px;
+        min-width: calc(var(--staff-col-width) + (var(--slot-count) * var(--slot-width)));
+    }
+    .queue-grid-row {
+        display: grid;
+        grid-template-columns: var(--staff-col-width) repeat(var(--slot-count), minmax(var(--slot-width), 1fr));
+        position: relative;
+    }
+    .queue-cell {
+        border-top: 1px solid #e5edf5;
+    }
+    .queue-head-row .queue-cell {
+        height: 62px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f4f8fc;
+        border-top: 0;
+        border-bottom: 1px solid #d9e6f2;
+        font-weight: 700;
+        color: #27496d;
+    }
+    .queue-staff-head,
+    .queue-staff-cell {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        border-right: 1px solid #dce7f2;
+        background: #f8fbff;
+    }
+    .queue-staff-head {
+        z-index: 6;
+        justify-content: flex-start;
+        padding-left: 1rem;
+    }
+    .queue-time-head {
+        border-left: 1px solid #e5edf5;
+        font-size: 0.86rem;
+    }
+    .queue-data-row .queue-cell {
+        min-height: 94px;
+    }
+    .queue-staff-cell {
+        padding: 0.9rem 0.85rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 0.2rem;
+    }
+    .queue-slot-cell {
+        border-left: 1px solid #edf2f7;
+        cursor: crosshair;
+        background: linear-gradient(180deg, #ffffff 0%, #fcfeff 100%);
+        transition: background-color 0.15s;
+    }
+    .queue-slot-cell:hover {
+        background: #edf7ff;
+    }
+    .booking-row-layer {
+        position: absolute;
+        left: var(--staff-col-width);
+        right: 0;
+        top: 0;
+        bottom: 0;
+        pointer-events: auto;
+        z-index: 10;
+    }
+    .booking-card {
+        position: absolute;
+        top: 8px;
+        height: calc(100% - 16px);
+        border-radius: 12px;
+        border: 1px solid;
+        padding: 0.42rem 0.58rem;
+        cursor: pointer;
+        pointer-events: auto;
+        z-index: 50;
+        overflow: hidden;
+        transition: transform 0.2s, box-shadow 0.2s;
+        min-width: 84px;
+    }
+    .booking-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(15, 66, 120, 0.16);
+    }
+    .booking-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.68rem;
+        margin-bottom: 0.18rem;
+    }
+    .booking-time {
+        font-weight: 700;
+        opacity: 0.9;
+    }
+    .booking-paid,
+    .booking-unpaid {
+        border-radius: 999px;
+        padding: 0.06rem 0.42rem;
+        font-size: 0.62rem;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .booking-paid {
+        background: rgba(20, 184, 154, 0.18);
+        color: #0f8b73;
+    }
+    .booking-unpaid {
+        background: rgba(31, 115, 224, 0.15);
+        color: #1a5ea8;
+    }
+    .booking-customer {
+        font-weight: 700;
+        font-size: 0.84rem;
+        line-height: 1.1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .booking-service {
+        opacity: 0.86;
+        font-size: 0.72rem;
+        line-height: 1.18;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .state-waiting {
+        background: #e6f5ff;
+        border-color: #9fd5f5;
+        color: #245f98;
+    }
+    .state-in_service {
+        background: #e3f9f2;
+        border-color: #98e3d1;
+        color: #117a67;
+    }
+    .state-completed {
+        background: #eef4f8;
+        border-color: #cbdae4;
+        color: #4e7186;
+    }
+    .state-cancelled {
+        background: #fff1f1;
+        border-color: #f4b7b7;
+        color: #c34a4a;
+    }
+    .selected-service-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        border-radius: 999px;
+        padding: 0.22rem 0.52rem;
+        background-color: #ffffff;
+        border: 1px solid #b6d5ef;
+        color: #275f98;
+        font-size: 0.78rem;
+        font-weight: 600;
+    }
+    .selected-service-chip button {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        padding: 0;
+        line-height: 1;
+    }
+    @media (max-width: 991.98px) {
+        .booking-mobile-safe {
+            padding-bottom: 5.4rem;
+        }
+        .mobile-bottom-nav {
+            display: flex !important;
+            position: fixed !important;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1099 !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+        }
+        .queue-toolbar {
+            align-items: flex-start !important;
+        }
+        .queue-toolbar .badge {
+            white-space: normal;
+            text-align: left;
+        }
+        .queue-board {
+            --staff-col-width: 155px;
+            --slot-width: 105px;
+        }
+        .queue-data-row .queue-cell {
+            min-height: 84px;
+        }
+        .booking-card {
+            top: 6px;
+            height: calc(100% - 12px);
+            padding: 0.36rem 0.48rem;
+        }
+    }
+</style>
+</head>
+<body>
+    <div class="d-flex">
+        <aside class="sidebar-desktop bg-white border-end p-3 shadow-sm">
+            <style>
+    .pf-sidebar .nav-link.link-dark { color: #2e3f55 !important; }
+    .pf-sidebar .nav-link.link-dark:hover {
+        color: #1f73e0 !important;
+        background-color: rgba(31, 115, 224, 0.08) !important;
+    }
+    .pf-sidebar .text-muted { color: #5c728a !important; }
+</style>
+
+<div class="pf-sidebar">
+<div class="mb-4 px-2">
+    <h4 class="fw-bold text-primary mb-0"><i class="bi bi-flower1"></i> PlayFlow</h4>
+    <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">Spa Management System</small>
+</div>
+
+<div class="nav flex-column nav-pills">
+    <small class="text-muted fw-bold mb-2 px-2" style="font-size: 0.75rem;">งานหลัก</small>
+    <a href="http://127.0.0.1:8001" class="nav-link link-dark">
+        <i class="bi bi-speedometer2 me-2"></i> Dashboard
+    </a>
+    <a href="http://127.0.0.1:8001/pos" class="nav-link link-dark">
+        <i class="bi bi-cart-fill me-2"></i> POS คิดเงิน
+    </a>
+    <a href="http://127.0.0.1:8001/booking" class="nav-link active">
+        <i class="bi bi-calendar-event-fill me-2"></i> ตารางคิว/จอง
+    </a>
+
+    <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บริหารจัดการ</small>
+    <a href="http://127.0.0.1:8001/customers" class="nav-link link-dark"><i class="bi bi-people-fill me-2"></i> ลูกค้า (CRM)</a>
+    <a href="http://127.0.0.1:8001/staff" class="nav-link link-dark">
+        <i class="bi bi-person-badge-fill me-2"></i> พนักงาน
+    </a>
+    <a href="http://127.0.0.1:8001/products" class="nav-link link-dark"><i class="bi bi-box-seam-fill me-2"></i> สินค้า & สต็อก</a>
+    <a href="http://127.0.0.1:8001/membership" class="nav-link link-dark"><i class="bi bi-card-checklist me-2"></i> สมาชิก & แพ็กเกจ</a>
+
+    <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บัญชี & รายงาน</small>
+    <a href="http://127.0.0.1:8001/reports" class="nav-link link-dark"><i class="bi bi-bar-chart-line-fill me-2"></i> รายงานวิเคราะห์</a>
+    <a href="http://127.0.0.1:8001/financial" class="nav-link link-dark"><i class="bi bi-wallet2 me-2"></i> การเงิน/P&L</a>
+    <a href="http://127.0.0.1:8001/commissions" class="nav-link link-dark"><i class="bi bi-cash-stack me-2"></i> ค่าคอมมิชชัน</a>
+
+    <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">ตั้งค่าระบบ</small>
+    <a href="http://127.0.0.1:8001/branches" class="nav-link link-dark"><i class="bi bi-building-fill me-2"></i> จัดการสาขา</a>
+    <a href="http://127.0.0.1:8001/users" class="nav-link link-dark"><i class="bi bi-shield-lock-fill me-2"></i> จัดการผู้ใช้งาน</a>
+</div>
+
+</div>
+        </aside>
+
+        <div class="main-content d-flex flex-column">
+            <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top py-2">
+    <div class="container-fluid">
+        <div class="d-flex align-items-center">
+            <button class="btn mobile-menu-btn d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="เปิดเมนูหลัก">
+                <i class="bi bi-list fs-4"></i>
+            </button>
+            <div>
+                <h5 class="mb-0 fw-bold text-dark">ตารางคิวนวด (Interactive)</h5>
+                <small class="text-muted">Branch: Sukhumvit</small>
+            </div>
+        </div>
+
+        <div class="ms-auto d-flex align-items-center">
+            <div class="dropdown">
+                <a href="#" class="d-flex align-items-center link-dark text-decoration-none dropdown-toggle bg-light p-2 rounded-pill px-3" id="userDropdown" data-bs-toggle="dropdown">
+                    <img src="https://i.pravatar.cc/100?u=manager" alt="user" width="32" height="32" class="rounded-circle me-2 border border-primary">
+                    <span class="d-none d-md-inline small fw-bold">Manager Sukhumvit</span>
+                </a>
+                <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
+                    <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i>โปรไฟล์</a></li>
+                    <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i>ตั้งค่า</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item text-danger" href="#"><i class="bi bi-box-arrow-right me-2"></i>ออกจากระบบ</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</nav>
+
+            <main class="container-fluid p-4 mb-5">
+                
+<div class="booking-page booking-mobile-safe">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+            <div class="queue-toolbar d-flex justify-content-between align-items-center mb-4 gap-3">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <input type="date" id="queue-date" class="form-control rounded-pill px-3 shadow-none border-secondary-subtle" value="2026-03-16">
+                    <button class="btn btn-primary rounded-pill px-4" onclick="openModal()"><i class="bi bi-plus-lg me-2"></i> เพิ่มคิว</button>
+                </div>
+                <span class="badge text-bg-light border rounded-pill px-3 py-2 fw-semibold">
+                    <i class="bi bi-info-circle me-1"></i> กดแทบคิวเพื่อแก้บริการ/เวลา/หมอ และชำระเงิน
+                </span>
+            </div>
+
+            <div class="table-responsive rounded-4 border overflow-hidden queue-board-wrap">
+                <div id="queue-board" class="queue-board bg-white" style="--slot-count: 11;">
+                    <div class="queue-grid-row queue-head-row">
+                        <div class="queue-cell queue-staff-head">หมอนวด</div>
+                                                <div class="queue-cell queue-time-head">10:00</div>
+                                                <div class="queue-cell queue-time-head">11:00</div>
+                                                <div class="queue-cell queue-time-head">12:00</div>
+                                                <div class="queue-cell queue-time-head">13:00</div>
+                                                <div class="queue-cell queue-time-head">14:00</div>
+                                                <div class="queue-cell queue-time-head">15:00</div>
+                                                <div class="queue-cell queue-time-head">16:00</div>
+                                                <div class="queue-cell queue-time-head">17:00</div>
+                                                <div class="queue-cell queue-time-head">18:00</div>
+                                                <div class="queue-cell queue-time-head">19:00</div>
+                                                <div class="queue-cell queue-time-head">20:00</div>
+                                            </div>
+
+                                        <div class="queue-grid-row queue-data-row" data-staff-id="MS001">
+                        <div class="queue-cell queue-staff-cell">
+                            <div class="fw-bold">ฟ้า</div>
+                            <div class="text-muted small">Therapist (Senior)</div>
+                        </div>
+                                                <div class="queue-cell queue-slot-cell" data-time="10:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="11:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="12:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="13:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="14:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="15:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="16:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="17:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="18:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="19:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="20:00"></div>
+                                                <div class="booking-row-layer" id="layer-MS001" data-staff-id="MS001"></div>
+                    </div>
+                                        <div class="queue-grid-row queue-data-row" data-staff-id="MS002">
+                        <div class="queue-cell queue-staff-cell">
+                            <div class="fw-bold">ปราง</div>
+                            <div class="text-muted small">Therapist (Junior)</div>
+                        </div>
+                                                <div class="queue-cell queue-slot-cell" data-time="10:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="11:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="12:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="13:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="14:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="15:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="16:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="17:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="18:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="19:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="20:00"></div>
+                                                <div class="booking-row-layer" id="layer-MS002" data-staff-id="MS002"></div>
+                    </div>
+                                        <div class="queue-grid-row queue-data-row" data-staff-id="MS003">
+                        <div class="queue-cell queue-staff-cell">
+                            <div class="fw-bold">แก้ว</div>
+                            <div class="text-muted small">Therapist</div>
+                        </div>
+                                                <div class="queue-cell queue-slot-cell" data-time="10:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="11:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="12:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="13:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="14:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="15:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="16:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="17:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="18:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="19:00"></div>
+                                                <div class="queue-cell queue-slot-cell" data-time="20:00"></div>
+                                                <div class="booking-row-layer" id="layer-MS003" data-staff-id="MS003"></div>
+                    </div>
+                                    </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="bookingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow">
+            <div class="modal-header border-0 pb-0">
+                <div>
+                    <h5 class="fw-bold mb-1" id="booking-modal-title">
+                        <i class="bi bi-journal-plus me-2 text-primary"></i>เพิ่มรายการจองใหม่
+                    </h5>
+                    <span class="badge rounded-pill text-bg-light border" id="booking-modal-subtitle">กำหนดรายละเอียดคิวก่อนบันทึก</span>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body pt-3">
+                <form id="booking-form" class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">ลูกค้า</label>
+                        <select class="form-select rounded-3 shadow-none" id="customer-select" required>
+                                                        <option value="CUS-WALKIN">Walk-in (-)</option>
+                                                        <option value="CUS001">คุณสมชาย ใจดี (089-111-1111)</option>
+                                                        <option value="CUS002">คุณวิภาวรรณ (081-222-2222)</option>
+                                                        <option value="CUS003">คุณธนา (095-333-3333)</option>
+                                                    </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">หมอนวด</label>
+                        <select class="form-select rounded-3 shadow-none" id="staff-select" required>
+                                                        <option value="MS001">ฟ้า</option>
+                                                        <option value="MS002">ปราง</option>
+                                                        <option value="MS003">แก้ว</option>
+                                                    </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">เวลาเริ่ม</label>
+                        <input type="time" class="form-control rounded-3 shadow-none" id="start-time" value="10:00" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-bold">เวลาสิ้นสุด</label>
+                        <input type="time" class="form-control rounded-3 shadow-none" id="end-time" value="11:00" required>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">สถานะคิว</label>
+                        <select class="form-select rounded-3 shadow-none" id="status-select">
+                                                        <option value="waiting">รอรับบริการ</option>
+                                                        <option value="in_service">กำลังนวด</option>
+                                                        <option value="completed">เสร็จสิ้น</option>
+                                                        <option value="cancelled">ยกเลิก</option>
+                                                    </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">เพิ่มบริการ</label>
+                        <div class="input-group">
+                            <select class="form-select rounded-start-3 shadow-none" id="service-select">
+                                                                <option value="SVC001">นวดแผนไทย (Thai) (60 นาที)</option>
+                                                                <option value="SVC002">นวดน้ำมันอโรมา (60 นาที)</option>
+                                                                <option value="SVC003">สครับผิว (Scrub) (90 นาที)</option>
+                                                                <option value="SVC004">นวดศีรษะ บ่า ไหล่ (30 นาที)</option>
+                                                                <option value="SVC005">นวดฝ่าเท้า (Foot) (45 นาที)</option>
+                                                            </select>
+                            <button type="button" class="btn btn-outline-primary" id="add-service-btn">
+                                <i class="bi bi-plus-lg"></i> เพิ่ม
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small fw-bold">รายการบริการที่เลือก</label>
+                        <div id="selected-services" class="d-flex flex-wrap gap-2 p-2 border rounded-3 bg-light-subtle"></div>
+                    </div>
+                    <div class="col-12">
+                        <div class="d-flex justify-content-between align-items-center rounded-3 border px-3 py-2 bg-light-subtle">
+                            <div>
+                                <div class="small text-muted">ยอดชำระโดยประมาณ</div>
+                                <div class="small text-muted">คำนวณจากบริการที่เลือก</div>
+                            </div>
+                            <div class="fw-bold fs-5 text-primary" id="booking-total">0 บ.</div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 d-flex justify-content-between flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-danger rounded-pill px-3 d-none" id="delete-booking-btn">
+                    <i class="bi bi-trash3 me-1"></i> ลบคิว
+                </button>
+                <div class="d-flex gap-2 ms-auto">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">ปิด</button>
+                    <button type="button" class="btn btn-outline-success rounded-pill px-3" id="pay-booking-btn">
+                        <i class="bi bi-wallet2 me-1"></i> ชำระเงิน
+                    </button>
+                    <button type="button" class="btn btn-primary rounded-pill px-4 shadow-sm" id="save-booking-btn">บันทึก</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+            </main>
+        </div>
+    </div>
+
+    <div class="offcanvas offcanvas-start mobile-sidebar-offcanvas d-lg-none" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title fw-bold" id="mobileSidebarLabel">เมนูหลัก</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body p-3">
+            <div class="mobile-menu-panel">
+    <p class="mobile-menu-heading mb-3">เมนูหลังบ้าน</p>
+    <div class="d-flex flex-column gap-2">
+                <a href="http://127.0.0.1:8001/branches" class="mobile-menu-link ">
+            <span class="mobile-menu-icon"><i class="bi bi-shop-window"></i></span>
+            <span class="mobile-menu-content">
+                <span class="mobile-menu-title">ข้อมูลร้าน</span>
+                <span class="mobile-menu-subtitle">ตั้งค่าข้อมูลสาขาและร้าน</span>
+            </span>
+            <i class="bi bi-chevron-right mobile-menu-arrow"></i>
+        </a>
+                <a href="http://127.0.0.1:8001/products" class="mobile-menu-link ">
+            <span class="mobile-menu-icon"><i class="bi bi-list-stars"></i></span>
+            <span class="mobile-menu-content">
+                <span class="mobile-menu-title">บริการ</span>
+                <span class="mobile-menu-subtitle">จัดการบริการและราคา</span>
+            </span>
+            <i class="bi bi-chevron-right mobile-menu-arrow"></i>
+        </a>
+                <a href="http://127.0.0.1:8001/masseuse" class="mobile-menu-link ">
+            <span class="mobile-menu-icon"><i class="bi bi-person-badge"></i></span>
+            <span class="mobile-menu-content">
+                <span class="mobile-menu-title">หมอนวด</span>
+                <span class="mobile-menu-subtitle">เพิ่ม/ลดพนักงาน, ค่ามือ, ค่าคอม</span>
+            </span>
+            <i class="bi bi-chevron-right mobile-menu-arrow"></i>
+        </a>
+                <a href="http://127.0.0.1:8001/booking" class="mobile-menu-link active">
+            <span class="mobile-menu-icon"><i class="bi bi-door-open"></i></span>
+            <span class="mobile-menu-content">
+                <span class="mobile-menu-title">ห้องนวด</span>
+                <span class="mobile-menu-subtitle">จัดการเตียงและห้องนวด</span>
+            </span>
+            <i class="bi bi-chevron-right mobile-menu-arrow"></i>
+        </a>
+                <a href="http://127.0.0.1:8001/promotions" class="mobile-menu-link ">
+            <span class="mobile-menu-icon"><i class="bi bi-megaphone"></i></span>
+            <span class="mobile-menu-content">
+                <span class="mobile-menu-title">แพคเกจโปรโมชั่น</span>
+                <span class="mobile-menu-subtitle">ตั้งค่าโปรและแพคเกจขาย</span>
+            </span>
+            <i class="bi bi-chevron-right mobile-menu-arrow"></i>
+        </a>
+                <a href="http://127.0.0.1:8001/customers" class="mobile-menu-link ">
+            <span class="mobile-menu-icon"><i class="bi bi-people"></i></span>
+            <span class="mobile-menu-content">
+                <span class="mobile-menu-title">ลูกค้า</span>
+                <span class="mobile-menu-subtitle">แก้ไขข้อมูลลูกค้า</span>
+            </span>
+            <i class="bi bi-chevron-right mobile-menu-arrow"></i>
+        </a>
+                <a href="http://127.0.0.1:8001/users" class="mobile-menu-link ">
+            <span class="mobile-menu-icon"><i class="bi bi-shield-check"></i></span>
+            <span class="mobile-menu-content">
+                <span class="mobile-menu-title">สิทธิ์เข้าใช้</span>
+                <span class="mobile-menu-subtitle">จัดการสิทธิ์ผู้ใช้งาน</span>
+            </span>
+            <i class="bi bi-chevron-right mobile-menu-arrow"></i>
+        </a>
+            </div>
+</div>
+        </div>
+    </div>
+
+    <nav class="navbar fixed-bottom mobile-bottom-nav bg-white border-top d-lg-none py-1">
+    <div class="container-fluid">
+        <div class="d-flex w-100 justify-content-around text-center">
+            <a href="http://127.0.0.1:8001" class="text-decoration-none text-muted">
+                <i class="bi bi-speedometer2 fs-4 d-block"></i>
+                <span style="font-size: 10px;">หน้าหลัก</span>
+            </a>
+            <a href="http://127.0.0.1:8001/pos" class="text-decoration-none text-muted">
+                <i class="bi bi-cart4 fs-4 d-block"></i>
+                <span style="font-size: 10px;">ขาย</span>
+            </a>
+            <a href="http://127.0.0.1:8001/booking" class="text-decoration-none text-primary">
+                <i class="bi bi-calendar-check fs-4 d-block"></i>
+                <span style="font-size: 10px;">คิว</span>
+            </a>
+            <a href="http://127.0.0.1:8001/staff" class="text-decoration-none text-muted">
+                <i class="bi bi-people fs-4 d-block"></i>
+                <span style="font-size: 10px;">พนักงาน</span>
+            </a>
+        </div>
+    </div>
+</nav>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    const START_HOUR = 10;
+    const END_HOUR_EXCLUSIVE = 21;
+    const staffData = [{"id":"MS001","name":"\u0e1f\u0e49\u0e32","role":"Therapist (Senior)","status":"\u0e01\u0e33\u0e25\u0e31\u0e07\u0e43\u0e2b\u0e49\u0e1a\u0e23\u0e34\u0e01\u0e32\u0e23","income":5200,"commission":1560,"avatar":"https:\/\/i.pravatar.cc\/150?u=fa","shift":"10:00 - 19:00","queue":[{"booking_id":"BK001","customer":"\u0e04\u0e38\u0e13\u0e2a\u0e21\u0e0a\u0e32\u0e22","service":"\u0e19\u0e27\u0e14\u0e41\u0e1c\u0e19\u0e44\u0e17\u0e22","start":"10:00","end":"11:00","room_id":"R1","status":"in_service","color":"#31b8e9"},{"booking_id":"BK004","customer":"\u0e04\u0e38\u0e13\u0e27\u0e34\u0e20\u0e32\u0e27\u0e23\u0e23\u0e13","service":"\u0e19\u0e27\u0e14\u0e2d\u0e42\u0e23\u0e21\u0e32","start":"13:00","end":"14:00","room_id":"R1","status":"waiting","color":"#18c4b3"}]},{"id":"MS002","name":"\u0e1b\u0e23\u0e32\u0e07","role":"Therapist (Junior)","status":"\u0e40\u0e02\u0e49\u0e32\u0e07\u0e32\u0e19\u0e41\u0e25\u0e49\u0e27","income":4800,"commission":1200,"avatar":"https:\/\/i.pravatar.cc\/150?u=prang","shift":"11:00 - 20:00","queue":[{"booking_id":"BK002","customer":"\u0e04\u0e38\u0e13\u0e18\u0e19\u0e32","service":"\u0e19\u0e27\u0e14\u0e1d\u0e48\u0e32\u0e40\u0e17\u0e49\u0e32","start":"11:30","end":"12:15","room_id":"R2","status":"completed","color":"#5fc5ff"}]},{"id":"MS003","name":"\u0e41\u0e01\u0e49\u0e27","role":"Therapist","status":"\u0e1e\u0e31\u0e01\u0e40\u0e1a\u0e23\u0e01","income":3500,"commission":875,"avatar":"https:\/\/i.pravatar.cc\/150?u=kaew","shift":"10:00 - 18:00","queue":[]}];
+    const customerData = [{"id":"CUS-WALKIN","name":"Walk-in","phone":"-","line_id":"-","points":0},{"id":"CUS001","name":"\u0e04\u0e38\u0e13\u0e2a\u0e21\u0e0a\u0e32\u0e22 \u0e43\u0e08\u0e14\u0e35","phone":"089-111-1111","line_id":"@somchai","points":150},{"id":"CUS002","name":"\u0e04\u0e38\u0e13\u0e27\u0e34\u0e20\u0e32\u0e27\u0e23\u0e23\u0e13","phone":"081-222-2222","line_id":"@wipa","points":420},{"id":"CUS003","name":"\u0e04\u0e38\u0e13\u0e18\u0e19\u0e32","phone":"095-333-3333","line_id":"@thana","points":80}];
+    const serviceData = [{"id":"SVC001","type":"service","name":"\u0e19\u0e27\u0e14\u0e41\u0e1c\u0e19\u0e44\u0e17\u0e22 (Thai)","price":500,"duration":60,"color":"#31b8e9"},{"id":"SVC002","type":"service","name":"\u0e19\u0e27\u0e14\u0e19\u0e49\u0e33\u0e21\u0e31\u0e19\u0e2d\u0e42\u0e23\u0e21\u0e32","price":800,"duration":60,"color":"#18c4b3"},{"id":"SVC003","type":"service","name":"\u0e2a\u0e04\u0e23\u0e31\u0e1a\u0e1c\u0e34\u0e27 (Scrub)","price":1200,"duration":90,"color":"#5fc5ff"},{"id":"SVC004","type":"service","name":"\u0e19\u0e27\u0e14\u0e28\u0e35\u0e23\u0e29\u0e30 \u0e1a\u0e48\u0e32 \u0e44\u0e2b\u0e25\u0e48","price":400,"duration":30,"color":"#22d3ee"},{"id":"SVC005","type":"service","name":"\u0e19\u0e27\u0e14\u0e1d\u0e48\u0e32\u0e40\u0e17\u0e49\u0e32 (Foot)","price":350,"duration":45,"color":"#14b8a6"}];
+
+    const bookingModalEl = document.getElementById('bookingModal');
+    const queueBoardEl = document.getElementById('queue-board');
+    const bookingFormEl = document.getElementById('booking-form');
+    const customerSelectEl = document.getElementById('customer-select');
+    const staffSelectEl = document.getElementById('staff-select');
+    const startTimeEl = document.getElementById('start-time');
+    const endTimeEl = document.getElementById('end-time');
+    const statusSelectEl = document.getElementById('status-select');
+    const serviceSelectEl = document.getElementById('service-select');
+    const selectedServicesEl = document.getElementById('selected-services');
+    const bookingTotalEl = document.getElementById('booking-total');
+    const bookingTitleEl = document.getElementById('booking-modal-title');
+    const bookingSubtitleEl = document.getElementById('booking-modal-subtitle');
+    const saveBookingBtn = document.getElementById('save-booking-btn');
+    const deleteBookingBtn = document.getElementById('delete-booking-btn');
+    const addServiceBtn = document.getElementById('add-service-btn');
+    const payBookingBtn = document.getElementById('pay-booking-btn');
+
+    const customerMap = new Map(customerData.map(c => [c.id, c]));
+    const serviceMap = new Map(serviceData.map(s => [s.id, s]));
+
+    const defaultCustomerId = customerData[0]?.id || '';
+    const defaultServiceId = serviceData[0]?.id || '';
+    const defaultStaffId = staffData[0]?.id || '';
+
+    let bookings = [];
+    let bookingModal = null;
+    let editingBookingId = null;
+    let selectedServiceIds = [];
+
+    function normalizeText(value = '') {
+        return value.toString().toLowerCase().replace(/\([^)]*\)/g, '').replace(/\s+/g, '');
+    }
+
+    function findCustomerIdByName(name = '') {
+        const customer = customerData.find(c => c.name.includes(name) || name.includes(c.name));
+        return customer ? customer.id : defaultCustomerId;
+    }
+
+    function findServiceIdByName(name = '') {
+        const normalizedName = normalizeText(name);
+        const service = serviceData.find(s => {
+            const normalizedService = normalizeText(s.name);
+            return normalizedName.includes(normalizedService) || normalizedService.includes(normalizedName);
+        });
+        return service ? service.id : defaultServiceId;
+    }
+
+    function toMinutes(hhmm) {
+        const [h, m] = hhmm.split(':').map(Number);
+        return (h * 60) + m;
+    }
+
+    function toHHMM(totalMinutes) {
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    function clampMinutes(totalMinutes) {
+        const min = START_HOUR * 60;
+        const max = END_HOUR_EXCLUSIVE * 60;
+        return Math.max(min, Math.min(max, totalMinutes));
+    }
+
+    function addMinutes(time, offset) {
+        return toHHMM(clampMinutes(toMinutes(time) + offset));
+    }
+
+    function getServiceDuration(serviceId) {
+        return Number(serviceMap.get(serviceId)?.duration || 60);
+    }
+
+    function getServicePrice(serviceId) {
+        return Number(serviceMap.get(serviceId)?.price || 0);
+    }
+
+    function getTotalDuration(serviceIds) {
+        const total = serviceIds.reduce((sum, id) => sum + getServiceDuration(id), 0);
+        return total > 0 ? total : 60;
+    }
+
+    function getTotalPrice(serviceIds) {
+        return serviceIds.reduce((sum, id) => sum + getServicePrice(id), 0);
+    }
+
+    function getCustomerName(customerId, fallbackName = 'Walk-in') {
+        return customerMap.get(customerId)?.name || fallbackName;
+    }
+
+    function getServiceSummary(serviceIds) {
+        const names = serviceIds.map(id => serviceMap.get(id)?.name).filter(Boolean);
+        if (!names.length) return '-';
+        if (names.length === 1) return names[0];
+        return `${names[0]} +${names.length - 1} บริการ`;
+    }
+
+    function createBookingId() {
+        return `BK${Date.now().toString().slice(-6)}`;
+    }
+
+    staffData.forEach(s => s.queue.forEach(q => {
+        bookings.push({
+            id: q.booking_id,
+            customerId: findCustomerIdByName(q.customer),
+            customerName: q.customer,
+            serviceIds: [findServiceIdByName(q.service)].filter(Boolean),
+            staffId: s.id,
+            start: q.start.slice(0, 5),
+            end: q.end.slice(0, 5),
+            status: q.status,
+            paid: q.status === 'completed'
+        });
+    }));
+
+    function renderSelectedServices() {
+        if (!selectedServiceIds.length) {
+            selectedServicesEl.innerHTML = '<span class="small text-muted">ยังไม่มีบริการที่เลือก</span>';
+            bookingTotalEl.textContent = '0 บ.';
+            return;
+        }
+
+        selectedServicesEl.innerHTML = selectedServiceIds.map(serviceId => {
+            const service = serviceMap.get(serviceId);
+            if (!service) return '';
+            return `
+                <span class="selected-service-chip">
+                    ${service.name}
+                    <button type="button" onclick="removeService('${serviceId}')" aria-label="ลบบริการ">
+                        <i class="bi bi-x-circle-fill"></i>
+                    </button>
+                </span>
+            `;
+        }).join('');
+
+        bookingTotalEl.textContent = `${getTotalPrice(selectedServiceIds).toLocaleString()} บ.`;
+    }
+
+    function removeService(serviceId) {
+        selectedServiceIds = selectedServiceIds.filter(id => id !== serviceId);
+        renderSelectedServices();
+    }
+    window.removeService = removeService;
+
+    function ensureEndAfterStart() {
+        const start = toMinutes(startTimeEl.value);
+        const end = toMinutes(endTimeEl.value);
+        if (end <= start) {
+            endTimeEl.value = addMinutes(startTimeEl.value, getTotalDuration(selectedServiceIds));
+        }
+    }
+
+    function setModalMode(isEditing) {
+        bookingTitleEl.innerHTML = isEditing
+            ? '<i class="bi bi-pencil-square me-2 text-primary"></i>แก้ไขคิวจอง'
+            : '<i class="bi bi-journal-plus me-2 text-primary"></i>เพิ่มรายการจองใหม่';
+
+        bookingSubtitleEl.textContent = isEditing
+            ? 'แก้บริการ เวลา หมอนวด หรือชำระเงินจากคิวนี้ได้เลย'
+            : 'กำหนดรายละเอียดคิวก่อนบันทึก';
+
+        deleteBookingBtn.classList.toggle('d-none', !isEditing);
+    }
+
+    function fillModal(booking, isEditing = false) {
+        customerSelectEl.value = booking.customerId || defaultCustomerId;
+        staffSelectEl.value = booking.staffId || defaultStaffId;
+        startTimeEl.value = booking.start || '10:00';
+        endTimeEl.value = booking.end || addMinutes(startTimeEl.value, getTotalDuration(booking.serviceIds));
+        statusSelectEl.value = booking.status || 'waiting';
+        selectedServiceIds = [...(booking.serviceIds || [])];
+        if (!selectedServiceIds.length && defaultServiceId) selectedServiceIds = [defaultServiceId];
+        renderSelectedServices();
+        setModalMode(isEditing);
+        payBookingBtn.innerHTML = booking.paid
+            ? '<i class="bi bi-check2-circle me-1"></i> ชำระแล้ว'
+            : '<i class="bi bi-wallet2 me-1"></i> ชำระเงิน';
+        payBookingBtn.classList.toggle('btn-success', booking.paid);
+        payBookingBtn.classList.toggle('btn-outline-success', !booking.paid);
+    }
+
+    function renderBookings() {
+        document.querySelectorAll('.booking-row-layer').forEach(l => l.innerHTML = '');
+        const totalMinutes = (END_HOUR_EXCLUSIVE - START_HOUR) * 60;
+
+        bookings.forEach(b => {
+            const layer = document.getElementById(`layer-${b.staffId}`);
+            if (!layer) return;
+
+            const layerWidth = layer.clientWidth;
+            const layerHeight = layer.clientHeight;
+            if (!layerWidth || !layerHeight) return;
+
+            let startOffset = toMinutes(b.start) - (START_HOUR * 60);
+            let endOffset = toMinutes(b.end) - (START_HOUR * 60);
+
+            startOffset = Math.max(0, Math.min(totalMinutes - 15, startOffset));
+            endOffset = Math.max(startOffset + 15, Math.min(totalMinutes, endOffset));
+
+            const left = (startOffset / totalMinutes) * layerWidth;
+            const width = Math.max(((endOffset - startOffset) / totalMinutes) * layerWidth - 4, 86);
+
+            const card = document.createElement('div');
+            card.className = `booking-card state-${b.status}`;
+            card.dataset.bookingId = b.id;
+            card.style.left = `${left + 2}px`;
+            card.style.width = `${Math.min(width, layerWidth - left - 2)}px`;
+
+            card.innerHTML = `
+                <div class="booking-top">
+                    <span class="booking-time">${b.start} - ${b.end}</span>
+                    <span class="${b.paid ? 'booking-paid' : 'booking-unpaid'}">${b.paid ? 'ชำระแล้ว' : 'รอชำระ'}</span>
+                </div>
+                <div class="booking-customer">${getCustomerName(b.customerId, b.customerName)}</div>
+                <div class="booking-service">${getServiceSummary(b.serviceIds)}</div>
+            `;
+            card.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                openModal({ bookingId: b.id });
+            });
+
+            layer.appendChild(card);
+        });
+    }
+
+    function getModalInstance() {
+        if (!bookingModalEl || typeof bootstrap === 'undefined' || !bootstrap.Modal) return null;
+        if (!bookingModal) {
+            bookingModal = bootstrap.Modal.getOrCreateInstance(bookingModalEl);
+        }
+        return bookingModal;
+    }
+
+    function hasModalControls() {
+        return customerSelectEl
+            && staffSelectEl
+            && startTimeEl
+            && endTimeEl
+            && statusSelectEl
+            && selectedServicesEl
+            && bookingTotalEl
+            && bookingTitleEl
+            && bookingSubtitleEl
+            && payBookingBtn
+            && deleteBookingBtn;
+    }
+
+    function collectBookingPayload() {
+        if (!hasModalControls()) return null;
+        const start = startTimeEl.value;
+        const end = endTimeEl.value;
+
+        if (!customerSelectEl.value || !staffSelectEl.value || !start || !end) {
+            alert('กรุณากรอกข้อมูลให้ครบก่อนบันทึก');
+            return null;
+        }
+
+        if (!selectedServiceIds.length) {
+            alert('กรุณาเลือกอย่างน้อย 1 บริการ');
+            return null;
+        }
+
+        if (toMinutes(end) <= toMinutes(start)) {
+            alert('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม');
+            return null;
+        }
+
+        const existing = bookings.find(item => item.id === editingBookingId);
+
+        return {
+            id: existing?.id || createBookingId(),
+            customerId: customerSelectEl.value,
+            customerName: getCustomerName(customerSelectEl.value),
+            serviceIds: [...selectedServiceIds],
+            staffId: staffSelectEl.value,
+            start,
+            end,
+            status: statusSelectEl.value,
+            paid: existing?.paid || false
+        };
+    }
+
+    function upsertBooking(payload) {
+        const idx = bookings.findIndex(item => item.id === payload.id);
+        if (idx >= 0) {
+            bookings[idx] = payload;
+        } else {
+            bookings.push(payload);
+            editingBookingId = payload.id;
+        }
+    }
+
+    function saveBookingAndClose() {
+        const payload = collectBookingPayload();
+        if (!payload) return;
+        upsertBooking(payload);
+        renderBookings();
+        getModalInstance()?.hide();
+    }
+
+    function markAsPaid() {
+        const payload = collectBookingPayload();
+        if (!payload) return;
+        payload.paid = true;
+        payload.status = 'completed';
+        upsertBooking(payload);
+        renderBookings();
+        getModalInstance()?.hide();
+    }
+
+    function deleteBooking() {
+        if (!editingBookingId) return;
+        bookings = bookings.filter(item => item.id !== editingBookingId);
+        renderBookings();
+        getModalInstance()?.hide();
+    }
+
+    function scheduleRenderBookings() {
+        requestAnimationFrame(renderBookings);
+    }
+
+    function openModal(data = {}) {
+        const modalInstance = getModalInstance();
+        if (!modalInstance) {
+            alert('ไม่สามารถเปิดหน้าต่างคิวได้ กรุณารีเฟรชหน้าอีกครั้ง');
+            return;
+        }
+        if (!hasModalControls()) {
+            alert('ไม่พบฟอร์มจัดการคิวในหน้านี้');
+            return;
+        }
+
+        if (data.bookingId) {
+            const current = bookings.find(item => item.id === data.bookingId);
+            if (!current) return;
+            editingBookingId = current.id;
+            fillModal(current, true);
+            modalInstance.show();
+            return;
+        }
+
+        editingBookingId = null;
+        const startTime = data.time || '10:00';
+        const initialServices = defaultServiceId ? [defaultServiceId] : [];
+        const duration = getTotalDuration(initialServices);
+
+        fillModal({
+            customerId: defaultCustomerId,
+            serviceIds: initialServices,
+            staffId: data.staffId || defaultStaffId,
+            start: startTime,
+            end: addMinutes(startTime, duration),
+            status: 'waiting',
+            paid: false
+        }, false);
+
+        modalInstance.show();
+    }
+    window.openModal = openModal;
+
+    if (queueBoardEl) {
+        queueBoardEl.addEventListener('click', (e) => {
+            const card = e.target.closest('.booking-card');
+            if (card?.dataset.bookingId) {
+                openModal({ bookingId: card.dataset.bookingId });
+                return;
+            }
+
+            const slot = e.target.closest('.queue-slot-cell');
+            if (slot) {
+                const row = slot.closest('.queue-data-row');
+                openModal({
+                    staffId: row?.dataset.staffId || defaultStaffId,
+                    time: slot.dataset.time || '10:00'
+                });
+                return;
+            }
+
+            const layer = e.target.closest('.booking-row-layer');
+            if (layer && e.target === layer) {
+                const rect = layer.getBoundingClientRect();
+                const relativeX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+                const totalMinutes = (END_HOUR_EXCLUSIVE - START_HOUR) * 60;
+                const offsetMinutes = Math.floor((relativeX / Math.max(rect.width, 1)) * totalMinutes / 60) * 60;
+                const time = toHHMM((START_HOUR * 60) + offsetMinutes);
+                openModal({
+                    staffId: layer.dataset.staffId || defaultStaffId,
+                    time
+                });
+            }
+        });
+    }
+
+    addServiceBtn?.addEventListener('click', () => {
+        const serviceId = serviceSelectEl.value;
+        if (!serviceId) return;
+        if (selectedServiceIds.includes(serviceId)) return;
+        selectedServiceIds.push(serviceId);
+        renderSelectedServices();
+        ensureEndAfterStart();
+    });
+
+    startTimeEl?.addEventListener('change', ensureEndAfterStart);
+    endTimeEl?.addEventListener('change', ensureEndAfterStart);
+    saveBookingBtn?.addEventListener('click', saveBookingAndClose);
+    payBookingBtn?.addEventListener('click', markAsPaid);
+    deleteBookingBtn?.addEventListener('click', deleteBooking);
+
+    bookingModalEl?.addEventListener('hidden.bs.modal', () => {
+        if (bookingFormEl) bookingFormEl.reset();
+        selectedServiceIds = [];
+        editingBookingId = null;
+    });
+
+    window.addEventListener('resize', scheduleRenderBookings);
+
+    document.addEventListener('DOMContentLoaded', () => {
+        scheduleRenderBookings();
+    });
+</script>
+</body>
+</html>
+

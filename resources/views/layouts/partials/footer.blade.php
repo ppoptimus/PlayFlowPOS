@@ -1,22 +1,22 @@
-<nav class="navbar fixed-bottom bg-white border-top d-lg-none py-1">
-    <div class="container-fluid">
-        <div class="d-flex w-100 justify-content-around text-center">
-            <a href="{{ route('dashboard') }}" class="text-decoration-none {{ request()->routeIs('dashboard') ? 'text-primary' : 'text-muted' }}">
-                <i class="bi bi-speedometer2 fs-4 d-block"></i>
-                <span style="font-size: 10px;">หน้าหลัก</span>
-            </a>
-            <a href="{{ route('pos') }}" class="text-decoration-none {{ request()->routeIs('pos') ? 'text-primary' : 'text-muted' }}">
-                <i class="bi bi-cart4 fs-4 d-block"></i>
-                <span style="font-size: 10px;">ขาย</span>
-            </a>
-            <a href="{{ route('booking') }}" class="text-decoration-none {{ request()->routeIs('booking') ? 'active text-primary' : 'text-muted' }}">
-                <i class="bi bi-calendar-check fs-4 d-block"></i>
-                <span style="font-size: 10px;">คิว</span>
-            </a>
-            <a href="{{ route('staff') }}" class="text-decoration-none {{ request()->routeIs('staff') ? 'active text-primary' : 'text-muted' }}">
-                <i class="bi bi-people fs-4 d-block"></i>
-                <span style="font-size: 10px;">พนักงาน</span>
-            </a>
-        </div>
-    </div>
+<nav class="pf-mobile-nav" aria-label="เมนูล่างมือถือ">
+    <a href="{{ route('dashboard') }}"
+       class="pf-mobile-nav-item {{ request()->routeIs('dashboard') ? 'is-active' : '' }}">
+        <i class="bi bi-speedometer2"></i>
+        <span>หน้าหลัก</span>
+    </a>
+    <a href="{{ route('pos') }}"
+       class="pf-mobile-nav-item {{ request()->routeIs('pos') ? 'is-active' : '' }}">
+        <i class="bi bi-cart4"></i>
+        <span>ขาย</span>
+    </a>
+    <a href="{{ route('booking') }}"
+       class="pf-mobile-nav-item {{ request()->routeIs('booking') ? 'is-active' : '' }}">
+        <i class="bi bi-calendar-check"></i>
+        <span>คิว</span>
+    </a>
+    <a href="{{ route('staff') }}"
+       class="pf-mobile-nav-item {{ request()->routeIs('staff') ? 'is-active' : '' }}">
+        <i class="bi bi-people"></i>
+        <span>พนักงาน</span>
+    </a>
 </nav>

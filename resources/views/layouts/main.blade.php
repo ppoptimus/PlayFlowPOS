@@ -52,7 +52,55 @@
         .sidebar-desktop .link-dark { color: #2e3f55 !important; }
         .sidebar-desktop .link-dark:hover { background-color: rgba(31, 115, 224, 0.08); }
         .sidebar-desktop .text-muted { color: #5c728a !important; }
-        .fixed-bottom.bg-white { background-color: #f8fbfe !important; }
+        .pf-mobile-nav {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100vw;
+            max-width: 100vw;
+            z-index: 1040;
+            display: none;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            border-top: 1px solid #d8e4ef;
+            background: rgba(248, 252, 255, 0.98);
+            backdrop-filter: blur(8px);
+            box-shadow: 0 -8px 20px rgba(16, 67, 124, 0.12);
+            padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
+        }
+        body.modal-open .pf-mobile-nav,
+        body.offcanvas-open .pf-mobile-nav {
+            display: none !important;
+        }
+        .pf-mobile-nav-item {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.2rem;
+            text-decoration: none;
+            color: #5f7388;
+            padding: 0.45rem 0.2rem 0.5rem;
+            font-size: 0.65rem;
+            font-weight: 500;
+        }
+        .pf-mobile-nav-item i {
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+        .pf-mobile-nav-item span {
+            line-height: 1.1;
+            white-space: nowrap;
+        }
+        .pf-mobile-nav-item.is-active {
+            color: #1f73e0;
+            font-weight: 700;
+        }
+        .pf-mobile-nav-item:active {
+            background-color: rgba(31, 115, 224, 0.08);
+        }
+
         .navbar.sticky-top {
             background: linear-gradient(120deg, #1f73e0, #14b89a) !important;
             border-bottom-color: rgba(255, 255, 255, 0.22) !important;
@@ -167,17 +215,45 @@
         }
         .mobile-menu-link.active .mobile-menu-arrow { opacity: 1; }
         .form-control:focus, .form-select:focus { border-color: rgba(31, 115, 224, 0.5); box-shadow: 0 0 0 0.25rem rgba(31, 115, 224, 0.16); }
-        @media (max-width: 991.98px) { .sidebar-desktop { display: none; } }
+        @media (max-width: 991.98px) {
+            body {
+                padding-top: 66px;
+                padding-bottom: calc(68px + env(safe-area-inset-bottom));
+                -webkit-overflow-scrolling: touch;
+            }
+            .sidebar-desktop { display: none !important; }
+            .pf-mobile-nav { display: grid !important; }
+            .navbar {
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                z-index: 1045 !important;
+            }
+            .main-wrapper-d-flex {
+                display: block !important;
+            }
+            .main-content {
+                display: block !important;
+                min-height: auto;
+            }
+        }
+        @media (min-width: 992px) {
+            .sidebar-desktop { display: block !important; }
+            .pf-mobile-nav { display: none !important; }
+        }
     </style>
     @stack('head')
 </head>
 <body>
-    <div class="d-flex">
+    <div class="main-wrapper-d-flex d-flex">
         <aside class="sidebar-desktop bg-white border-end p-3 shadow-sm">
             @include('layouts.partials.sidebar')
         </aside>
 
-        <div class="main-content d-flex flex-column">
+        <div class="main-content d-flex flex-column w-100">
             @include('layouts.partials.navbar')
 
             <main class="container-fluid p-4 mb-5">
@@ -199,6 +275,86 @@
     @include('layouts.partials.footer')
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        (function () {
+            if (typeof window.bootstrap !== 'undefined') return;
+
+            function findOffcanvasTarget(trigger) {
+                const selector = trigger.getAttribute('data-bs-target');
+                if (!selector) return null;
+                return document.querySelector(selector);
+            }
+
+            function showOffcanvas(el) {
+                if (!el) return;
+                el.classList.add('show');
+                el.style.visibility = 'visible';
+                el.style.transform = 'none';
+                document.body.classList.add('offcanvas-open');
+            }
+
+            function hideOffcanvas(el) {
+                if (!el) return;
+                el.classList.remove('show');
+                el.style.visibility = '';
+                el.style.transform = '';
+                document.body.classList.remove('offcanvas-open');
+            }
+
+            document.addEventListener('click', function (event) {
+                const toggle = event.target.closest('[data-bs-toggle="offcanvas"]');
+                if (toggle) {
+                    event.preventDefault();
+                    const target = findOffcanvasTarget(toggle);
+                    if (target && target.classList.contains('show')) {
+                        hideOffcanvas(target);
+                    } else {
+                        showOffcanvas(target);
+                    }
+                    return;
+                }
+
+                const dismissOffcanvas = event.target.closest('[data-bs-dismiss="offcanvas"]');
+                if (dismissOffcanvas) {
+                    event.preventDefault();
+                    const offcanvas = dismissOffcanvas.closest('.offcanvas');
+                    hideOffcanvas(offcanvas);
+                    return;
+                }
+
+                const dismissModal = event.target.closest('[data-bs-dismiss="modal"]');
+                if (dismissModal) {
+                    event.preventDefault();
+                    const modal = dismissModal.closest('.modal');
+                    if (modal) {
+                        modal.classList.remove('show');
+                        modal.style.display = 'none';
+                        modal.setAttribute('aria-hidden', 'true');
+                        document.body.classList.remove('modal-open');
+                        const backdrop = document.querySelector('.modal-backdrop.pf-fallback');
+                        if (backdrop) backdrop.remove();
+                        modal.dispatchEvent(new Event('hidden.bs.modal'));
+                    }
+                }
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key !== 'Escape') return;
+                const shownOffcanvas = document.querySelector('.offcanvas.show');
+                if (shownOffcanvas) hideOffcanvas(shownOffcanvas);
+                const shownModal = document.querySelector('.modal.show');
+                if (shownModal) {
+                    shownModal.classList.remove('show');
+                    shownModal.style.display = 'none';
+                    shownModal.setAttribute('aria-hidden', 'true');
+                    document.body.classList.remove('modal-open');
+                    const backdrop = document.querySelector('.modal-backdrop.pf-fallback');
+                    if (backdrop) backdrop.remove();
+                    shownModal.dispatchEvent(new Event('hidden.bs.modal'));
+                }
+            });
+        })();
+    </script>
     @stack('scripts')
 </body>
 </html>
