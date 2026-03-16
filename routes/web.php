@@ -12,15 +12,15 @@ Route::post('/logout', 'Auth\LoginController@logout')
     ->middleware('auth');
 
 Route::middleware('auth')->group(function (): void {
-    Route::get('/', 'PlayFlowController@dashboard')->name('dashboard');
+    Route::get('/', 'DashboardController@index')->name('dashboard');
 
     Route::get('/home', function () {
         return redirect()->route('dashboard');
     })->name('home');
 
-    Route::get('/pos', 'PlayFlowController@pos')->name('pos');
-    Route::get('/booking', 'PlayFlowController@booking')->name('booking');
-    Route::get('/staff', 'PlayFlowController@staff')->name('staff');
+    Route::get('/pos', 'PosController@index')->name('pos');
+    Route::get('/booking', 'BookingController@index')->name('booking');
+    Route::get('/staff', 'StaffController@index')->name('staff');
 
     $modules = [
         'receipts', 'customers', 'membership', 'packages',
@@ -29,6 +29,6 @@ Route::middleware('auth')->group(function (): void {
     ];
 
     foreach ($modules as $module) {
-        Route::get('/' . $module, 'PlayFlowController@comingSoon')->name($module);
+        Route::get('/' . $module, 'ModuleController@comingSoon')->name($module);
     }
 });
