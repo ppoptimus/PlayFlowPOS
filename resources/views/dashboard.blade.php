@@ -1,15 +1,15 @@
 @extends('layouts.main')
 
 @section('title', 'Dashboard | PlayFlow POS')
-@section('page_title', 'Dashboard สรุปภาพรวม')
-@section('page_subtitle', 'ข้อมูลประจำสาขา สุขุมวิท')
+@section('page_title', 'Dashboard')
+@section('page_subtitle', 'สาขา สุขุมวิท')
 
 @section('content')
 <div class="row g-4">
     <div class="col-12">
         <div class="card dashboard-card section-surface">
             <div class="card-body p-4 p-lg-5">
-                <h4 class="fw-bold mb-4 section-title">รายงาน</h4>
+
                 <div class="row g-3">
                     <div class="col-12 col-md-6">
                         <div class="card dashboard-card h-100">

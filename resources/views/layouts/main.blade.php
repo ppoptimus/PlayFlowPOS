@@ -65,7 +65,7 @@
             border-top: 1px solid #d8e4ef;
             background: rgba(248, 252, 255, 0.98);
             backdrop-filter: blur(8px);
-            box-shadow: 0 -8px 30px rgba(16, 67, 124, 0.12);
+            box-shadow: 0 -8px 0px rgba(16, 67, 124, 0.12);
             padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
         }
         body.modal-open .pf-mobile-nav,

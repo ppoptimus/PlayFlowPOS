@@ -2,7 +2,7 @@
 
 @section('title', 'Staff | PlayFlow Spa POS')
 @section('page_title', 'Staff Management')
-@section('page_subtitle', 'Mockup: โปรไฟล์, กะงาน, รายได้ และคอมมิชชั่น')
+@section('page_subtitle', 'สุขุมวิท | Manager')
 
 @section('content')
 <div class="row g-3 mb-3">

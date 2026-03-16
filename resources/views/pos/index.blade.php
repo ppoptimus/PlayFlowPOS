@@ -1,34 +1,42 @@
 @extends('layouts.main')
 
 @section('title', 'POS - PlayFlow POS')
-@section('page_title', 'หน้าจอขายหน้าร้าน (POS)')
-@section('page_subtitle', 'สาขา: สุขุมวิท | พนักงาน: Manager')
+@section('page_title', 'หน้าจอขาย')
+@section('page_subtitle', 'สุขุมวิท | Manager')
 
 @section('content')
 <div class="row g-3">
     <div class="col-12 col-lg-2">
         <div class="card border-0 shadow-sm rounded-4 h-100">
             <div class="card-body p-3">
-                <div class="mb-3">
-                    <label class="form-label fw-bold small">ค้นหา</label>
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
-                        <input type="text" id="item-search" class="form-control border-start-0" placeholder="ชื่อ/SKU...">
-                    </div>
+                <label class="form-label fw-bold small text-muted text-uppercase" style="letter-spacing: 0.5px;">หมวดหมู่</label>
+                <div class="dropdown w-100">
+                    <button class="btn w-100 text-start d-flex justify-content-between align-items-center shadow-sm border rounded-4 py-3 fw-bold bg-white" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="categoryDropdownBtn">
+                        <span class="d-flex align-items-center"><i class="bi bi-grid-fill me-2 text-primary fs-5"></i> <span class="ms-1">ทั้งหมด</span></span>
+                        <i class="bi bi-chevron-down text-muted"></i>
+                    </button>
+                    <ul class="dropdown-menu w-100 border-0 shadow-lg rounded-4 p-2 mt-2">
+                        <li><a class="dropdown-item rounded-3 py-2 fw-semibold active tab-filter d-flex align-items-center mb-1" href="#" data-filter="all">
+                            <i class="bi bi-grid-fill me-2 text-primary fs-5"></i> ทั้งหมด
+                        </a></li>
+                        <li><a class="dropdown-item rounded-3 py-2 fw-semibold tab-filter d-flex align-items-center mb-1" href="#" data-filter="service">
+                            <i class="bi bi-person-walking me-2 text-info fs-5"></i> บริการนวด
+                        </a></li>
+                        <li><a class="dropdown-item rounded-3 py-2 fw-semibold tab-filter d-flex align-items-center" href="#" data-filter="product">
+                            <i class="bi bi-box-seam me-2 text-success fs-5"></i> สินค้าปลีก
+                        </a></li>
+                        <li><a class="dropdown-item rounded-3 py-2 fw-semibold tab-filter d-flex align-items-center" href="#" data-filter="package">
+                            <i class="bi bi-wallet me-2 text-success fs-5"></i> ซื้อแพคเกจเพิ่ม
+                        </a></li>
+                    </ul>
                 </div>
+
+                <hr class="text-black-50 my-3 opacity-25">
                 
-                <label class="form-label fw-bold small">หมวดหมู่</label>
-                <div class="list-group list-group-flush gap-2 border-0" id="category-filter">
-                    <button class="list-group-item list-group-item-action rounded-3 border-0 active tab-filter" data-filter="all">
-                        <i class="bi bi-grid-fill me-2"></i> ทั้งหมด
-                    </button>
-                    <button class="list-group-item list-group-item-action rounded-3 border-0 tab-filter" data-filter="service">
-                        <i class="bi bi-person-walking me-2"></i> บริการนวด
-                    </button>
-                    <button class="list-group-item list-group-item-action rounded-3 border-0 tab-filter" data-filter="product">
-                        <i class="bi bi-box-seam me-2"></i> สินค้าปลีก
-                    </button>
-                </div>
+                <label class="form-label fw-bold small text-muted text-uppercase" style="letter-spacing: 0.5px;">ข้อมูลลูกค้า</label>
+                <button class="btn w-100 text-start d-flex justify-content-between align-items-center shadow-sm border border-primary-subtle rounded-4 py-3 fw-bold bg-primary-subtle text-primary" type="button" data-bs-toggle="modal" data-bs-target="#newCustomerModal">
+                    <span class="d-flex align-items-center"><i class="bi bi-person-plus-fill me-2 fs-5"></i> <span class="ms-1">เพิ่มลูกค้าใหม่</span></span>
+                </button>
             </div>
         </div>
     </div>
@@ -100,6 +108,14 @@
                             <span class="input-group-text bg-light">฿</span>
                         </div>
                     </div>
+
+                    <div class="d-flex justify-content-between mb-3 align-items-center">
+                        <span class="text-muted">คอร์สโปรโมชั่น</span>
+                        <div class="input-group input-group-sm w-50">
+                            <input type="text" id="promotion-input" class="form-control text-end" value="">
+                            <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                        </div>
+                    </div>
                     
                     <div class="bg-primary-subtle p-3 rounded-4 mb-3 text-primary d-flex justify-content-between align-items-center">
                         <h5 class="mb-0 fw-bold">ยอดสุทธิ</h5>
@@ -128,6 +144,87 @@
                         <i class="bi bi-check-circle-fill me-2"></i> ชำระเงิน (Mock)
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Customer Modal -->
+<div class="modal fade" id="newCustomerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="background-color: #f4f7f9;">
+            <div class="modal-header border-0 bg-white px-4 pt-4 pb-2">
+                <div class="d-flex align-items-center">
+                    <div class="bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px;">
+                        <i class="bi bi-person-plus-fill fs-4"></i>
+                    </div>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">เพิ่มข้อมูลลูกค้าใหม่</h5>
+                        <small class="text-muted">บันทึกประวัติการใช้บริการและสะสมแต้ม</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body px-4 py-3">
+                <form id="new-customer-form">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted">ชื่อจริง <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg rounded-3 shadow-sm border-0 fs-6" placeholder="ชื่อจริง">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted">นามสกุล <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control form-control-lg rounded-3 shadow-sm border-0 fs-6" placeholder="นามสกุล">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted">ชื่อเล่น</label>
+                            <input type="text" class="form-control form-control-lg rounded-3 shadow-sm border-0 fs-6" placeholder="ชื่อเล่น">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted">เพศ</label>
+                            <select class="form-select form-select-lg rounded-3 shadow-sm border-0 fs-6 text-muted">
+                                <option value="" selected disabled>เลือกเพศ</option>
+                                <option value="M">ชาย (Male)</option>
+                                <option value="F">หญิง (Female)</option>
+                                <option value="O">อื่นๆ (Other)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted">อายุ (ปี)</label>
+                            <input type="number" class="form-control form-control-lg rounded-3 shadow-sm border-0 fs-6" placeholder="ระบุอายุ">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-muted">เบอร์โทรศัพท์ <span class="text-danger">*</span></label>
+                            <div class="input-group input-group-lg shadow-sm rounded-3 overflow-hidden">
+                                <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-telephone"></i></span>
+                                <input type="tel" class="form-control border-0 fs-6" placeholder="08X-XXX-XXXX">
+                            </div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold small text-muted">Line ID</label>
+                            <div class="input-group input-group-lg shadow-sm rounded-3 overflow-hidden">
+                                <span class="input-group-text bg-white border-0 text-success"><i class="bi bi-line"></i></span>
+                                <input type="text" class="form-control border-0 fs-6" placeholder="LINE ID ของลูกค้า">
+                            </div>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold small text-muted">ที่อยู่</label>
+                            <textarea class="form-control rounded-3 shadow-sm border-0 p-3 fs-6" rows="2" placeholder="รายละเอียดที่อยู่..."></textarea>
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold small text-muted">หมายเหตุ / ข้อมูลเพิ่มเติม</label>
+                            <textarea class="form-control rounded-3 shadow-sm border-0 p-3 fs-6" rows="2" placeholder="เช่น อาการแพ้, โรคประจำตัว, น้ำหนักมือที่ชอบ..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 px-4 pb-4 pt-2 bg-transparent justify-content-end">
+                <button type="button" class="btn btn-white text-muted rounded-pill px-4 fw-bold shadow-sm border me-2" data-bs-dismiss="modal">ยกเลิก</button>
+                <button type="button" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm" onclick="saveNewCustomer()"><i class="bi bi-check-circle-fill me-2"></i> บันทึกลูกค้า</button>
             </div>
         </div>
     </div>
@@ -201,9 +298,17 @@
 
     // ฟิลเตอร์หมวดหมู่
     document.querySelectorAll('.tab-filter').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-filter').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            document.querySelectorAll('.tab-filter').forEach(b => {
+                b.classList.remove('active', 'bg-primary-subtle');
+            });
+            btn.classList.add('active', 'bg-primary-subtle');
+            
+            // อัปเดตข้อความบนปุ่ม dropdown ให้ตรงกับที่เลือก
+            const iconHtml = btn.querySelector('i').outerHTML;
+            const textHtml = btn.textContent.trim();
+            document.getElementById('categoryDropdownBtn').innerHTML = `<span class="d-flex align-items-center">${iconHtml} <span class="ms-1">${textHtml}</span></span> <i class="bi bi-chevron-down text-muted"></i>`;
             
             const filter = btn.dataset.filter;
             document.querySelectorAll('.item-card-wrap').forEach(item => {
@@ -237,6 +342,13 @@
         alert('บันทึกรายการสำเร็จ (จำลองการทำงาน)');
         cart = [];
         renderCart();
+    }
+
+    function saveNewCustomer() {
+        alert('บันทึกข้อมูลลูกค้าสำเร็จ (จำลองการทำงาน)');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('newCustomerModal'));
+        if (modal) modal.hide();
+        document.getElementById('new-customer-form').reset();
     }
 </script>
 @endpush
