@@ -218,7 +218,7 @@
         @media (max-width: 991.98px) {
             body {
                 padding-top: 66px;
-                padding-bottom: calc(68px + env(safe-area-inset-bottom));
+                padding-bottom: calc(85px + env(safe-area-inset-bottom)) !important;
                 -webkit-overflow-scrolling: touch;
             }
             .sidebar-desktop { display: none !important; }
@@ -234,6 +234,7 @@
             }
             .main-wrapper-d-flex {
                 display: block !important;
+                padding-bottom: 75px !important;
             }
             .main-content {
                 display: block !important;
@@ -256,7 +257,7 @@
         <div class="main-content d-flex flex-column w-100">
             @include('layouts.partials.navbar')
 
-            <main class="container-fluid p-4 mb-5">
+            <main class="container-fluid p-4 pb-5 mb-5 pb-lg-4 mb-lg-0">
                 @yield('content')
             </main>
         </div>
