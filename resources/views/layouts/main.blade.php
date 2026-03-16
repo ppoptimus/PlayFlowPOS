@@ -119,6 +119,28 @@
         }
         .navbar.sticky-top .dropdown-toggle:hover { background-color: rgba(255, 255, 255, 0.24) !important; }
         .navbar.sticky-top img.border-primary { border-color: rgba(255, 255, 255, 0.82) !important; }
+        .navbar.sticky-top .dropdown-menu {
+            background: #ffffff;
+            border: 1px solid rgba(31, 115, 224, 0.14) !important;
+        }
+        .navbar.sticky-top .dropdown-menu .dropdown-item,
+        .navbar.sticky-top .dropdown-menu .dropdown-item-text {
+            color: #1e3e5f !important;
+        }
+        .navbar.sticky-top .dropdown-menu .text-muted {
+            color: #6b7f93 !important;
+        }
+        .navbar.sticky-top .dropdown-menu .bi {
+            color: currentColor !important;
+        }
+        .navbar.sticky-top .dropdown-menu .dropdown-item.text-danger,
+        .navbar.sticky-top .dropdown-menu .dropdown-item.text-danger .bi {
+            color: #dc3545 !important;
+        }
+        .navbar.sticky-top .dropdown-menu .dropdown-item:hover,
+        .navbar.sticky-top .dropdown-menu .dropdown-item:focus {
+            background-color: #eef5ff;
+        }
         .navbar.sticky-top .mobile-menu-btn {
             background: linear-gradient(135deg, rgba(23, 120, 214, 0.95), rgba(22, 184, 156, 0.95));
             border: 1px solid rgba(255, 255, 255, 0.45);

@@ -2,22 +2,32 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DashboardService;
 use App\Services\MockDataService;
 use Illuminate\Contracts\View\View;
 
 class PlayFlowController extends Controller
 {
+    private DashboardService $dashboardService;
     private MockDataService $mockDataService;
 
-    public function __construct(MockDataService $mockDataService)
+    public function __construct(
+        DashboardService $dashboardService,
+        MockDataService $mockDataService
+    )
     {
+        $this->dashboardService = $dashboardService;
         $this->mockDataService = $mockDataService;
     }
 
     public function dashboard(): View
     {
+        $branchId = request()->has('branch_id') ? (int) request()->query('branch_id') : null;
+        $range = (string) request()->query('range', 'today');
+        $stats = $this->dashboardService->getDashboardStats($branchId, $range);
+
         return view('dashboard', [
-            'stats' => $this->mockDataService->getDashboardStats(),
+            'stats' => $stats,
         ]);
     }
 

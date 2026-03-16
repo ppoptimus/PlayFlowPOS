@@ -2,7 +2,7 @@
 
 @section('title', 'Dashboard | PlayFlow POS')
 @section('page_title', 'Dashboard')
-@section('page_subtitle', 'สาขา สุขุมวิท')
+@section('page_subtitle', $stats['branch_name'] ?? '-')
 
 @section('content')
 <div class="row g-4">
@@ -11,20 +11,25 @@
             <div class="card-body p-4 p-lg-5">
 
                 <div class="row g-3">
-                    <div class="col-12 col-md-6">
+                    <div class="col-6 col-md-6">
                         <div class="card dashboard-card h-100">
                             <div class="card-body p-4">
-                                <h5 class="fw-semibold text-secondary mb-3 section-subtitle">จำนวนลูกค้าวันนี้</h5>
+                                <h5 class="fw-semibold text-secondary mb-3 section-subtitle">ลูกค้าวันนี้</h5>
                                 <h1 class="fw-bold mb-2 text-dark stat-big">{{ $stats['today_clients'] }} คน</h1>
-                                <p class="small mb-0 text-success"><i class="bi bi-arrow-up"></i> +12% จากเมื่อวาน</p>
+                                <p class="small mb-0 {{ $stats['client_trend']['class'] ?? 'text-secondary' }}">
+                                    <i class="bi {{ $stats['client_trend']['icon'] ?? 'bi-arrow-right' }}"></i>
+                                    {{ $stats['client_trend']['text'] ?? '0% จากเมื่อวาน' }}
+                                </p>
                             </div>
                         </div>
                     </div>
-                    <div class="col-12 col-md-6">
+                    <div class="col-6 col-md-6">
                         <div class="card dashboard-card h-100">
                             <div class="card-body p-4 d-flex flex-column justify-content-center align-items-center text-center">
-                                <i class="bi bi-bar-chart-line fs-1 text-primary mb-2"></i>
-                                <h2 class="fw-bold mb-0 section-title">รายงาน</h2>
+                                <i class="bi bi-receipt fs-1 text-primary mb-2"></i>
+                                <h2 class="fw-bold mb-0 section-title">{{ number_format($stats['today_orders'] ?? 0) }}</h2>
+                                <p class="mb-0 fw-semibold text-secondary">บิลวันนี้</p>
+                                <small class="text-muted">อัปเดต {{ $stats['last_sync'] ?? '-' }}</small>
                             </div>
                         </div>
                     </div>
@@ -39,15 +44,18 @@
                 <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
                     <h4 class="fw-bold mb-0 section-title">รายงานยอดขาย</h4>
                     <div class="btn-group report-range-group" role="group" aria-label="ช่วงเวลารายงานยอดขาย">
-                        <button type="button" class="btn report-range-btn active">วันนี้</button>
-                        <button type="button" class="btn report-range-btn">เมื่อวาน</button>
-                        <button type="button" class="btn report-range-btn">7 วันย้อนหลัง</button>
+                        <a href="{{ route('dashboard', array_filter(['range' => 'today', 'branch_id' => request('branch_id')])) }}"
+                           class="btn report-range-btn {{ ($stats['selected_range'] ?? 'today') === 'today' ? 'active' : '' }}">วันนี้</a>
+                        <a href="{{ route('dashboard', array_filter(['range' => 'yesterday', 'branch_id' => request('branch_id')])) }}"
+                           class="btn report-range-btn {{ ($stats['selected_range'] ?? 'today') === 'yesterday' ? 'active' : '' }}">เมื่อวาน</a>
+                        <a href="{{ route('dashboard', array_filter(['range' => '7d', 'branch_id' => request('branch_id')])) }}"
+                           class="btn report-range-btn {{ ($stats['selected_range'] ?? 'today') === '7d' ? 'active' : '' }}">7 วันย้อนหลัง</a>
                     </div>
                 </div>
                 <div class="d-flex flex-column gap-3">
                     <div class="report-row rounded-4 px-4 py-3">
-                        <span class="report-label">รายวัน</span>
-                        <span class="report-value">{{ number_format($stats['today_sales']) }} บ.</span>
+                        <span class="report-label">{{ $stats['selected_range_label'] ?? 'วันนี้' }}</span>
+                        <span class="report-value">{{ number_format($stats['selected_range_sales'] ?? 0) }} บ.</span>
                     </div>
                     <div class="report-row rounded-4 px-4 py-3">
                         <span class="report-label">รายเดือน</span>
@@ -58,10 +66,6 @@
         </div>
     </div>
 
-    @php
-        $dailyMasseuseFee = (int) round(collect($stats['top_masseuses'])->sum('amount') * 0.3);
-        $monthlyMasseuseFee = $dailyMasseuseFee * 30;
-    @endphp
     <div class="col-12 col-lg-4">
         <div class="card dashboard-card h-100">
             <div class="card-body p-4">
@@ -69,11 +73,11 @@
                 <div class="d-flex flex-column gap-3">
                     <div class="report-row rounded-4 px-4 py-3">
                         <span class="report-label">รายวัน</span>
-                        <span class="report-value">{{ number_format($dailyMasseuseFee) }} บ.</span>
+                        <span class="report-value">{{ number_format($stats['daily_masseuse_fee'] ?? 0) }} บ.</span>
                     </div>
                     <div class="report-row rounded-4 px-4 py-3">
                         <span class="report-label">รายเดือน</span>
-                        <span class="report-value">{{ number_format($monthlyMasseuseFee) }} บ.</span>
+                        <span class="report-value">{{ number_format($stats['monthly_masseuse_fee'] ?? 0) }} บ.</span>
                     </div>
                 </div>
             </div>
@@ -202,13 +206,15 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     const ctx = document.getElementById('salesChart').getContext('2d');
+    const salesChartLabels = @json($stats['sales_chart']['labels'] ?? []);
+    const salesChartData = @json($stats['sales_chart']['data'] ?? []);
     new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'],
+            labels: salesChartLabels.length ? salesChartLabels : ['-', '-', '-', '-', '-', '-', '-'],
             datasets: [{
                 label: 'ยอดขาย (บาท)',
-                data: [12000, 15000, 11000, 18000, 22000, 25000, 28000],
+                data: salesChartData.length ? salesChartData : [0, 0, 0, 0, 0, 0, 0],
                 borderColor: '#1f73e0',
                 backgroundColor: 'rgba(31, 115, 224, 0.2)',
                 fill: true,
@@ -221,19 +227,5 @@
         }
     });
 </script>
-<script>
-    const reportRangeButtons = document.querySelectorAll('.report-range-btn');
-    reportRangeButtons.forEach((button) => {
-        button.setAttribute('aria-pressed', button.classList.contains('active') ? 'true' : 'false');
-        button.addEventListener('click', () => {
-            reportRangeButtons.forEach((btn) => {
-                btn.classList.remove('active');
-                btn.setAttribute('aria-pressed', 'false');
-            });
-
-            button.classList.add('active');
-            button.setAttribute('aria-pressed', 'true');
-        });
-    });
-</script>
 @endpush
+
