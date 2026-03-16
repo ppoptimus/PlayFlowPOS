@@ -65,7 +65,7 @@
             border-top: 1px solid #d8e4ef;
             background: rgba(248, 252, 255, 0.98);
             backdrop-filter: blur(8px);
-            box-shadow: 0 -8px 20px rgba(16, 67, 124, 0.12);
+            box-shadow: 0 -8px 30px rgba(16, 67, 124, 0.12);
             padding-bottom: calc(0.25rem + env(safe-area-inset-bottom));
         }
         body.modal-open .pf-mobile-nav,
@@ -82,8 +82,8 @@
             text-decoration: none;
             color: #5f7388;
             padding: 0.45rem 0.2rem 0.5rem;
-            font-size: 0.65rem;
-            font-weight: 500;
+            font-size: 0.75rem;
+            font-weight: 700;
         }
         .pf-mobile-nav-item i {
             font-size: 1.25rem;

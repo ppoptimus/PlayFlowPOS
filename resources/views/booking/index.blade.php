@@ -1,7 +1,7 @@
 @extends('layouts.main')
 
 @section('title', 'ตารางคิวนวด - PlayFlow')
-@section('page_title', 'ตารางคิวนวด (Interactive)')
+@section('page_title', 'ตารางคิวนวด')
 
 @section('content')
 @php
@@ -13,12 +13,12 @@
 <div class="booking-page booking-mobile-safe">
     <div class="card shadow-sm border-0">
         <div class="card-body p-4" style="overflow-x:hidden;">
-            <div class="queue-toolbar d-flex justify-content-between align-items-center mb-4 gap-3">
-                <div class="d-flex flex-wrap gap-2 align-items-center">
-                    <input type="date" id="queue-date" class="form-control rounded-pill px-3 shadow-none border-secondary-subtle" value="{{ date('Y-m-d') }}">
-                    <button class="btn btn-primary rounded-pill px-4" onclick="openModal()"><i class="bi bi-plus-lg me-2"></i> เพิ่มคิว</button>
+            <div class="queue-toolbar d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+                <div class="d-flex flex-wrap gap-2 align-items-center w-100" style="max-width: 100%;">
+                    <input type="date" id="queue-date" class="form-control rounded-pill px-3 shadow-none border-secondary-subtle flex-grow-1" value="{{ date('Y-m-d') }}" style="width: auto; max-width: 160px;">
+                    <button class="btn btn-primary rounded-pill px-4 flex-shrink-0" onclick="openModal()"><i class="bi bi-plus-lg me-2"></i> เพิ่มคิว</button>
                 </div>
-                <span class="badge text-bg-light border rounded-pill px-3 py-2 fw-semibold">
+                <span class="badge text-bg-light border rounded-3 px-3 py-2 fw-semibold text-wrap text-start lh-base d-block w-100 w-md-auto">
                     <i class="bi bi-info-circle me-1"></i> กดแทบคิวเพื่อแก้บริการ/เวลา/หมอ และชำระเงิน
                 </span>
             </div>
@@ -85,12 +85,12 @@
     .queue-staff-cell {
         position: sticky;
         left: 0;
-        z-index: 3;
+        z-index: 30;
         border-right: 1px solid #dce7f2;
         background: #f8fbff;
     }
     .queue-staff-head {
-        z-index: 6;
+        z-index: 40;
         justify-content: flex-start;
         padding-left: 1rem;
     }
@@ -230,13 +230,6 @@
     @media (max-width: 991.98px) {
         .booking-mobile-safe {
             padding-bottom: 5.4rem;
-        }
-        .queue-toolbar {
-            align-items: flex-start !important;
-        }
-        .queue-toolbar .badge {
-            white-space: normal;
-            text-align: left;
         }
         .queue-board {
             --staff-col-width: 90px;
