@@ -1,7 +1,7 @@
 <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom sticky-top py-2">
     <div class="container-fluid">
         <div class="d-flex align-items-center">
-            <button class="btn btn-light d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar">
+            <button class="btn mobile-menu-btn d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar" aria-label="เปิดเมนูหลัก">
                 <i class="bi bi-list fs-4"></i>
             </button>
             <div>

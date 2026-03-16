@@ -6,41 +6,75 @@
 
 @section('content')
 <div class="row g-4">
-    <div class="col-12 col-md-4">
-        <div class="card border-0 shadow-sm rounded-4 h-100 bg-primary text-white">
-            <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h6 class="mb-0 opacity-75">ยอดขายรวมวันนี้</h6>
-                    <i class="bi bi-currency-dollar fs-4"></i>
+    <div class="col-12">
+        <div class="card dashboard-card section-surface">
+            <div class="card-body p-4 p-lg-5">
+                <h4 class="fw-bold mb-4 section-title">รายงาน</h4>
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <div class="card dashboard-card h-100">
+                            <div class="card-body p-4">
+                                <h5 class="fw-semibold text-secondary mb-3 section-subtitle">จำนวนลูกค้าวันนี้</h5>
+                                <h1 class="fw-bold mb-2 text-dark stat-big">{{ $stats['today_clients'] }} คน</h1>
+                                <p class="small mb-0 text-success"><i class="bi bi-arrow-up"></i> +12% จากเมื่อวาน</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <div class="card dashboard-card h-100">
+                            <div class="card-body p-4 d-flex flex-column justify-content-center align-items-center text-center">
+                                <i class="bi bi-bar-chart-line fs-1 text-primary mb-2"></i>
+                                <h2 class="fw-bold mb-0 section-title">รายงาน</h2>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <h2 class="fw-bold mb-1">{{ number_format($stats['today_sales']) }} ฿</h2>
-                <p class="small mb-0"><i class="bi bi-clock-history"></i> {{ $stats['last_sync'] }}</p>
             </div>
         </div>
     </div>
 
-    <div class="col-12 col-md-4">
-        <div class="card border-0 shadow-sm rounded-4 h-100 bg-white">
+    <div class="col-12 col-lg-8">
+        <div class="card dashboard-card h-100">
             <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3 text-secondary">
-                    <h6 class="mb-0">จำนวนลูกค้าวันนี้</h6>
-                    <i class="bi bi-people fs-4"></i>
+                <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+                    <h4 class="fw-bold mb-0 section-title">รายงานยอดขาย</h4>
+                    <div class="btn-group" role="group" aria-label="ช่วงเวลารายงานยอดขาย">
+                        <button type="button" class="btn report-range-btn active">เมื่อวาน</button>
+                        <button type="button" class="btn report-range-btn">7 วันย้อนหลัง</button>
+                    </div>
                 </div>
-                <h2 class="fw-bold mb-1 text-dark">{{ $stats['today_clients'] }} คน</h2>
-                <p class="small mb-0 text-success"><i class="bi bi-arrow-up"></i> +12% จากเมื่อวาน</p>
+                <div class="d-flex flex-column gap-3">
+                    <div class="report-row rounded-4 px-4 py-3">
+                        <span class="report-label">รายวัน</span>
+                        <span class="report-value">{{ number_format($stats['today_sales']) }} บ.</span>
+                    </div>
+                    <div class="report-row rounded-4 px-4 py-3">
+                        <span class="report-label">รายเดือน</span>
+                        <span class="report-value">{{ number_format($stats['monthly_sales']) }} บ.</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="col-12 col-md-4">
-        <div class="card border-0 shadow-sm rounded-4 h-100 bg-white border-start border-4 border-info">
+    @php
+        $dailyMasseuseFee = (int) round(collect($stats['top_masseuses'])->sum('amount') * 0.3);
+        $monthlyMasseuseFee = $dailyMasseuseFee * 30;
+    @endphp
+    <div class="col-12 col-lg-4">
+        <div class="card dashboard-card h-100">
             <div class="card-body p-4">
-                <div class="d-flex justify-content-between align-items-center mb-3 text-secondary">
-                    <h6 class="mb-0">ยอดขายเดือนนี้</h6>
-                    <i class="bi bi-graph-up fs-4"></i>
+                <h4 class="fw-bold mb-4 section-title">ค่ามือหมอนวด</h4>
+                <div class="d-flex flex-column gap-3">
+                    <div class="report-row rounded-4 px-4 py-3">
+                        <span class="report-label">รายวัน</span>
+                        <span class="report-value">{{ number_format($dailyMasseuseFee) }} บ.</span>
+                    </div>
+                    <div class="report-row rounded-4 px-4 py-3">
+                        <span class="report-label">รายเดือน</span>
+                        <span class="report-value">{{ number_format($monthlyMasseuseFee) }} บ.</span>
+                    </div>
                 </div>
-                <h2 class="fw-bold mb-1 text-dark">{{ number_format($stats['monthly_sales']) }} ฿</h2>
-                <p class="small mb-0 text-muted">เป้าหมาย: 150,000 ฿</p>
             </div>
         </div>
     </div>
@@ -75,44 +109,72 @@
         </div>
     </div>
 
-    <div class="col-12">
-        <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-body p-4">
-                <h5 class="fw-bold mb-4">พนักงานทำยอดสูงสุด (Top Earner)</h5>
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle border-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="border-0">พนักงาน</th>
-                                <th class="border-0 text-center">จำนวนคิว</th>
-                                <th class="border-0 text-end">ยอดรวม</th>
-                                <th class="border-0"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($stats['top_masseuses'] as $m)
-                            <tr>
-                                <td class="border-0">
-                                    <div class="d-flex align-items-center">
-                                        <img src="{{ $m['avatar'] }}" class="rounded-circle me-3" width="40" height="40">
-                                        <span class="fw-bold">{{ $m['name'] }}</span>
-                                    </div>
-                                </td>
-                                <td class="border-0 text-center">{{ $m['queue_count'] }} คิว</td>
-                                <td class="border-0 text-end fw-bold text-primary">{{ number_format($m['amount']) }} ฿</td>
-                                <td class="border-0 text-end">
-                                    <span class="badge bg-light text-primary rounded-pill">Top {{ $loop->iteration }}</span>
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 @endsection
+
+@push('head')
+<style>
+    .dashboard-card {
+        border: 1px solid rgba(23, 107, 183, 0.08);
+        box-shadow: 0 10px 24px rgba(19, 75, 137, 0.08);
+        border-radius: 1rem;
+    }
+    .section-surface {
+        background: linear-gradient(160deg, #f8fdff 0%, #eff8fc 60%, #f4fbf7 100%);
+    }
+    .section-title {
+        font-size: clamp(1.4rem, 1.2rem + 1.1vw, 2.1rem);
+        line-height: 1.2;
+        color: #143d6b;
+    }
+    .section-subtitle {
+        font-size: clamp(1rem, 0.95rem + 0.5vw, 1.25rem);
+    }
+    .stat-big {
+        font-size: clamp(1.8rem, 1.3rem + 2vw, 3rem);
+        line-height: 1.1;
+        word-break: break-word;
+    }
+    .report-range-btn {
+        border-color: #8db6d8;
+        color: #174973;
+        background: #ffffff;
+    }
+    .report-range-btn.active,
+    .report-range-btn:hover {
+        background: linear-gradient(135deg, #1e6fbf, #1aa38f);
+        color: #ffffff;
+        border-color: #1e6fbf;
+    }
+    .report-row {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.4rem 1rem;
+        background: linear-gradient(135deg, #9de6f8 0%, #72cae8 45%, #53c9b0 100%);
+        color: #103c66;
+    }
+    .report-label,
+    .report-value {
+        font-weight: 700;
+        font-size: clamp(1.4rem, 1.05rem + 1.25vw, 2.2rem);
+        line-height: 1.15;
+        min-width: 0;
+    }
+    .report-value {
+        margin-left: auto;
+        text-align: right;
+        word-break: break-word;
+    }
+    @media (max-width: 1399.98px) {
+        .col-lg-4 .report-label,
+        .col-lg-4 .report-value {
+            font-size: clamp(1.15rem, 0.95rem + 0.95vw, 1.85rem);
+        }
+    }
+</style>
+@endpush
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

@@ -71,6 +71,101 @@
         }
         .navbar.sticky-top .dropdown-toggle:hover { background-color: rgba(255, 255, 255, 0.24) !important; }
         .navbar.sticky-top img.border-primary { border-color: rgba(255, 255, 255, 0.82) !important; }
+        .navbar.sticky-top .mobile-menu-btn {
+            background: linear-gradient(135deg, rgba(23, 120, 214, 0.95), rgba(22, 184, 156, 0.95));
+            border: 1px solid rgba(255, 255, 255, 0.45);
+            box-shadow: 0 8px 18px rgba(14, 82, 153, 0.28);
+            color: #ffffff !important;
+        }
+        .navbar.sticky-top .mobile-menu-btn:hover,
+        .navbar.sticky-top .mobile-menu-btn:focus-visible {
+            background: linear-gradient(135deg, rgba(19, 102, 184, 1), rgba(18, 158, 134, 1));
+            border-color: rgba(255, 255, 255, 0.65);
+            color: #ffffff !important;
+        }
+        .mobile-sidebar-offcanvas .offcanvas-header {
+            background: linear-gradient(120deg, #1f73e0, #14b89a);
+            color: #ffffff;
+        }
+        .mobile-sidebar-offcanvas .offcanvas-title { color: #ffffff; }
+        .mobile-sidebar-offcanvas .btn-close { filter: brightness(0) invert(1); }
+        .mobile-sidebar-offcanvas {
+            width: min(90vw, 360px);
+        }
+        .mobile-sidebar-offcanvas .offcanvas-body {
+            background: linear-gradient(180deg, #f7fbff 0%, #eff8fc 52%, #eefaf6 100%);
+        }
+        .mobile-menu-heading {
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #3a6d9d;
+        }
+        .mobile-menu-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            border: 1px solid rgba(29, 111, 178, 0.15);
+            border-radius: 0.9rem;
+            padding: 0.78rem 0.85rem;
+            text-decoration: none;
+            background-color: #ffffff;
+            color: #1d4f7f;
+            box-shadow: 0 6px 16px rgba(14, 68, 126, 0.06);
+            transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+        }
+        .mobile-menu-link:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(14, 68, 126, 0.1);
+            border-color: rgba(22, 137, 137, 0.35);
+            color: #1d4f7f;
+        }
+        .mobile-menu-link.active {
+            background: linear-gradient(135deg, #1f73e0, #14b89a);
+            color: #ffffff;
+            border-color: rgba(16, 113, 150, 0.9);
+        }
+        .mobile-menu-icon {
+            width: 2rem;
+            height: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.65rem;
+            background: rgba(31, 115, 224, 0.12);
+            color: #1b65bb;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .mobile-menu-link.active .mobile-menu-icon {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+        .mobile-menu-content {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        .mobile-menu-title {
+            font-size: 0.98rem;
+            font-weight: 700;
+            line-height: 1.15;
+            word-break: break-word;
+        }
+        .mobile-menu-subtitle {
+            font-size: 0.74rem;
+            opacity: 0.85;
+            margin-top: 0.15rem;
+            line-height: 1.2;
+            word-break: break-word;
+        }
+        .mobile-menu-arrow {
+            margin-left: auto;
+            opacity: 0.72;
+            flex-shrink: 0;
+        }
+        .mobile-menu-link.active .mobile-menu-arrow { opacity: 1; }
         .form-control:focus, .form-select:focus { border-color: rgba(31, 115, 224, 0.5); box-shadow: 0 0 0 0.25rem rgba(31, 115, 224, 0.16); }
         @media (max-width: 991.98px) { .sidebar-desktop { display: none; } }
     </style>
@@ -88,6 +183,16 @@
             <main class="container-fluid p-4 mb-5">
                 @yield('content')
             </main>
+        </div>
+    </div>
+
+    <div class="offcanvas offcanvas-start mobile-sidebar-offcanvas d-lg-none" tabindex="-1" id="mobileSidebar" aria-labelledby="mobileSidebarLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title fw-bold" id="mobileSidebarLabel">เมนูหลัก</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body p-3">
+            @include('layouts.partials.mobile-sidebar')
         </div>
     </div>
 
