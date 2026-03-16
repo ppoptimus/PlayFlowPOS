@@ -23,7 +23,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/staff', 'PlayFlowController@staff')->name('staff');
 
     $modules = [
-        'queue', 'receipts', 'customers', 'membership', 'packages',
+        'receipts', 'customers', 'membership', 'packages',
         'masseuse', 'commissions', 'products', 'promotions',
         'reports', 'financial', 'branches', 'users',
     ];
