@@ -30,6 +30,10 @@
                         </a></li>
                     </ul>
                 </div>
+                <div class="mt-3">
+                    <label class="form-label fw-bold small text-muted text-uppercase" style="letter-spacing: 0.5px;">ค้นหารายการ</label>
+                    <input type="text" id="item-search" class="form-control rounded-3 shadow-sm" placeholder="พิมพ์ชื่อบริการ/สินค้า">
+                </div>
 
                 <hr class="text-black-50 my-3 opacity-25">
                 
@@ -47,9 +51,9 @@
                 <div class="row g-2" id="item-grid">
                     @foreach($items as $item)
                     <div class="col-6 col-md-4 item-card-wrap" data-type="{{ $item['type'] }}" data-name="{{ strtolower($item['name']) }}">
-                        <div class="card h-100 border shadow-none rounded-4 item-card" 
+                        <div class="card h-100 border shadow-none rounded-4 item-card"
                              style="cursor: pointer;"
-                             onclick="addToCart('{{ $item['id'] }}', '{{ $item['name'] }}', {{ $item['price'] }}, '{{ $item['type'] }}')">
+                             onclick='addToCart(@json($item["id"]), @json($item["name"]), {{ $item["price"] }}, @json($item["type"]), {{ $item["source_id"] }})'>
                             <div class="card-body p-3">
                                 <span class="badge {{ $item['type'] == 'service' ? 'bg-info-subtle text-info' : 'bg-success-subtle text-success' }} mb-2 rounded-pill">
                                     {{ $item['type'] == 'service' ? 'Service' : 'Product' }}
@@ -72,6 +76,10 @@
         <div class="card border-0 shadow-sm rounded-4 h-100">
             <div class="card-body p-3 d-flex flex-column">
                 <h5 class="fw-bold mb-3"><i class="bi bi-receipt me-2"></i> รายการปัจจุบัน</h5>
+                <div id="booking-context-banner" class="alert alert-info rounded-3 py-2 d-none">
+                    <strong>รับมาจากหน้าจองคิว</strong><br>
+                    <span id="booking-context-text" class="small"></span>
+                </div>
                 
                 <div class="row g-2 mb-3">
                     <div class="col-6">
@@ -140,8 +148,8 @@
                         </div>
                     </div>
 
-                    <button class="btn btn-primary w-100 btn-lg rounded-pill mt-3 py-3 fw-bold shadow-sm" onclick="checkout()">
-                        <i class="bi bi-check-circle-fill me-2"></i> ชำระเงิน (Mock)
+                    <button class="btn btn-primary w-100 btn-lg rounded-pill mt-3 py-3 fw-bold shadow-sm" id="checkout-btn" onclick="checkout()">
+                        <i class="bi bi-check-circle-fill me-2"></i> ชำระเงิน
                     </button>
                 </div>
             </div>
@@ -235,12 +243,48 @@
 <script>
     let cart = [];
 
-    function addToCart(id, name, price, type) {
+    const bookingContext = @json($bookingContext);
+    const serviceItems = @json($serviceItems);
+    const checkoutUrl = "{{ route('pos.checkout') }}";
+    const bookingUrl = "{{ route('booking') }}";
+    const csrfToken = "{{ csrf_token() }}";
+
+    const customerSelectEl = document.getElementById('customer-select');
+    const staffSelectEl = document.getElementById('staff-select');
+    const discountInputEl = document.getElementById('discount-input');
+    const checkoutBtn = document.getElementById('checkout-btn');
+    const bookingBannerEl = document.getElementById('booking-context-banner');
+    const bookingBannerTextEl = document.getElementById('booking-context-text');
+
+    function notifySuccess(message) {
+        if (window.PFPopup && typeof window.PFPopup.success === 'function') {
+            window.PFPopup.success(message);
+            return;
+        }
+        console.log(message);
+    }
+
+    function notifyError(message) {
+        if (window.PFPopup && typeof window.PFPopup.error === 'function') {
+            window.PFPopup.error(message);
+            return;
+        }
+        console.error(message);
+    }
+
+    function addToCart(id, name, price, type, sourceId) {
         const index = cart.findIndex(item => item.id === id);
         if (index > -1) {
             cart[index].qty++;
         } else {
-            cart.push({ id, name, price, type, qty: 1 });
+            cart.push({
+                id,
+                sourceId: Number(sourceId),
+                name,
+                price: Number(price),
+                type,
+                qty: 1,
+            });
         }
         renderCart();
     }
@@ -252,17 +296,18 @@
 
     function updateQty(id, delta) {
         const item = cart.find(i => i.id === id);
-        if (item) {
-            item.qty += delta;
-            if (item.qty <= 0) remove(id);
-            else renderCart();
+        if (!item) return;
+        item.qty += delta;
+        if (item.qty <= 0) {
+            remove(id);
+            return;
         }
+        renderCart();
     }
 
     function renderCart() {
         const cartList = document.getElementById('cart-list');
-        const emptyMsg = document.getElementById('empty-cart-msg');
-        
+
         if (cart.length === 0) {
             cartList.innerHTML = '<div class="text-center text-muted py-5" id="empty-cart-msg">ยังไม่มีรายการในบิล</div>';
             calculate();
@@ -284,19 +329,137 @@
                 <button class="btn btn-sm text-danger ms-2" onclick="remove('${item.id}')"><i class="bi bi-trash"></i></button>
             </div>
         `).join('');
+
         calculate();
     }
 
     function calculate() {
         const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
-        const discount = parseFloat(document.getElementById('discount-input').value) || 0;
+        const discount = parseFloat(discountInputEl.value) || 0;
         const total = Math.max(0, subtotal - discount);
 
         document.getElementById('subtotal').innerText = subtotal.toLocaleString() + ' ฿';
         document.getElementById('grand-total').innerText = total.toLocaleString() + ' ฿';
     }
 
-    // ฟิลเตอร์หมวดหมู่
+    function getActivePaymentMethod() {
+        const activeButton = document.querySelector('.payment-btn.active');
+        if (!activeButton) return 'cash';
+        return activeButton.dataset.pay || 'cash';
+    }
+
+    function toCheckoutBookingContext() {
+        if (!bookingContext || bookingContext.fromBooking !== true) {
+            return null;
+        }
+
+        return {
+            booking_id: bookingContext.bookingId || null,
+            queue_date: bookingContext.queueDate || null,
+            start_time: bookingContext.startTime || null,
+            end_time: bookingContext.endTime || null,
+            customer_id: customerSelectEl && customerSelectEl.value ? Number(customerSelectEl.value) : (bookingContext.customerId || null),
+            staff_id: staffSelectEl && staffSelectEl.value ? Number(staffSelectEl.value) : (bookingContext.staffId || null),
+            service_id: bookingContext.serviceId || null,
+            bed_id: bookingContext.bedId || null,
+            is_paid: Boolean(bookingContext.isPaid),
+        };
+    }
+
+    async function checkout() {
+        if (cart.length === 0) {
+            notifyError('กรุณาเลือกรายการสินค้า');
+            return;
+        }
+
+        const payload = {
+            customer_id: customerSelectEl.value ? Number(customerSelectEl.value) : null,
+            staff_id: staffSelectEl.value ? Number(staffSelectEl.value) : null,
+            discount_amount: parseFloat(discountInputEl.value) || 0,
+            payment_method: getActivePaymentMethod(),
+            items: cart.map(item => ({
+                type: item.type,
+                source_id: item.sourceId,
+                qty: item.qty,
+            })),
+            booking_context: toCheckoutBookingContext(),
+        };
+
+        try {
+            checkoutBtn.disabled = true;
+            const response = await fetch(checkoutUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                const message = (data.errors && Object.values(data.errors)[0] && Object.values(data.errors)[0][0])
+                    ? Object.values(data.errors)[0][0]
+                    : (data.message || 'ชำระเงินไม่สำเร็จ');
+                throw new Error(message);
+            }
+
+            notifySuccess(`ชำระเงินสำเร็จ\nเลขที่บิล: ${data.order_no}`);
+
+            if (bookingContext && bookingContext.fromBooking === true) {
+                const returnDate = bookingContext.queueDate || '';
+                setTimeout(() => {
+                    window.location.href = returnDate
+                        ? `${bookingUrl}?date=${encodeURIComponent(returnDate)}`
+                        : bookingUrl;
+                }, 1000);
+                return;
+            }
+
+            cart = [];
+            renderCart();
+        } catch (error) {
+            notifyError(error.message);
+        } finally {
+            checkoutBtn.disabled = false;
+        }
+    }
+
+    function applyBookingContext() {
+        if (!bookingContext || bookingContext.fromBooking !== true) {
+            return;
+        }
+
+        if (bookingBannerEl) {
+            bookingBannerEl.classList.remove('d-none');
+            if (bookingBannerTextEl) {
+                bookingBannerTextEl.textContent = `วันที่ ${bookingContext.queueDate || '-'} เวลา ${bookingContext.startTime || '-'}-${bookingContext.endTime || '-'} น.`;
+            }
+        }
+
+        if (bookingContext.customerId && customerSelectEl) {
+            customerSelectEl.value = String(bookingContext.customerId);
+        }
+
+        if (bookingContext.staffId && staffSelectEl) {
+            staffSelectEl.value = String(bookingContext.staffId);
+        }
+
+        if (bookingContext.serviceId && cart.length === 0) {
+            const service = serviceItems.find(item => Number(item.source_id) === Number(bookingContext.serviceId));
+            if (service) {
+                addToCart(service.id, service.name, Number(service.price), 'service', Number(service.source_id));
+            }
+        }
+
+        if (bookingContext.isPaid === true && checkoutBtn) {
+            checkoutBtn.disabled = true;
+            checkoutBtn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i> คิวนี้ชำระแล้ว';
+        }
+    }
+
     document.querySelectorAll('.tab-filter').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
@@ -304,12 +467,11 @@
                 b.classList.remove('active', 'bg-primary-subtle');
             });
             btn.classList.add('active', 'bg-primary-subtle');
-            
-            // อัปเดตข้อความบนปุ่ม dropdown ให้ตรงกับที่เลือก
+
             const iconHtml = btn.querySelector('i').outerHTML;
             const textHtml = btn.textContent.trim();
             document.getElementById('categoryDropdownBtn').innerHTML = `<span class="d-flex align-items-center">${iconHtml} <span class="ms-1">${textHtml}</span></span> <i class="bi bi-chevron-down text-muted"></i>`;
-            
+
             const filter = btn.dataset.filter;
             document.querySelectorAll('.item-card-wrap').forEach(item => {
                 item.style.display = (filter === 'all' || item.dataset.type === filter) ? 'block' : 'none';
@@ -317,38 +479,40 @@
         });
     });
 
-    // ค้นหา
-    document.getElementById('item-search').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        document.querySelectorAll('.item-card-wrap').forEach(item => {
-            const name = item.dataset.name;
-            item.style.display = name.includes(term) ? 'block' : 'none';
+    const itemSearchInput = document.getElementById('item-search');
+    if (itemSearchInput) {
+        itemSearchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.item-card-wrap').forEach(item => {
+                const name = item.dataset.name;
+                item.style.display = name.includes(term) ? 'block' : 'none';
+            });
         });
-    });
+    }
 
-    // ปุ่มเลือกวิธีชำระเงิน
     document.querySelectorAll('.payment-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.payment-btn').forEach(b => b.classList.remove('active', 'btn-primary'));
+            document.querySelectorAll('.payment-btn').forEach(b => {
+                b.classList.remove('active', 'btn-primary');
+                b.classList.add('btn-outline-secondary');
+            });
             btn.classList.add('active', 'btn-primary');
             btn.classList.remove('btn-outline-secondary');
         });
     });
 
-    document.getElementById('discount-input').addEventListener('input', calculate);
-
-    function checkout() {
-        if (cart.length === 0) return alert('กรุณาเลือกรายการสินค้า');
-        alert('บันทึกรายการสำเร็จ (จำลองการทำงาน)');
-        cart = [];
-        renderCart();
+    if (discountInputEl) {
+        discountInputEl.addEventListener('input', calculate);
     }
 
     function saveNewCustomer() {
-        alert('บันทึกข้อมูลลูกค้าสำเร็จ (จำลองการทำงาน)');
+        notifySuccess('บันทึกข้อมูลลูกค้าสำเร็จ (จำลองการทำงาน)');
         const modal = bootstrap.Modal.getInstance(document.getElementById('newCustomerModal'));
         if (modal) modal.hide();
         document.getElementById('new-customer-form').reset();
     }
+
+    applyBookingContext();
+    renderCart();
 </script>
 @endpush

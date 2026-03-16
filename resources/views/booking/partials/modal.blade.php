@@ -13,6 +13,11 @@
             <div class="modal-body pt-3">
                 <form id="booking-form" class="row g-3">
                     <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">ค้นหาลูกค้าจากเบอร์โทร</label>
+                        <input type="tel" class="form-control rounded-3 shadow-none" id="customer-phone" placeholder="พิมพ์เบอร์ เช่น 0891111111">
+                        <div class="form-text" id="customer-phone-hint">พิมพ์อย่างน้อย 3 ตัวเลขเพื่อเลือกข้อมูลลูกค้าเดิมอัตโนมัติ</div>
+                    </div>
+                    <div class="col-12 col-md-6">
                         <label class="form-label small fw-bold">ลูกค้า</label>
                         <select class="form-select rounded-3 shadow-none" id="customer-select" required>
                             @foreach($customers as $c)
@@ -25,6 +30,15 @@
                         <select class="form-select rounded-3 shadow-none" id="staff-select" required>
                             @foreach($staff as $s)
                             <option value="{{ $s['id'] }}">{{ $s['name'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label small fw-bold">ห้อง/เตียง</label>
+                        <select class="form-select rounded-3 shadow-none" id="bed-select">
+                            <option value="">ไม่ระบุ</option>
+                            @foreach($beds as $bed)
+                            <option value="{{ $bed['id'] }}">{{ $bed['name'] }}</option>
                             @endforeach
                         </select>
                     </div>

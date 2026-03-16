@@ -15,7 +15,7 @@
         <div class="card-body p-4" style="overflow-x:hidden;">
             <div class="queue-toolbar d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
                 <div class="d-flex flex-wrap gap-2 align-items-center w-100" style="max-width: 100%;">
-                    <input type="date" id="queue-date" class="form-control rounded-pill px-3 shadow-none border-secondary-subtle flex-grow-1" value="{{ date('Y-m-d') }}" style="width: auto; max-width: 160px;">
+                    <input type="date" id="queue-date" class="form-control rounded-pill px-3 shadow-none border-secondary-subtle flex-grow-1" value="{{ $selectedDate }}" style="width: auto; max-width: 160px;">
                     <button class="btn btn-primary rounded-pill px-4 flex-shrink-0" onclick="openModal()"><i class="bi bi-plus-lg me-2"></i> เพิ่มคิว</button>
                 </div>
                 <span class="badge text-bg-light border rounded-3 px-3 py-2 fw-semibold text-wrap text-start lh-base d-block w-100 w-md-auto">
@@ -274,15 +274,22 @@
 <script>
     const START_HOUR = {{ $startHour }};
     const END_HOUR_EXCLUSIVE = {{ $endHour + 1 }};
+    const activeBranchId = @json($activeBranchId);
     const staffData = @json($staff);
     const customerData = @json($customers);
     const serviceData = @json($serviceItems);
+    const bedData = @json($beds);
+    const initialBookings = @json($bookings);
 
     const bookingModalEl = document.getElementById('bookingModal');
     const queueBoardEl = document.getElementById('queue-board');
+    const queueDateEl = document.getElementById('queue-date');
     const bookingFormEl = document.getElementById('booking-form');
+    const customerPhoneEl = document.getElementById('customer-phone');
+    const customerPhoneHintEl = document.getElementById('customer-phone-hint');
     const customerSelectEl = document.getElementById('customer-select');
     const staffSelectEl = document.getElementById('staff-select');
+    const bedSelectEl = document.getElementById('bed-select');
     const startTimeEl = document.getElementById('start-time');
     const endTimeEl = document.getElementById('end-time');
     const statusSelectEl = document.getElementById('status-select');
@@ -296,34 +303,56 @@
     const addServiceBtn = document.getElementById('add-service-btn');
     const payBookingBtn = document.getElementById('pay-booking-btn');
 
-    const customerMap = new Map(customerData.map(c => [c.id, c]));
-    const serviceMap = new Map(serviceData.map(s => [s.id, s]));
+    const bookingApi = {
+        data: "{{ route('booking.data') }}",
+        store: "{{ route('booking.store') }}",
+        updateBase: "{{ url('/booking') }}",
+        pos: "{{ route('pos') }}",
+        csrfToken: "{{ csrf_token() }}",
+    };
 
-    const defaultCustomerId = customerData.length ? customerData[0].id : '';
-    const defaultServiceId = serviceData.length ? serviceData[0].id : '';
-    const defaultStaffId = staffData.length ? staffData[0].id : '';
+    function normalizeId(value) {
+        return value === null || value === undefined ? '' : String(value);
+    }
 
-    let bookings = [];
+    const customerMap = new Map(customerData.map(c => [normalizeId(c.id), c]));
+    const serviceMap = new Map(serviceData.map(s => [normalizeId(s.id), s]));
+    const bedMap = new Map(bedData.map(b => [normalizeId(b.id), b]));
+
+    const defaultCustomerId = customerData.length ? normalizeId(customerData[0].id) : '';
+    const defaultServiceId = serviceData.length ? normalizeId(serviceData[0].id) : '';
+    const defaultStaffId = staffData.length ? normalizeId(staffData[0].id) : '';
+    const defaultDate = queueDateEl ? queueDateEl.value : "{{ $selectedDate }}";
+
+    let bookings = (Array.isArray(initialBookings) ? initialBookings : []).map(normalizeBooking);
     let bookingModal = null;
     let editingBookingId = null;
     let selectedServiceIds = [];
 
-    function normalizeText(value = '') {
-        return value.toString().toLowerCase().replace(/\([^)]*\)/g, '').replace(/\s+/g, '');
+    function notifyError(message) {
+        if (window.PFPopup && typeof window.PFPopup.error === 'function') {
+            window.PFPopup.error(message);
+            return;
+        }
+        console.error(message);
     }
 
-    function findCustomerIdByName(name = '') {
-        const customer = customerData.find(c => c.name.includes(name) || name.includes(c.name));
-        return customer ? customer.id : defaultCustomerId;
-    }
-
-    function findServiceIdByName(name = '') {
-        const normalizedName = normalizeText(name);
-        const service = serviceData.find(s => {
-            const normalizedService = normalizeText(s.name);
-            return normalizedName.includes(normalizedService) || normalizedService.includes(normalizedName);
-        });
-        return service ? service.id : defaultServiceId;
+    function normalizeBooking(input = {}) {
+        return {
+            id: normalizeId(input.id),
+            customerId: normalizeId(input.customerId),
+            customerName: input.customerName || '',
+            serviceIds: Array.isArray(input.serviceIds)
+                ? input.serviceIds.map(normalizeId).filter(Boolean)
+                : (input.serviceId ? [normalizeId(input.serviceId)] : []),
+            staffId: normalizeId(input.staffId),
+            bedId: normalizeId(input.bedId),
+            start: (input.start || '10:00').slice(0, 5),
+            end: (input.end || '11:00').slice(0, 5),
+            status: input.status || 'waiting',
+            paid: Boolean(input.paid),
+            cancelReason: input.cancelReason || null,
+        };
     }
 
     function toMinutes(hhmm) {
@@ -348,12 +377,12 @@
     }
 
     function getServiceDuration(serviceId) {
-        const service = serviceMap.get(serviceId);
+        const service = serviceMap.get(normalizeId(serviceId));
         return Number((service && service.duration) || 60);
     }
 
     function getServicePrice(serviceId) {
-        const service = serviceMap.get(serviceId);
+        const service = serviceMap.get(normalizeId(serviceId));
         return Number((service && service.price) || 0);
     }
 
@@ -367,39 +396,25 @@
     }
 
     function getCustomerName(customerId, fallbackName = 'Walk-in') {
-        const customer = customerMap.get(customerId);
+        const customer = customerMap.get(normalizeId(customerId));
         return (customer && customer.name) || fallbackName;
+    }
+
+    function getBedName(bedId) {
+        const bed = bedMap.get(normalizeId(bedId));
+        return bed ? bed.name : '';
     }
 
     function getServiceSummary(serviceIds) {
         const names = serviceIds
             .map(id => {
-                const service = serviceMap.get(id);
+                const service = serviceMap.get(normalizeId(id));
                 return service ? service.name : '';
             })
             .filter(Boolean);
         if (!names.length) return '-';
-        if (names.length === 1) return names[0];
-        return `${names[0]} +${names.length - 1} บริการ`;
+        return names[0];
     }
-
-    function createBookingId() {
-        return `BK${Date.now().toString().slice(-6)}`;
-    }
-
-    staffData.forEach(s => s.queue.forEach(q => {
-        bookings.push({
-            id: q.booking_id,
-            customerId: findCustomerIdByName(q.customer),
-            customerName: q.customer,
-            serviceIds: [findServiceIdByName(q.service)].filter(Boolean),
-            staffId: s.id,
-            start: q.start.slice(0, 5),
-            end: q.end.slice(0, 5),
-            status: q.status,
-            paid: q.status === 'completed'
-        });
-    }));
 
     function renderSelectedServices() {
         if (!selectedServiceIds.length) {
@@ -409,7 +424,7 @@
         }
 
         selectedServicesEl.innerHTML = selectedServiceIds.map(serviceId => {
-            const service = serviceMap.get(serviceId);
+            const service = serviceMap.get(normalizeId(serviceId));
             if (!service) return '';
             return `
                 <span class="selected-service-chip">
@@ -425,7 +440,7 @@
     }
 
     function removeService(serviceId) {
-        selectedServiceIds = selectedServiceIds.filter(id => id !== serviceId);
+        selectedServiceIds = selectedServiceIds.filter(id => normalizeId(id) !== normalizeId(serviceId));
         renderSelectedServices();
     }
     window.removeService = removeService;
@@ -452,19 +467,23 @@
 
     function fillModal(booking, isEditing = false) {
         customerSelectEl.value = booking.customerId || defaultCustomerId;
-        staffSelectEl.value = booking.staffId || defaultStaffId;
+        staffSelectEl.value = normalizeId(booking.staffId || defaultStaffId);
+        if (bedSelectEl) bedSelectEl.value = normalizeId(booking.bedId || '');
         startTimeEl.value = booking.start || '10:00';
         endTimeEl.value = booking.end || addMinutes(startTimeEl.value, getTotalDuration(booking.serviceIds));
         statusSelectEl.value = booking.status || 'waiting';
-        selectedServiceIds = [...(booking.serviceIds || [])];
+        selectedServiceIds = [...(booking.serviceIds || [])].map(normalizeId).slice(0, 1);
         if (!selectedServiceIds.length && defaultServiceId) selectedServiceIds = [defaultServiceId];
         renderSelectedServices();
         setModalMode(isEditing);
         payBookingBtn.innerHTML = booking.paid
             ? '<i class="bi bi-check2-circle me-1"></i> ชำระแล้ว'
             : '<i class="bi bi-wallet2 me-1"></i> ชำระเงิน';
+        payBookingBtn.disabled = Boolean(booking.paid);
+        saveBookingBtn.disabled = Boolean(booking.paid);
         payBookingBtn.classList.toggle('btn-success', booking.paid);
         payBookingBtn.classList.toggle('btn-outline-success', !booking.paid);
+        deleteBookingBtn.classList.toggle('d-none', !isEditing || Boolean(booking.paid));
     }
 
     function renderBookings() {
@@ -472,7 +491,7 @@
         const totalMinutes = (END_HOUR_EXCLUSIVE - START_HOUR) * 60;
 
         bookings.forEach(b => {
-            const layer = document.getElementById(`layer-${b.staffId}`);
+            const layer = document.getElementById(`layer-${normalizeId(b.staffId)}`);
             if (!layer) return;
 
             const layerWidth = layer.clientWidth;
@@ -500,7 +519,7 @@
                     <span class="${b.paid ? 'booking-paid' : 'booking-unpaid'}">${b.paid ? 'ชำระแล้ว' : 'รอชำระ'}</span>
                 </div>
                 <div class="booking-customer">${getCustomerName(b.customerId, b.customerName)}</div>
-                <div class="booking-service">${getServiceSummary(b.serviceIds)}</div>
+                <div class="booking-service">${getServiceSummary(b.serviceIds)}${getBedName(b.bedId) ? ' · ' + getBedName(b.bedId) : ''}</div>
             `;
             card.addEventListener('click', (ev) => {
                 ev.stopPropagation();
@@ -555,6 +574,7 @@
     function hasModalControls() {
         return customerSelectEl
             && staffSelectEl
+            && bedSelectEl
             && startTimeEl
             && endTimeEl
             && statusSelectEl
@@ -570,78 +590,179 @@
         if (!hasModalControls()) return null;
         const start = startTimeEl.value;
         const end = endTimeEl.value;
+        const queueDate = (queueDateEl && queueDateEl.value) ? queueDateEl.value : defaultDate;
 
         if (!customerSelectEl.value || !staffSelectEl.value || !start || !end) {
-            alert('กรุณากรอกข้อมูลให้ครบก่อนบันทึก');
+            notifyError('กรุณากรอกข้อมูลให้ครบก่อนบันทึก');
             return null;
         }
 
         if (!selectedServiceIds.length) {
-            alert('กรุณาเลือกอย่างน้อย 1 บริการ');
+            notifyError('กรุณาเลือกอย่างน้อย 1 บริการ');
             return null;
         }
 
         if (toMinutes(end) <= toMinutes(start)) {
-            alert('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม');
+            notifyError('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม');
             return null;
         }
 
-        const existing = bookings.find(item => item.id === editingBookingId);
-
         return {
-            id: (existing && existing.id) || createBookingId(),
-            customerId: customerSelectEl.value,
-            customerName: getCustomerName(customerSelectEl.value),
-            serviceIds: [...selectedServiceIds],
-            staffId: staffSelectEl.value,
-            start,
-            end,
+            branch_id: activeBranchId || null,
+            queue_date: queueDate,
+            customer_id: Number(customerSelectEl.value),
+            service_id: Number(selectedServiceIds[0]),
+            masseuse_id: staffSelectEl.value ? Number(staffSelectEl.value) : null,
+            bed_id: bedSelectEl.value ? Number(bedSelectEl.value) : null,
+            start_time: start,
+            end_time: end,
             status: statusSelectEl.value,
-            paid: (existing && existing.paid) || false
+            cancel_reason: null,
         };
     }
 
-    function upsertBooking(payload) {
-        const idx = bookings.findIndex(item => item.id === payload.id);
+    function upsertBooking(booking) {
+        const normalized = normalizeBooking(booking);
+        const idx = bookings.findIndex(item => normalizeId(item.id) === normalizeId(normalized.id));
         if (idx >= 0) {
-            bookings[idx] = payload;
+            bookings[idx] = normalized;
         } else {
-            bookings.push(payload);
-            editingBookingId = payload.id;
+            bookings.push(normalized);
+            editingBookingId = normalized.id;
         }
     }
 
-    function saveBookingAndClose() {
+    function extractErrorMessage(errorPayload = {}) {
+        if (errorPayload && typeof errorPayload.message === 'string' && errorPayload.message.trim() !== '') {
+            if (!errorPayload.errors) {
+                return errorPayload.message;
+            }
+        }
+
+        if (errorPayload && errorPayload.errors && typeof errorPayload.errors === 'object') {
+            const firstKey = Object.keys(errorPayload.errors)[0];
+            if (firstKey && Array.isArray(errorPayload.errors[firstKey]) && errorPayload.errors[firstKey].length > 0) {
+                return errorPayload.errors[firstKey][0];
+            }
+        }
+
+        return 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง';
+    }
+
+    async function requestJson(url, options = {}) {
+        const response = await fetch(url, {
+            method: options.method || 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': bookingApi.csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+                ...(options.headers || {}),
+            },
+            body: options.body || null,
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            throw new Error(extractErrorMessage(payload));
+        }
+
+        return payload;
+    }
+
+    async function saveBookingAndClose() {
         const payload = collectBookingPayload();
         if (!payload) return;
-        upsertBooking(payload);
-        renderBookings();
-        const modal = getModalInstance();
-        if (modal && typeof modal.hide === 'function') {
-            modal.hide();
+
+        try {
+            saveBookingBtn.disabled = true;
+            const isEditing = Boolean(editingBookingId);
+            const url = isEditing
+                ? `${bookingApi.updateBase}/${editingBookingId}`
+                : bookingApi.store;
+            const method = isEditing ? 'PUT' : 'POST';
+            const response = await requestJson(url, {
+                method,
+                body: JSON.stringify(payload),
+            });
+            upsertBooking(response.booking);
+            renderBookings();
+            const modal = getModalInstance();
+            if (modal && typeof modal.hide === 'function') {
+                modal.hide();
+            }
+        } catch (error) {
+            notifyError(error.message);
+        } finally {
+            saveBookingBtn.disabled = false;
         }
     }
 
     function markAsPaid() {
         const payload = collectBookingPayload();
         if (!payload) return;
-        payload.paid = true;
-        payload.status = 'completed';
-        upsertBooking(payload);
-        renderBookings();
-        const modal = getModalInstance();
-        if (modal && typeof modal.hide === 'function') {
-            modal.hide();
+
+        const params = new URLSearchParams({
+            from_booking: '1',
+            queue_date: payload.queue_date,
+            customer_id: String(payload.customer_id),
+            staff_id: payload.masseuse_id !== null ? String(payload.masseuse_id) : '',
+            service_id: String(payload.service_id),
+            bed_id: payload.bed_id !== null ? String(payload.bed_id) : '',
+            start_time: payload.start_time,
+            end_time: payload.end_time,
+        });
+
+        if (activeBranchId) {
+            params.set('branch_id', String(activeBranchId));
+        }
+
+        if (editingBookingId) {
+            params.set('booking_id', String(editingBookingId));
+        }
+
+        window.location.href = `${bookingApi.pos}?${params.toString()}`;
+    }
+
+    async function deleteBooking() {
+        if (!editingBookingId) return;
+
+        try {
+            deleteBookingBtn.disabled = true;
+            const deleteUrl = activeBranchId
+                ? `${bookingApi.updateBase}/${editingBookingId}?branch_id=${encodeURIComponent(String(activeBranchId))}`
+                : `${bookingApi.updateBase}/${editingBookingId}`;
+            await requestJson(deleteUrl, {
+                method: 'DELETE',
+            });
+            bookings = bookings.filter(item => normalizeId(item.id) !== normalizeId(editingBookingId));
+            renderBookings();
+            const modal = getModalInstance();
+            if (modal && typeof modal.hide === 'function') {
+                modal.hide();
+            }
+        } catch (error) {
+            notifyError(error.message);
+        } finally {
+            deleteBookingBtn.disabled = false;
         }
     }
 
-    function deleteBooking() {
-        if (!editingBookingId) return;
-        bookings = bookings.filter(item => item.id !== editingBookingId);
-        renderBookings();
-        const modal = getModalInstance();
-        if (modal && typeof modal.hide === 'function') {
-            modal.hide();
+    async function loadBookingsByDate(dateValue) {
+        const params = new URLSearchParams({
+            date: dateValue || defaultDate,
+        });
+        if (activeBranchId) {
+            params.set('branch_id', String(activeBranchId));
+        }
+
+        try {
+            const response = await requestJson(`${bookingApi.data}?${params.toString()}`);
+            bookings = (response.bookings || []).map(normalizeBooking);
+            renderBookings();
+        } catch (error) {
+            notifyError(error.message);
         }
     }
 
@@ -652,11 +773,11 @@
     function openModal(data = {}) {
         const modalInstance = getModalInstance();
         if (!modalInstance) {
-            alert('ไม่สามารถเปิดหน้าต่างคิวได้ กรุณารีเฟรชหน้าอีกครั้ง');
+            notifyError('ไม่สามารถเปิดหน้าต่างคิวได้ กรุณารีเฟรชหน้าอีกครั้ง');
             return;
         }
         if (!hasModalControls()) {
-            alert('ไม่พบฟอร์มจัดการคิวในหน้านี้');
+            notifyError('ไม่พบฟอร์มจัดการคิวในหน้านี้');
             return;
         }
 
@@ -670,14 +791,15 @@
         }
 
         editingBookingId = null;
-        const startTime = data.time || '10:00';
+        const startTime = (data.time || '10:00').slice(0, 5);
         const initialServices = defaultServiceId ? [defaultServiceId] : [];
         const duration = getTotalDuration(initialServices);
 
         fillModal({
             customerId: defaultCustomerId,
             serviceIds: initialServices,
-            staffId: data.staffId || defaultStaffId,
+            staffId: normalizeId(data.staffId || defaultStaffId),
+            bedId: '',
             start: startTime,
             end: addMinutes(startTime, duration),
             status: 'waiting',
@@ -723,10 +845,9 @@
 
     if (addServiceBtn) {
         addServiceBtn.addEventListener('click', () => {
-            const serviceId = serviceSelectEl.value;
+            const serviceId = normalizeId(serviceSelectEl.value);
             if (!serviceId) return;
-            if (selectedServiceIds.includes(serviceId)) return;
-            selectedServiceIds.push(serviceId);
+            selectedServiceIds = [serviceId];
             renderSelectedServices();
             ensureEndAfterStart();
         });
@@ -743,6 +864,44 @@
             if (bookingFormEl) bookingFormEl.reset();
             selectedServiceIds = [];
             editingBookingId = null;
+            if (saveBookingBtn) saveBookingBtn.disabled = false;
+            if (payBookingBtn) payBookingBtn.disabled = false;
+            if (deleteBookingBtn) deleteBookingBtn.disabled = false;
+        });
+    }
+
+    if (customerPhoneEl) {
+        customerPhoneEl.addEventListener('input', () => {
+            const rawDigits = customerPhoneEl.value.replace(/\D/g, '');
+            if (rawDigits.length < 3) {
+                if (customerPhoneHintEl) {
+                    customerPhoneHintEl.textContent = 'พิมพ์อย่างน้อย 3 ตัวเลขเพื่อเลือกข้อมูลลูกค้าเดิมอัตโนมัติ';
+                }
+                return;
+            }
+
+            const found = customerData.find(customer => {
+                const customerPhone = String(customer.phone || '').replace(/\D/g, '');
+                return customerPhone.includes(rawDigits);
+            });
+
+            if (!found) {
+                if (customerPhoneHintEl) {
+                    customerPhoneHintEl.textContent = 'ไม่พบลูกค้าจากเบอร์นี้';
+                }
+                return;
+            }
+
+            customerSelectEl.value = normalizeId(found.id);
+            if (customerPhoneHintEl) {
+                customerPhoneHintEl.textContent = `พบลูกค้า: ${found.name}`;
+            }
+        });
+    }
+
+    if (queueDateEl) {
+        queueDateEl.addEventListener('change', () => {
+            loadBookingsByDate(queueDateEl.value);
         });
     }
 

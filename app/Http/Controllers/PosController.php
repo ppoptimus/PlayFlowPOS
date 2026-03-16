@@ -2,29 +2,53 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\MockDataService;
+use App\Services\PosService;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PosController extends Controller
 {
-    private MockDataService $mockDataService;
+    private PosService $posService;
 
-    public function __construct(MockDataService $mockDataService)
+    public function __construct(PosService $posService)
     {
-        $this->mockDataService = $mockDataService;
+        $this->posService = $posService;
     }
 
-    public function index(): View
+    public function index(Request $request): View
     {
-        $items = $this->mockDataService->getPosItems();
+        $pageData = $this->posService->getPageData($request->user(), $request->query());
 
-        return view('pos.index', [
-            'items' => $items,
-            'serviceItems' => array_values(array_filter($items, static function ($item) {
-                return $item['type'] === 'service';
-            })),
-            'staff' => $this->mockDataService->getStaff(),
-            'customers' => $this->mockDataService->getCustomers(),
+        return view('pos.index', $pageData);
+    }
+
+    public function checkout(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'branch_id' => 'nullable|integer',
+            'customer_id' => 'nullable|integer|exists:customers,id',
+            'staff_id' => 'nullable|integer|exists:masseuses,id',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'payment_method' => 'required|string|in:cash,transfer,card,credit_card,package_redeem',
+            'items' => 'required|array|min:1',
+            'items.*.type' => 'required|string|in:service,product,package',
+            'items.*.source_id' => 'required|integer',
+            'items.*.qty' => 'required|integer|min:1',
+            'booking_context' => 'nullable|array',
+            'booking_context.booking_id' => 'nullable|integer',
+            'booking_context.queue_date' => 'nullable|date_format:Y-m-d',
+            'booking_context.start_time' => 'nullable|date_format:H:i',
+            'booking_context.end_time' => 'nullable|date_format:H:i',
+            'booking_context.customer_id' => 'nullable|integer',
+            'booking_context.staff_id' => 'nullable|integer',
+            'booking_context.service_id' => 'nullable|integer',
+            'booking_context.bed_id' => 'nullable|integer',
+            'booking_context.is_paid' => 'nullable|boolean',
         ]);
+
+        $result = $this->posService->checkout($request->user(), $payload);
+
+        return response()->json($result);
     }
 }

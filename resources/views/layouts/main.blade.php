@@ -237,6 +237,35 @@
         }
         .mobile-menu-link.active .mobile-menu-arrow { opacity: 1; }
         .form-control:focus, .form-select:focus { border-color: rgba(31, 115, 224, 0.5); box-shadow: 0 0 0 0.25rem rgba(31, 115, 224, 0.16); }
+        .pf-toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.65rem;
+            pointer-events: none;
+        }
+        .pf-toast {
+            pointer-events: auto;
+            min-width: 280px;
+            max-width: min(92vw, 420px);
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 12px 30px rgba(15, 58, 104, 0.25);
+            overflow: hidden;
+            backdrop-filter: blur(6px);
+            color: #ecf4ff;
+        }
+        .pf-toast .toast-body {
+            white-space: pre-line;
+            font-size: 0.94rem;
+        }
+        .pf-toast-success { background: linear-gradient(135deg, rgba(15, 153, 123, 0.98), rgba(22, 183, 151, 0.98)); }
+        .pf-toast-error { background: linear-gradient(135deg, rgba(175, 48, 65, 0.98), rgba(218, 78, 94, 0.98)); }
+        .pf-toast-warning { background: linear-gradient(135deg, rgba(171, 121, 29, 0.98), rgba(212, 152, 36, 0.98)); }
+        .pf-toast-info { background: linear-gradient(135deg, rgba(31, 98, 180, 0.98), rgba(40, 141, 219, 0.98)); }
         @media (max-width: 991.98px) {
             body {
                 padding-top: 66px;
@@ -296,6 +325,7 @@
     </div>
 
     @include('layouts.partials.footer')
+    <div id="pf-toast-container" class="pf-toast-container"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -376,6 +406,92 @@
                     shownModal.dispatchEvent(new Event('hidden.bs.modal'));
                 }
             });
+        })();
+
+        (function () {
+            const container = document.getElementById('pf-toast-container');
+            if (!container) return;
+
+            function iconByType(type) {
+                if (type === 'success') return 'bi-check-circle-fill';
+                if (type === 'error') return 'bi-exclamation-octagon-fill';
+                if (type === 'warning') return 'bi-exclamation-triangle-fill';
+                return 'bi-info-circle-fill';
+            }
+
+            function titleByType(type) {
+                if (type === 'success') return 'สำเร็จ';
+                if (type === 'error') return 'ผิดพลาด';
+                if (type === 'warning') return 'แจ้งเตือน';
+                return 'ข้อมูล';
+            }
+
+            function fallbackShow(toastEl, delay) {
+                toastEl.style.opacity = '0';
+                toastEl.style.transform = 'translateY(-8px)';
+                toastEl.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+                requestAnimationFrame(function () {
+                    toastEl.style.opacity = '1';
+                    toastEl.style.transform = 'translateY(0)';
+                });
+
+                setTimeout(function () {
+                    toastEl.style.opacity = '0';
+                    toastEl.style.transform = 'translateY(-8px)';
+                    setTimeout(function () {
+                        toastEl.remove();
+                    }, 220);
+                }, delay);
+            }
+
+            window.PFPopup = {
+                show: function (message, type, options) {
+                    const resolvedType = type || 'info';
+                    const resolvedOptions = options || {};
+                    const title = resolvedOptions.title || titleByType(resolvedType);
+                    const delay = Number(resolvedOptions.delay || 2800);
+
+                    const toastEl = document.createElement('div');
+                    toastEl.className = 'toast pf-toast pf-toast-' + resolvedType;
+                    toastEl.setAttribute('role', 'status');
+                    toastEl.setAttribute('aria-live', 'polite');
+                    toastEl.setAttribute('aria-atomic', 'true');
+                    toastEl.innerHTML = '' +
+                        '<div class="toast-header text-white border-0 bg-transparent">' +
+                        '  <i class="bi ' + iconByType(resolvedType) + ' me-2"></i>' +
+                        '  <strong class="me-auto">' + title + '</strong>' +
+                        '  <button type="button" class="btn-close btn-close-white ms-2 mb-1" data-bs-dismiss="toast" aria-label="Close"></button>' +
+                        '</div>' +
+                        '<div class="toast-body"></div>';
+
+                    const bodyEl = toastEl.querySelector('.toast-body');
+                    if (bodyEl) bodyEl.textContent = String(message || '');
+                    container.appendChild(toastEl);
+
+                    if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+                        const toast = new bootstrap.Toast(toastEl, {
+                            autohide: true,
+                            delay: delay,
+                        });
+                        toastEl.addEventListener('hidden.bs.toast', function () {
+                            toastEl.remove();
+                        });
+                        toast.show();
+                    } else {
+                        fallbackShow(toastEl, delay);
+                    }
+                },
+                success: function (message, options) { this.show(message, 'success', options); },
+                error: function (message, options) { this.show(message, 'error', options); },
+                warning: function (message, options) { this.show(message, 'warning', options); },
+                info: function (message, options) { this.show(message, 'info', options); },
+            };
+
+            window.pfNotify = function (message, type, options) {
+                const resolver = window.PFPopup;
+                if (!resolver) return;
+                resolver.show(message, type, options);
+            };
         })();
     </script>
     @stack('scripts')
