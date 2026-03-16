@@ -7,7 +7,7 @@ class MockDataService
     public function getDashboardStats(): array
     {
         return [
-            'today_sales' => 12720,
+            'today_sales' => 2720,
             'today_clients' => 24,
             'monthly_sales' => 124500,
             'last_sync' => 'อัปเดตล่าสุด 10:42',
