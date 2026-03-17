@@ -1,0 +1,487 @@
+<?php
+
+namespace App\Services;
+
+use App\User;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
+
+class CustomerService
+{
+    private const PRESSURE_LEVELS = [
+        ['value' => 'light', 'label' => 'เบา (Light)'],
+        ['value' => 'medium', 'label' => 'ปานกลาง (Medium)'],
+        ['value' => 'firm', 'label' => 'หนัก (Firm)'],
+    ];
+
+    private array $tableExistsCache = [];
+    private array $columnExistsCache = [];
+
+    public function getPageData(User $user, ?int $selectedCustomerId, string $search): array
+    {
+        $normalizedSearch = trim($search);
+        $customers = $this->getCustomers($normalizedSearch);
+        $selectedCustomer = null;
+        $history = [];
+
+        if ($selectedCustomerId !== null && $selectedCustomerId > 0) {
+            $selectedCustomer = $this->findCustomerById($selectedCustomerId);
+            if ($selectedCustomer !== null) {
+                $history = $this->getCustomerOrderHistory((int) $selectedCustomer['id']);
+            }
+        }
+
+        return [
+            'search' => $normalizedSearch,
+            'customers' => $customers,
+            'selectedCustomer' => $selectedCustomer,
+            'history' => $history,
+            'summary' => $this->buildSummary($customers),
+            'pressureLevels' => self::PRESSURE_LEVELS,
+        ];
+    }
+
+    public function getCustomerById(int $customerId): ?array
+    {
+        return $this->findCustomerById($customerId);
+    }
+
+    public function getHistoryByCustomerId(int $customerId): array
+    {
+        return $this->getCustomerOrderHistory($customerId);
+    }
+
+    public function createCustomer(array $payload): array
+    {
+        $this->assertCustomersTableExists();
+        $data = $this->sanitizeCustomerData($payload);
+        if (empty($data)) {
+            throw ValidationException::withMessages([
+                'customer' => ['ไม่สามารถบันทึกข้อมูลลูกค้าได้ เพราะโครงสร้างตารางยังไม่พร้อม'],
+            ]);
+        }
+        $now = now();
+
+        if ($this->hasColumn('customers', 'created_at')) {
+            $data['created_at'] = $now;
+        }
+        if ($this->hasColumn('customers', 'updated_at')) {
+            $data['updated_at'] = $now;
+        }
+
+        $customerId = (int) DB::table('customers')->insertGetId($data);
+        $customer = $this->findCustomerById($customerId);
+
+        if ($customer === null) {
+            throw ValidationException::withMessages([
+                'customer' => ['ไม่พบข้อมูลลูกค้าที่เพิ่งบันทึก'],
+            ]);
+        }
+
+        return $customer;
+    }
+
+    public function updateCustomer(int $customerId, array $payload): array
+    {
+        $this->assertCustomersTableExists();
+        $existing = $this->findCustomerById($customerId);
+
+        if ($existing === null) {
+            throw ValidationException::withMessages([
+                'customer' => ['ไม่พบข้อมูลลูกค้าที่ต้องการแก้ไข'],
+            ]);
+        }
+
+        $data = $this->sanitizeCustomerData($payload);
+        if ($this->hasColumn('customers', 'updated_at')) {
+            $data['updated_at'] = now();
+        }
+
+        if (empty($data)) {
+            return $existing;
+        }
+
+        DB::table('customers')
+            ->where('id', $customerId)
+            ->update($data);
+
+        $updated = $this->findCustomerById($customerId);
+        return $updated !== null ? $updated : $existing;
+    }
+
+    public function deleteCustomer(int $customerId): void
+    {
+        $this->assertCustomersTableExists();
+        $existing = DB::table('customers')
+            ->where('id', $customerId)
+            ->exists();
+
+        if (!$existing) {
+            throw ValidationException::withMessages([
+                'customer' => ['ไม่พบข้อมูลลูกค้าที่ต้องการลบ'],
+            ]);
+        }
+
+        if ($this->tableExists('orders')) {
+            $hasOrders = DB::table('orders')
+                ->where('customer_id', $customerId)
+                ->exists();
+            if ($hasOrders) {
+                throw ValidationException::withMessages([
+                    'customer' => ['ลูกค้ารายนี้มีประวัติการชำระเงินแล้ว จึงไม่สามารถลบได้'],
+                ]);
+            }
+        }
+
+        if ($this->tableExists('bookings')) {
+            $hasBookings = DB::table('bookings')
+                ->where('customer_id', $customerId)
+                ->exists();
+            if ($hasBookings) {
+                throw ValidationException::withMessages([
+                    'customer' => ['ลูกค้ารายนี้มีประวัติคิวจองแล้ว จึงไม่สามารถลบได้'],
+                ]);
+            }
+        }
+
+        DB::table('customers')
+            ->where('id', $customerId)
+            ->delete();
+    }
+
+    private function getCustomers(string $search): array
+    {
+        if (!$this->tableExists('customers')) {
+            return [];
+        }
+
+        $query = $this->buildCustomersBaseQuery()
+            ->orderBy('name')
+            ->orderBy('c.id');
+
+        if ($search !== '') {
+            $searchDigits = preg_replace('/\D+/', '', $search);
+
+            $query->where(function ($where) use ($search, $searchDigits): void {
+                if ($this->hasColumn('customers', 'name')) {
+                    $where->where('c.name', 'like', '%' . $search . '%');
+                } else {
+                    $where->whereRaw("CONCAT('Customer #', c.id) LIKE ?", ['%' . $search . '%']);
+                }
+
+                if ($this->hasColumn('customers', 'phone')) {
+                    $where->orWhere('c.phone', 'like', '%' . $search . '%');
+                }
+
+                if ($this->hasColumn('customers', 'line_id')) {
+                    $where->orWhere('c.line_id', 'like', '%' . $search . '%');
+                }
+
+                if ($searchDigits !== '' && $this->hasColumn('customers', 'phone')) {
+                    $where->orWhereRaw(
+                        "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.phone, '-', ''), ' ', ''), '+', ''), '(', ''), ')', '') LIKE ?",
+                        ['%' . $searchDigits . '%']
+                    );
+                }
+            });
+        }
+
+        return $query
+            ->limit(500)
+            ->get()
+            ->map(function ($row): array {
+                return $this->mapCustomerRow($row);
+            })
+            ->all();
+    }
+
+    private function findCustomerById(int $customerId): ?array
+    {
+        if (!$this->tableExists('customers')) {
+            return null;
+        }
+
+        $row = $this->buildCustomersBaseQuery()
+            ->where('c.id', $customerId)
+            ->first();
+
+        if ($row === null) {
+            return null;
+        }
+
+        return $this->mapCustomerRow($row);
+    }
+
+    private function getCustomerOrderHistory(int $customerId): array
+    {
+        if (!$this->tableExists('orders')) {
+            return [];
+        }
+
+        $hasOrderItems = $this->tableExists('order_items');
+        $query = DB::table('orders as o')
+            ->where('o.customer_id', $customerId)
+            ->orderByDesc('o.created_at')
+            ->limit(50);
+
+        if ($hasOrderItems) {
+            $query
+                ->leftJoin('order_items as oi', 'oi.order_id', '=', 'o.id')
+                ->leftJoin('services as s', function ($join): void {
+                    $join->on('s.id', '=', 'oi.item_id')
+                        ->where('oi.item_type', '=', 'service');
+                })
+                ->leftJoin('products as p', function ($join): void {
+                    $join->on('p.id', '=', 'oi.item_id')
+                        ->where('oi.item_type', '=', 'product');
+                })
+                ->leftJoin('packages as pkg', function ($join): void {
+                    $join->on('pkg.id', '=', 'oi.item_id')
+                        ->where('oi.item_type', '=', 'package');
+                })
+                ->groupBy(
+                    'o.id',
+                    'o.order_no',
+                    'o.created_at',
+                    'o.payment_method',
+                    'o.status',
+                    'o.grand_total'
+                );
+        }
+
+        $select = [
+            'o.id',
+            'o.order_no',
+            'o.created_at',
+            'o.payment_method',
+            'o.status',
+            'o.grand_total',
+        ];
+
+        if ($hasOrderItems) {
+            $select[] = DB::raw('COUNT(oi.id) as item_count');
+            $select[] = DB::raw(
+                "GROUP_CONCAT(DISTINCT COALESCE(s.name, p.name, pkg.name, CONCAT('Item #', oi.item_id)) SEPARATOR ', ') as item_summary"
+            );
+        } else {
+            $select[] = DB::raw('0 as item_count');
+            $select[] = DB::raw("'' as item_summary");
+        }
+
+        return $query
+            ->get($select)
+            ->map(function ($row): array {
+                return [
+                    'id' => (int) $row->id,
+                    'order_no' => $row->order_no !== null ? (string) $row->order_no : 'Order #' . (int) $row->id,
+                    'created_at' => $this->formatDateTime($row->created_at),
+                    'payment_method' => (string) ($row->payment_method ?? ''),
+                    'payment_method_label' => $this->translatePaymentMethod((string) ($row->payment_method ?? '')),
+                    'status' => (string) ($row->status ?? ''),
+                    'status_label' => $this->translateOrderStatus((string) ($row->status ?? '')),
+                    'grand_total' => (float) ($row->grand_total ?? 0),
+                    'item_count' => (int) ($row->item_count ?? 0),
+                    'item_summary' => (string) ($row->item_summary ?? ''),
+                ];
+            })
+            ->all();
+    }
+
+    private function buildSummary(array $customers): array
+    {
+        $totalCustomers = count($customers);
+        $activeCustomers30d = 0;
+
+        if ($this->tableExists('orders')) {
+            $activeCustomers30d = (int) DB::table('orders')
+                ->where('created_at', '>=', now()->subDays(30)->toDateTimeString())
+                ->whereNotNull('customer_id')
+                ->distinct('customer_id')
+                ->count('customer_id');
+        }
+
+        return [
+            'total_customers' => $totalCustomers,
+            'active_customers_30d' => $activeCustomers30d,
+        ];
+    }
+
+    private function buildCustomersBaseQuery()
+    {
+        $query = DB::table('customers as c')
+            ->select('c.id');
+
+        $this->addCustomerColumnSelect($query, 'name', "CONCAT('Customer #', c.id)");
+        $this->addCustomerColumnSelect($query, 'phone', "''");
+        $this->addCustomerColumnSelect($query, 'line_id', "''");
+        $this->addCustomerColumnSelect($query, 'preferred_pressure_level', 'NULL');
+        $this->addCustomerColumnSelect($query, 'health_notes', 'NULL');
+        $this->addCustomerColumnSelect($query, 'contraindications', 'NULL');
+
+        if ($this->tableExists('orders')) {
+            $query->selectSub(function ($subQuery): void {
+                $subQuery->from('orders as o')
+                    ->selectRaw('COUNT(*)')
+                    ->whereColumn('o.customer_id', 'c.id');
+            }, 'visit_count');
+
+            $query->selectSub(function ($subQuery): void {
+                $subQuery->from('orders as o')
+                    ->selectRaw('COALESCE(SUM(CASE WHEN o.status = ? THEN o.grand_total ELSE 0 END), 0)', ['paid'])
+                    ->whereColumn('o.customer_id', 'c.id');
+            }, 'total_spent');
+
+            $query->selectSub(function ($subQuery): void {
+                $subQuery->from('orders as o')
+                    ->selectRaw('MAX(o.created_at)')
+                    ->whereColumn('o.customer_id', 'c.id');
+            }, 'last_visit_at');
+        } else {
+            $query->selectRaw('0 as visit_count');
+            $query->selectRaw('0 as total_spent');
+            $query->selectRaw('NULL as last_visit_at');
+        }
+
+        return $query;
+    }
+
+    private function mapCustomerRow($row): array
+    {
+        return [
+            'id' => (int) $row->id,
+            'name' => (string) ($row->name ?? ''),
+            'phone' => (string) ($row->phone ?? ''),
+            'line_id' => (string) ($row->line_id ?? ''),
+            'preferred_pressure_level' => $row->preferred_pressure_level !== null ? (string) $row->preferred_pressure_level : null,
+            'health_notes' => $row->health_notes !== null ? (string) $row->health_notes : '',
+            'contraindications' => $row->contraindications !== null ? (string) $row->contraindications : '',
+            'visit_count' => (int) ($row->visit_count ?? 0),
+            'total_spent' => (float) ($row->total_spent ?? 0),
+            'last_visit_at' => $this->formatDateTime($row->last_visit_at),
+        ];
+    }
+
+    private function addCustomerColumnSelect($query, string $column, string $fallbackExpression): void
+    {
+        if ($this->hasColumn('customers', $column)) {
+            $query->addSelect('c.' . $column);
+            return;
+        }
+
+        $query->selectRaw($fallbackExpression . ' as ' . $column);
+    }
+
+    private function sanitizeCustomerData(array $payload): array
+    {
+        $data = [];
+
+        if ($this->hasColumn('customers', 'name') && array_key_exists('name', $payload)) {
+            $data['name'] = trim((string) $payload['name']);
+        }
+
+        if ($this->hasColumn('customers', 'phone') && array_key_exists('phone', $payload)) {
+            $data['phone'] = trim((string) $payload['phone']);
+        }
+
+        if ($this->hasColumn('customers', 'line_id') && array_key_exists('line_id', $payload)) {
+            $lineId = trim((string) ($payload['line_id'] ?? ''));
+            $data['line_id'] = $lineId !== '' ? $lineId : null;
+        }
+
+        if ($this->hasColumn('customers', 'preferred_pressure_level') && array_key_exists('preferred_pressure_level', $payload)) {
+            $pressure = trim((string) ($payload['preferred_pressure_level'] ?? ''));
+            $data['preferred_pressure_level'] = $pressure !== '' ? $pressure : null;
+        }
+
+        if ($this->hasColumn('customers', 'health_notes') && array_key_exists('health_notes', $payload)) {
+            $notes = trim((string) ($payload['health_notes'] ?? ''));
+            $data['health_notes'] = $notes !== '' ? $notes : null;
+        }
+
+        if ($this->hasColumn('customers', 'contraindications') && array_key_exists('contraindications', $payload)) {
+            $contraindications = trim((string) ($payload['contraindications'] ?? ''));
+            $data['contraindications'] = $contraindications !== '' ? $contraindications : null;
+        }
+
+        return $data;
+    }
+
+    private function assertCustomersTableExists(): void
+    {
+        if ($this->tableExists('customers')) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'customer' => ['ยังไม่พบตาราง customers ในฐานข้อมูล'],
+        ]);
+    }
+
+    private function tableExists(string $table): bool
+    {
+        if (!array_key_exists($table, $this->tableExistsCache)) {
+            $this->tableExistsCache[$table] = Schema::hasTable($table);
+        }
+
+        return (bool) $this->tableExistsCache[$table];
+    }
+
+    private function hasColumn(string $table, string $column): bool
+    {
+        $cacheKey = $table . '.' . $column;
+
+        if (!array_key_exists($cacheKey, $this->columnExistsCache)) {
+            $this->columnExistsCache[$cacheKey] = $this->tableExists($table) && Schema::hasColumn($table, $column);
+        }
+
+        return (bool) $this->columnExistsCache[$cacheKey];
+    }
+
+    private function formatDateTime($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse((string) $value)->format('Y-m-d H:i');
+        } catch (\Throwable $e) {
+            return (string) $value;
+        }
+    }
+
+    private function translatePaymentMethod(string $method): string
+    {
+        if ($method === 'cash') {
+            return 'เงินสด';
+        }
+        if ($method === 'transfer') {
+            return 'โอนเงิน';
+        }
+        if ($method === 'credit_card' || $method === 'card') {
+            return 'บัตรเครดิต';
+        }
+        if ($method === 'package_redeem') {
+            return 'ตัดแพ็กเกจ';
+        }
+
+        return $method !== '' ? $method : '-';
+    }
+
+    private function translateOrderStatus(string $status): string
+    {
+        if ($status === 'paid') {
+            return 'ชำระแล้ว';
+        }
+        if ($status === 'refunded') {
+            return 'คืนเงิน';
+        }
+        if ($status === 'void') {
+            return 'ยกเลิกบิล';
+        }
+
+        return $status !== '' ? $status : '-';
+    }
+}

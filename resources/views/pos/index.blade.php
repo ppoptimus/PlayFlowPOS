@@ -295,6 +295,7 @@
     const serviceItems = @json($serviceItems);
     const customers = @json($customers ?? []);
     const checkoutUrl = "{{ route('pos.checkout') }}";
+    const quickCreateCustomerUrl = "{{ route('customers.quick-create') }}";
     const bookingUrl = "{{ route('booking') }}";
     const receiptDetailBaseUrl = "{{ url('/receipts') }}";
     const csrfToken = "{{ csrf_token() }}";
@@ -312,6 +313,7 @@
     const printChoiceOrderNoEl = document.getElementById('print-choice-order-no');
     const printNowBtn = document.getElementById('print-now-btn');
     const skipPrintBtn = document.getElementById('skip-print-btn');
+    const newCustomerFormEl = document.getElementById('new-customer-form');
     let printChoiceResolver = null;
 
     function notifySuccess(message) {
@@ -344,6 +346,21 @@
             return;
         }
         console.info(message);
+    }
+
+    function extractErrorMessage(payload, fallbackMessage) {
+        if (payload && payload.errors && typeof payload.errors === 'object') {
+            const firstKey = Object.keys(payload.errors)[0];
+            if (firstKey && Array.isArray(payload.errors[firstKey]) && payload.errors[firstKey][0]) {
+                return String(payload.errors[firstKey][0]);
+            }
+        }
+
+        if (payload && typeof payload.message === 'string' && payload.message.trim() !== '') {
+            return payload.message;
+        }
+
+        return fallbackMessage;
     }
 
     function addToCart(id, name, price, type, sourceId) {
@@ -863,10 +880,71 @@
     }
 
     function saveNewCustomer() {
-        notifySuccess('บันทึกข้อมูลลูกค้าสำเร็จ (จำลองการทำงาน)');
-        const modal = bootstrap.Modal.getInstance(document.getElementById('newCustomerModal'));
-        if (modal) modal.hide();
-        document.getElementById('new-customer-form').reset();
+        if (!newCustomerFormEl) {
+            notifyError('ไม่พบฟอร์มเพิ่มลูกค้า');
+            return;
+        }
+
+        const textInputs = Array.from(newCustomerFormEl.querySelectorAll('input[type="text"]'));
+        const firstName = textInputs[0] ? String(textInputs[0].value || '').trim() : '';
+        const lastName = textInputs[1] ? String(textInputs[1].value || '').trim() : '';
+        const nickname = textInputs[2] ? String(textInputs[2].value || '').trim() : '';
+        const lineId = textInputs[3] ? String(textInputs[3].value || '').trim() : '';
+        const phoneInput = newCustomerFormEl.querySelector('input[type="tel"]');
+        const phone = phoneInput ? String(phoneInput.value || '').trim() : '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        const customerName = fullName !== '' ? fullName : nickname;
+
+        if (customerName === '' || phone === '') {
+            notifyWarning('กรุณากรอกชื่อลูกค้าและเบอร์โทรให้ครบ');
+            return;
+        }
+
+        fetch(quickCreateCustomerUrl, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({
+                name: customerName,
+                phone: phone,
+                line_id: lineId !== '' ? lineId : null,
+            }),
+        })
+        .then(async (response) => {
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(extractErrorMessage(data, 'บันทึกข้อมูลลูกค้าไม่สำเร็จ'));
+            }
+
+            const customer = data.customer || null;
+            if (customer && customer.id) {
+                customers.push(customer);
+
+                if (customerNameInputEl) {
+                    customerNameInputEl.value = String(customer.name || '');
+                }
+                if (customerIdHiddenEl) {
+                    customerIdHiddenEl.value = String(customer.id);
+                }
+                updateCustomerMatchHint(`ผูก CRM: ${customer.name || ''}`, 'success');
+            }
+
+            notifySuccess(data.message || 'บันทึกลูกค้าเรียบร้อยแล้ว');
+
+            const modalEl = document.getElementById('newCustomerModal');
+            const modal = (typeof bootstrap !== 'undefined' && bootstrap.Modal)
+                ? bootstrap.Modal.getOrCreateInstance(modalEl)
+                : null;
+            if (modal) modal.hide();
+            newCustomerFormEl.reset();
+        })
+        .catch((error) => {
+            notifyError(error.message || 'บันทึกข้อมูลลูกค้าไม่สำเร็จ');
+        });
     }
 
     applyBookingContext();

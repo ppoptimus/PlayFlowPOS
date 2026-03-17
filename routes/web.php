@@ -29,9 +29,15 @@ Route::middleware('auth')->group(function (): void {
     Route::delete('/booking/{bookingId}', 'BookingController@destroy')->name('booking.destroy');
     Route::get('/masseuse', 'MasseuseController@index')->name('masseuse');
     Route::post('/masseuse/attendance', 'MasseuseController@updateAttendance')->name('masseuse.attendance');
+    Route::get('/customers', 'CustomerController@index')->name('customers');
+    Route::post('/customers', 'CustomerController@store')->name('customers.store');
+    Route::post('/customers/quick-create', 'CustomerController@quickCreate')->name('customers.quick-create');
+    Route::get('/customers/{customerId}/history', 'CustomerController@history')->name('customers.history');
+    Route::put('/customers/{customerId}', 'CustomerController@update')->name('customers.update');
+    Route::delete('/customers/{customerId}', 'CustomerController@destroy')->name('customers.destroy');
 
     $modules = [
-        'customers', 'membership', 'packages', 'staff',
+        'membership', 'packages', 'staff',
         'commissions', 'products', 'promotions',
         'reports', 'financial', 'branches', 'users',
     ];

@@ -29,7 +29,7 @@
     </a>
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บริหารจัดการ</small>
-    <a href="{{ route('customers') }}" class="nav-link link-dark"><i class="bi bi-people-fill me-2"></i> ลูกค้า (CRM)</a>
+    <a href="{{ route('customers') }}" class="nav-link {{ request()->routeIs('customers*') ? 'active' : 'link-dark' }}"><i class="bi bi-people-fill me-2"></i> ลูกค้า (CRM)</a>
     <a href="{{ route('masseuse') }}" class="nav-link {{ request()->routeIs('masseuse*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-person-badge-fill me-2"></i> หมอนวด
     </a>
