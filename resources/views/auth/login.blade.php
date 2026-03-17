@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="th">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,6 +17,7 @@
             place-items: center;
             background: radial-gradient(circle at 20% 20%, #d4edf9 0%, #e8f3fa 42%, #edf7fb 100%);
         }
+
         .login-card {
             width: min(92vw, 420px);
             border: 1px solid rgba(31, 115, 224, 0.14);
@@ -23,6 +25,7 @@
             background: #ffffff;
             box-shadow: 0 18px 36px rgba(20, 73, 124, 0.14);
         }
+
         .brand-pill {
             display: inline-flex;
             align-items: center;
@@ -33,21 +36,36 @@
             color: #1f73e0;
             font-weight: 700;
         }
+
+        .brand-logo {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .brand-logo img {
+            width: min(78%, 250px);
+            height: auto;
+            display: block;
+        }
+
         .btn-primary {
             background: linear-gradient(135deg, #2d8ff0, #14b89a);
             border: none;
         }
+
         .btn-primary:hover {
             background: linear-gradient(135deg, #246fd0, #109079);
         }
     </style>
 </head>
+
 <body>
-    <div class="login-card p-4 p-md-5">
+    <div class="login-card p-4 p-md-5 shadow-lg">
         <div class="mb-4 text-center">
-            <span class="brand-pill"><i class="bi bi-flower1"></i> PlayFlow POS</span>
-            <h1 class="h4 fw-bold mt-3 mb-1">เข้าสู่ระบบ</h1>
-            <p class="text-muted mb-0">ใช้ Username และ Password ของพนักงาน</p>
+            <div class="brand-logo">
+                <img src="{{ asset('img/bglogin.png') }}" alt="PlayFlow POS">
+            </div>
         </div>
 
         @if ($errors->any())
@@ -60,39 +78,30 @@
             @csrf
 
             <div class="mb-3">
-                <label class="form-label fw-semibold" for="username">Username</label>
-                <input
-                    id="username"
-                    type="text"
-                    name="username"
+                <label class="form-label fw-semibold" for="username">ชื่อผู้ใช้งาน</label>
+                <input style="border-radius:1.20rem;" id="username" type="text" name="username"
                     class="form-control form-control-lg @error('username') is-invalid @enderror"
-                    value="{{ old('username') }}"
-                    required
-                    autofocus
-                    autocomplete="username"
-                >
+                    value="{{ old('username') }}" required autofocus autocomplete="username">
                 @error('username')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
 
             <div class="mb-4">
-                <label class="form-label fw-semibold" for="password">Password</label>
-                <input
-                    id="password"
-                    type="password"
-                    name="password"
-                    class="form-control form-control-lg @error('password') is-invalid @enderror"
-                    required
-                    autocomplete="current-password"
-                >
+                <label class="form-label fw-semibold" for="password">รหัสผ่าน</label>
+                <input style="border-radius:1.20rem" id="password" type="password" name="password"
+                    class="form-control form-control-lg @error('password') is-invalid @enderror" required
+                    autocomplete="current-password">
                 @error('password')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
             </div>
 
-            <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">เข้าสู่ระบบ</button>
+            <button type="submit"
+                style="border-radius:1.25rem; padding: 1rem;  align-items: center; justify-content: center; gap: 0.75rem; transition: all 0.3s ease; font-size: 1.5rem; font-weight: 700; box-shadow: 0 10px 20px rgba(7, 90, 135, 0.25);"
+                class="btn btn-primary w-100">เข้าสู่ระบบ <i class="bi bi-chevron-right fs-5"></i></button>
         </form>
     </div>
 </body>
+
 </html>
