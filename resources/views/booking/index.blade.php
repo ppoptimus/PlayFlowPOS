@@ -11,8 +11,8 @@
 @endphp
 
 <div class="booking-page booking-mobile-safe">
-    <div class="card shadow-sm border-0">
-        <div class="card-body p-4" style="overflow-x:hidden;">
+    <div class="card shadow-sm border-0 booking-shell">
+        <div class="card-body p-4 booking-card-body" style="overflow-x:hidden;">
             <div class="queue-toolbar d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
                 <div class="d-flex flex-wrap gap-2 align-items-center w-100" style="max-width: 100%;">
                     <input type="date" id="queue-date" class="form-control rounded-pill px-3 shadow-none border-secondary-subtle flex-grow-1" value="{{ $selectedDate }}" style="width: auto; max-width: 160px;">
@@ -21,6 +21,21 @@
                 <span class="badge text-bg-light border rounded-3 px-3 py-2 fw-semibold text-wrap text-start lh-base d-block w-100 w-md-auto">
                     <i class="bi bi-info-circle me-1"></i> กดแทบคิวเพื่อแก้บริการ/เวลา/หมอ และชำระเงิน
                 </span>
+            </div>
+
+            <div class="queue-board-toolbar d-flex align-items-center justify-content-between gap-2 mb-3">
+                <span class="queue-zoom-hint small text-muted">
+                    <i class="bi bi-arrows-angle-expand me-1"></i>ซูมได้เฉพาะตาราง
+                </span>
+                <div class="btn-group btn-group-sm queue-zoom-controls" role="group" aria-label="Queue board zoom controls">
+                    <button type="button" class="btn btn-outline-secondary" id="queue-zoom-out" aria-label="Zoom out">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary fw-semibold" id="queue-zoom-reset">100%</button>
+                    <button type="button" class="btn btn-outline-secondary" id="queue-zoom-in" aria-label="Zoom in">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
             </div>
 
             <div class="table-responsive rounded-4 border queue-board-wrap">
@@ -33,10 +48,19 @@
                     </div>
 
                     @foreach($staff as $s)
+                    @php
+                        $staffNameParts = preg_split('/\s+/', trim($s['name']), 2);
+                        $staffFirstName = $staffNameParts[0] ?? $s['name'];
+                        $staffLastName = $staffNameParts[1] ?? '';
+                    @endphp
                     <div class="queue-grid-row queue-data-row" data-staff-id="{{ $s['id'] }}">
-                        <div class="queue-cell queue-staff-cell">
-                            <div class="fw-bold">{{ $s['name'] }}</div>
-                            <div class="text-muted small queue-staff-role">{{ preg_replace('/\s*\([^)]*\)/', '', $s['role']) }}</div>
+                        <div class="queue-cell queue-staff-cell" title="{{ $s['name'] }}">
+                            <div class="queue-staff-name fw-bold">
+                                <span>{{ $staffFirstName }}</span>
+                                @if($staffLastName !== '')
+                                <span>{{ $staffLastName }}</span>
+                                @endif
+                            </div>
                         </div>
                         @for($h = $startHour; $h <= $endHour; $h++)
                         <div class="queue-cell queue-slot-cell"
@@ -58,9 +82,33 @@
 @push('head')
 <style>
     .queue-board {
-        --staff-col-width: 190px;
-        --slot-width: 118px;
+        --board-zoom: 1;
+        --staff-col-base: 124px;
+        --slot-base: 132px;
+        --head-row-base-height: 62px;
+        --data-row-base-height: 94px;
+        --staff-font-base: 0.92rem;
+        --time-font-base: 0.86rem;
+        --card-top-base: 8px;
+        --card-radius-base: 12px;
+        --card-padding-y-base: 0.42rem;
+        --card-padding-x-base: 0.58rem;
+        --card-min-width-base: 84px;
+        --card-customer-font-base: 0.84rem;
+        --card-service-font-base: 0.72rem;
+        --card-meta-font-base: 0.68rem;
+        --paid-font-base: 0.62rem;
+        --paid-pad-y-base: 0.06rem;
+        --paid-pad-x-base: 0.42rem;
+        --staff-col-width: calc(var(--staff-col-base) * var(--board-zoom));
+        --slot-width: calc(var(--slot-base) * var(--board-zoom));
         min-width: calc(var(--staff-col-width) + (var(--slot-count) * var(--slot-width)));
+    }
+    .queue-board-wrap {
+        overscroll-behavior-x: contain;
+        overscroll-behavior-y: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-x pan-y;
     }
     .queue-grid-row {
         display: grid;
@@ -71,7 +119,7 @@
         border-top: 1px solid #e5edf5;
     }
     .queue-head-row .queue-cell {
-        height: 62px;
+        height: calc(var(--head-row-base-height) * var(--board-zoom));
         display: flex;
         align-items: center;
         justify-content: center;
@@ -96,17 +144,25 @@
     }
     .queue-time-head {
         border-left: 1px solid #e5edf5;
-        font-size: 0.86rem;
+        font-size: calc(var(--time-font-base) * var(--board-zoom));
     }
     .queue-data-row .queue-cell {
-        min-height: 94px;
+        min-height: calc(var(--data-row-base-height) * var(--board-zoom));
     }
     .queue-staff-cell {
         padding: 0.9rem 0.85rem;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        gap: 0.2rem;
+        align-items: flex-start;
+    }
+    .queue-staff-name {
+        display: flex;
+        flex-direction: column;
+        gap: 0.12rem;
+        line-height: 1.12;
+        word-break: break-word;
+        font-size: calc(var(--staff-font-base) * var(--board-zoom));
     }
     .queue-slot-cell {
         border-left: 1px solid #edf2f7;
@@ -128,17 +184,17 @@
     }
     .booking-card {
         position: absolute;
-        top: 8px;
-        height: calc(100% - 16px);
-        border-radius: 12px;
+        top: calc(var(--card-top-base) * var(--board-zoom));
+        height: calc(100% - (var(--card-top-base) * var(--board-zoom) * 2));
+        border-radius: calc(var(--card-radius-base) * var(--board-zoom));
         border: 1px solid;
-        padding: 0.42rem 0.58rem;
+        padding: calc(var(--card-padding-y-base) * var(--board-zoom)) calc(var(--card-padding-x-base) * var(--board-zoom));
         cursor: pointer;
         pointer-events: auto;
         z-index: 50;
         overflow: hidden;
         transition: transform 0.2s, box-shadow 0.2s;
-        min-width: 84px;
+        min-width: calc(var(--card-min-width-base) * var(--board-zoom));
     }
     .booking-card:hover {
         transform: translateY(-1px);
@@ -149,7 +205,7 @@
         justify-content: space-between;
         align-items: center;
         gap: 0.3rem;
-        font-size: 0.68rem;
+        font-size: calc(var(--card-meta-font-base) * var(--board-zoom));
         margin-bottom: 0.18rem;
     }
     .booking-time {
@@ -159,8 +215,8 @@
     .booking-paid,
     .booking-unpaid {
         border-radius: 999px;
-        padding: 0.06rem 0.42rem;
-        font-size: 0.62rem;
+        padding: calc(var(--paid-pad-y-base) * var(--board-zoom)) calc(var(--paid-pad-x-base) * var(--board-zoom));
+        font-size: calc(var(--paid-font-base) * var(--board-zoom));
         font-weight: 700;
         white-space: nowrap;
     }
@@ -174,7 +230,7 @@
     }
     .booking-customer {
         font-weight: 700;
-        font-size: 0.84rem;
+        font-size: calc(var(--card-customer-font-base) * var(--board-zoom));
         line-height: 1.1;
         white-space: nowrap;
         overflow: hidden;
@@ -182,11 +238,65 @@
     }
     .booking-service {
         opacity: 0.86;
-        font-size: 0.72rem;
+        font-size: calc(var(--card-service-font-base) * var(--board-zoom));
         line-height: 1.18;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+    }
+    .queue-board-toolbar {
+        padding: 0.78rem 0.95rem;
+        border-radius: 1rem;
+        border: 1px solid rgba(180, 149, 88, 0.28);
+        background: linear-gradient(135deg, rgba(248, 244, 235, 0.96), rgba(234, 224, 204, 0.9));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72), 0 10px 22px rgba(43, 58, 79, 0.08);
+    }
+    .queue-zoom-hint {
+        color: #7d6740 !important;
+        font-size: 0.78rem !important;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .queue-zoom-controls {
+        padding: 0.2rem;
+        border-radius: 999px;
+        background: linear-gradient(135deg, #192838, #0f1c2a);
+        border: 1px solid rgba(191, 161, 101, 0.34);
+        box-shadow: 0 12px 24px rgba(15, 26, 40, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        gap: 0.25rem;
+    }
+    .queue-zoom-controls .btn {
+        min-width: 2.4rem;
+        border: 0;
+        border-radius: 999px !important;
+        background: transparent;
+        color: #f3e8cf;
+        font-weight: 700;
+        box-shadow: none !important;
+        transition: transform 0.18s ease, background-color 0.18s ease, color 0.18s ease, opacity 0.18s ease;
+    }
+    .queue-zoom-controls #queue-zoom-reset {
+        min-width: 4.4rem;
+        background: linear-gradient(135deg, #d8bd82, #b88d4d);
+        color: #1e2430;
+        letter-spacing: 0.04em;
+        text-shadow: 0 1px 0 rgba(255, 255, 255, 0.32);
+    }
+    .queue-zoom-controls .btn:hover,
+    .queue-zoom-controls .btn:focus-visible {
+        background: rgba(255, 255, 255, 0.12);
+        color: #fff4d8;
+        transform: translateY(-1px);
+    }
+    .queue-zoom-controls #queue-zoom-reset:hover,
+    .queue-zoom-controls #queue-zoom-reset:focus-visible {
+        background: linear-gradient(135deg, #e4c98f, #c79b56);
+        color: #171c25;
+    }
+    .queue-zoom-controls .btn:disabled {
+        opacity: 0.4;
+        transform: none;
     }
     .state-waiting {
         background: #e6f5ff;
@@ -231,41 +341,65 @@
         .booking-mobile-safe {
             padding-bottom: 5.4rem;
         }
+        .booking-page {
+            margin-left: -0.9rem;
+            margin-right: -0.9rem;
+        }
+        .booking-shell {
+            border-radius: 1rem;
+        }
+        .booking-card-body {
+            padding: 0.9rem !important;
+        }
+        .queue-toolbar {
+            margin-bottom: 0.9rem !important;
+        }
+        .queue-toolbar .badge {
+            padding: 0.55rem 0.7rem !important;
+            font-size: 0.74rem;
+        }
         .queue-board {
-            --staff-col-width: 90px;
-            --slot-width: 100px;
+            --staff-col-base: 78px;
+            --slot-base: 116px;
+            --head-row-base-height: 48px;
+            --data-row-base-height: 78px;
+            --staff-font-base: 0.74rem;
+            --time-font-base: 0.75rem;
+            --card-top-base: 6px;
+            --card-radius-base: 8px;
+            --card-padding-y-base: 0.3rem;
+            --card-padding-x-base: 0.4rem;
+            --card-min-width-base: 70px;
+            --card-customer-font-base: 0.78rem;
+            --card-service-font-base: 0.66rem;
         }
         .queue-staff-cell {
-            padding: 0.6rem 0.5rem;
+            padding: 0.55rem 0.4rem;
         }
-        .queue-staff-cell .fw-bold {
-            font-size: 0.8rem;
-        }
-        .queue-staff-role {
-            font-size: 0.68rem;
+        .queue-staff-name {
+            gap: 0.08rem;
         }
         .queue-staff-head {
-            padding-left: 0.5rem;
-            font-size: 0.8rem;
-        }
-        .queue-head-row .queue-cell {
-            height: 48px;
-        }
-        .queue-time-head {
-            font-size: 0.75rem;
-        }
-        .queue-data-row .queue-cell {
-            min-height: 78px;
+            padding-left: 0.4rem;
+            font-size: calc(0.72rem * var(--board-zoom));
         }
         .booking-card {
-            top: 6px;
-            height: calc(100% - 12px);
-            padding: 0.3rem 0.4rem;
-            border-radius: 8px;
-            min-width: 70px;
+            box-shadow: 0 4px 12px rgba(15, 66, 120, 0.08);
         }
-        .booking-customer { font-size: 0.78rem; }
-        .booking-service { font-size: 0.66rem; }
+        .queue-board-toolbar {
+            margin-bottom: 0.75rem !important;
+            padding: 0.68rem 0.8rem;
+        }
+        .queue-zoom-hint {
+            font-size: 0.68rem !important;
+        }
+        .queue-zoom-controls .btn {
+            padding-left: 0.6rem;
+            padding-right: 0.6rem;
+        }
+        .queue-zoom-controls #queue-zoom-reset {
+            min-width: 3.9rem;
+        }
     }
 </style>
 @endpush
@@ -283,6 +417,7 @@
 
     const bookingModalEl = document.getElementById('bookingModal');
     const queueBoardEl = document.getElementById('queue-board');
+    const queueBoardWrapEl = document.querySelector('.queue-board-wrap');
     const queueDateEl = document.getElementById('queue-date');
     const bookingFormEl = document.getElementById('booking-form');
     const customerPhoneEl = document.getElementById('customer-phone');
@@ -302,6 +437,9 @@
     const deleteBookingBtn = document.getElementById('delete-booking-btn');
     const addServiceBtn = document.getElementById('add-service-btn');
     const payBookingBtn = document.getElementById('pay-booking-btn');
+    const queueZoomOutBtn = document.getElementById('queue-zoom-out');
+    const queueZoomResetBtn = document.getElementById('queue-zoom-reset');
+    const queueZoomInBtn = document.getElementById('queue-zoom-in');
 
     const bookingApi = {
         data: "{{ route('booking.data') }}",
@@ -310,6 +448,10 @@
         pos: "{{ route('pos') }}",
         csrfToken: "{{ csrf_token() }}",
     };
+    const BOARD_ZOOM_MIN = 0.85;
+    const BOARD_ZOOM_MAX = 1.9;
+    const BOARD_ZOOM_STEP = 0.12;
+    const BOARD_ZOOM_STORAGE_KEY = 'playflow-booking-board-zoom';
 
     function normalizeId(value) {
         return value === null || value === undefined ? '' : String(value);
@@ -328,6 +470,10 @@
     let bookingModal = null;
     let editingBookingId = null;
     let selectedServiceIds = [];
+    let boardZoom = 1;
+    let pinchZoomState = null;
+    let pendingZoomRestore = null;
+    let pendingZoomFrame = null;
 
     function notifyError(message) {
         if (window.PFPopup && typeof window.PFPopup.error === 'function') {
@@ -335,6 +481,94 @@
             return;
         }
         console.error(message);
+    }
+
+    function clampBoardZoom(nextZoom) {
+        return Math.max(BOARD_ZOOM_MIN, Math.min(BOARD_ZOOM_MAX, nextZoom));
+    }
+
+    function updateBoardZoomControls() {
+        if (queueZoomResetBtn) {
+            queueZoomResetBtn.textContent = `${Math.round(boardZoom * 100)}%`;
+        }
+        if (queueZoomOutBtn) queueZoomOutBtn.disabled = boardZoom <= BOARD_ZOOM_MIN + 0.001;
+        if (queueZoomInBtn) queueZoomInBtn.disabled = boardZoom >= BOARD_ZOOM_MAX - 0.001;
+    }
+
+    function scheduleZoomRender() {
+        if (pendingZoomFrame !== null) return;
+        pendingZoomFrame = requestAnimationFrame(() => {
+            pendingZoomFrame = null;
+            renderBookings();
+
+            if (!queueBoardWrapEl || !queueBoardEl || !pendingZoomRestore) return;
+
+            const restore = pendingZoomRestore;
+            pendingZoomRestore = null;
+            const wrapRect = queueBoardWrapEl.getBoundingClientRect();
+            const anchorX = typeof restore.clientX === 'number'
+                ? (restore.clientX - wrapRect.left)
+                : (wrapRect.width / 2);
+            const targetContentX = restore.contentRatio * queueBoardEl.scrollWidth;
+            queueBoardWrapEl.scrollLeft = Math.max(0, targetContentX - anchorX);
+        });
+    }
+
+    function applyBoardZoom(nextZoom, options = {}) {
+        if (!queueBoardEl || !queueBoardWrapEl) return;
+
+        const zoom = clampBoardZoom(nextZoom);
+        if (Math.abs(zoom - boardZoom) < 0.001) return;
+
+        const wrapRect = queueBoardWrapEl.getBoundingClientRect();
+        const anchorX = typeof options.clientX === 'number'
+            ? (options.clientX - wrapRect.left)
+            : (wrapRect.width / 2);
+        const contentRatio = (queueBoardWrapEl.scrollLeft + anchorX) / Math.max(queueBoardEl.scrollWidth, 1);
+
+        boardZoom = zoom;
+        queueBoardEl.style.setProperty('--board-zoom', String(boardZoom));
+        pendingZoomRestore = {
+            clientX: options.clientX,
+            contentRatio,
+        };
+        updateBoardZoomControls();
+        scheduleZoomRender();
+
+        try {
+            window.localStorage.setItem(BOARD_ZOOM_STORAGE_KEY, String(boardZoom));
+        } catch (error) {
+            console.warn('Unable to persist board zoom', error);
+        }
+    }
+
+    function restoreBoardZoom() {
+        if (!queueBoardEl) return;
+
+        let savedZoom = 1;
+        try {
+            const rawValue = window.localStorage.getItem(BOARD_ZOOM_STORAGE_KEY);
+            savedZoom = rawValue ? Number(rawValue) : 1;
+        } catch (error) {
+            savedZoom = 1;
+        }
+
+        boardZoom = clampBoardZoom(Number.isFinite(savedZoom) ? savedZoom : 1);
+        queueBoardEl.style.setProperty('--board-zoom', String(boardZoom));
+        updateBoardZoomControls();
+    }
+
+    function getTouchDistance(touchA, touchB) {
+        const deltaX = touchA.clientX - touchB.clientX;
+        const deltaY = touchA.clientY - touchB.clientY;
+        return Math.hypot(deltaX, deltaY);
+    }
+
+    function getTouchCenter(touchA, touchB) {
+        return {
+            x: (touchA.clientX + touchB.clientX) / 2,
+            y: (touchA.clientY + touchB.clientY) / 2,
+        };
     }
 
     function normalizeBooking(input = {}) {
@@ -905,9 +1139,61 @@
         });
     }
 
+    if (queueZoomOutBtn) {
+        queueZoomOutBtn.addEventListener('click', () => {
+            applyBoardZoom(boardZoom - BOARD_ZOOM_STEP);
+        });
+    }
+
+    if (queueZoomResetBtn) {
+        queueZoomResetBtn.addEventListener('click', () => {
+            applyBoardZoom(1);
+        });
+    }
+
+    if (queueZoomInBtn) {
+        queueZoomInBtn.addEventListener('click', () => {
+            applyBoardZoom(boardZoom + BOARD_ZOOM_STEP);
+        });
+    }
+
+    if (queueBoardWrapEl) {
+        queueBoardWrapEl.addEventListener('touchstart', (event) => {
+            if (event.touches.length !== 2) return;
+
+            const [touchA, touchB] = event.touches;
+            pinchZoomState = {
+                startDistance: getTouchDistance(touchA, touchB),
+                startZoom: boardZoom,
+            };
+            event.preventDefault();
+        }, { passive: false });
+
+        queueBoardWrapEl.addEventListener('touchmove', (event) => {
+            if (event.touches.length !== 2 || !pinchZoomState) return;
+
+            const [touchA, touchB] = event.touches;
+            const nextDistance = getTouchDistance(touchA, touchB);
+            if (!nextDistance || !pinchZoomState.startDistance) return;
+
+            const center = getTouchCenter(touchA, touchB);
+            const nextZoom = pinchZoomState.startZoom * (nextDistance / pinchZoomState.startDistance);
+            applyBoardZoom(nextZoom, { clientX: center.x, clientY: center.y });
+            event.preventDefault();
+        }, { passive: false });
+
+        const clearPinchZoomState = () => {
+            pinchZoomState = null;
+        };
+
+        queueBoardWrapEl.addEventListener('touchend', clearPinchZoomState);
+        queueBoardWrapEl.addEventListener('touchcancel', clearPinchZoomState);
+    }
+
     window.addEventListener('resize', scheduleRenderBookings);
 
     document.addEventListener('DOMContentLoaded', () => {
+        restoreBoardZoom();
         scheduleRenderBookings();
     });
 </script>
