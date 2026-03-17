@@ -1135,7 +1135,12 @@
 
     if (queueDateEl) {
         queueDateEl.addEventListener('change', () => {
-            loadBookingsByDate(queueDateEl.value);
+            const params = new URLSearchParams(window.location.search);
+            params.set('date', queueDateEl.value);
+            if (activeBranchId) {
+                params.set('branch_id', String(activeBranchId));
+            }
+            window.location.href = `${bookingApi.updateBase}?${params.toString()}`;
         });
     }
 

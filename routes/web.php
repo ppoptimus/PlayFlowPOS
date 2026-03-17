@@ -27,11 +27,12 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/booking', 'BookingController@store')->name('booking.store');
     Route::put('/booking/{bookingId}', 'BookingController@update')->name('booking.update');
     Route::delete('/booking/{bookingId}', 'BookingController@destroy')->name('booking.destroy');
-    Route::get('/staff', 'StaffController@index')->name('staff');
+    Route::get('/masseuse', 'MasseuseController@index')->name('masseuse');
+    Route::post('/masseuse/attendance', 'MasseuseController@updateAttendance')->name('masseuse.attendance');
 
     $modules = [
-        'customers', 'membership', 'packages',
-        'masseuse', 'commissions', 'products', 'promotions',
+        'customers', 'membership', 'packages', 'staff',
+        'commissions', 'products', 'promotions',
         'reports', 'financial', 'branches', 'users',
     ];
 

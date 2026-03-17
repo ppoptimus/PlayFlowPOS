@@ -30,8 +30,8 @@
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บริหารจัดการ</small>
     <a href="{{ route('customers') }}" class="nav-link link-dark"><i class="bi bi-people-fill me-2"></i> ลูกค้า (CRM)</a>
-    <a href="{{ route('staff') }}" class="nav-link {{ request()->routeIs('staff') ? 'active' : 'link-dark' }}">
-        <i class="bi bi-person-badge-fill me-2"></i> พนักงาน
+    <a href="{{ route('masseuse') }}" class="nav-link {{ request()->routeIs('masseuse*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-person-badge-fill me-2"></i> หมอนวด
     </a>
     <a href="{{ route('products') }}" class="nav-link link-dark"><i class="bi bi-box-seam-fill me-2"></i> สินค้า & สต็อก</a>
     <a href="{{ route('membership') }}" class="nav-link link-dark"><i class="bi bi-card-checklist me-2"></i> สมาชิก & แพ็กเกจ</a>
@@ -39,7 +39,7 @@
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บัญชี & รายงาน</small>
     <a href="{{ route('reports') }}" class="nav-link link-dark"><i class="bi bi-bar-chart-line-fill me-2"></i> รายงานวิเคราะห์</a>
     <a href="{{ route('financial') }}" class="nav-link link-dark"><i class="bi bi-wallet2 me-2"></i> การเงิน/P&L</a>
-    <a href="{{ route('commissions') }}" class="nav-link link-dark"><i class="bi bi-cash-stack me-2"></i> ค่าคอมมิชชัน</a>
+    <a href="{{ route('commissions') }}" class="nav-link link-dark"><i class="bi bi-cash-stack me-2"></i> ค่าคอมมิชชั่น</a>
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">ตั้งค่าระบบ</small>
     <a href="{{ route('branches') }}" class="nav-link link-dark"><i class="bi bi-building-fill me-2"></i> จัดการสาขา</a>

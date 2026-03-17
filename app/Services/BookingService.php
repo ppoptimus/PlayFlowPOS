@@ -16,6 +16,13 @@ class BookingService
         'cancelled' => 'ยกเลิก',
     ];
 
+    private StaffAttendanceService $staffAttendanceService;
+
+    public function __construct(StaffAttendanceService $staffAttendanceService)
+    {
+        $this->staffAttendanceService = $staffAttendanceService;
+    }
+
     public function getPageData(User $user, ?int $requestedBranchId, string $date): array
     {
         $branchId = $this->resolveAuthorizedBranchId($user, $requestedBranchId);
@@ -24,7 +31,7 @@ class BookingService
         return [
             'activeBranchId' => $branchId,
             'selectedDate' => $selectedDate,
-            'staff' => $this->getStaff($branchId),
+            'staff' => $this->getStaff($branchId, $selectedDate, true),
             'serviceItems' => $this->getServiceItems(),
             'customers' => $this->getCustomers(),
             'beds' => $this->getBeds($branchId),
@@ -34,6 +41,52 @@ class BookingService
                 'cancelled' => self::STATUSES['cancelled'],
             ],
             'bookings' => $this->getBookingsByDate($branchId, $selectedDate),
+        ];
+    }
+
+    public function getStaffRoster(User $user, ?int $requestedBranchId, string $date, bool $onlyWorking = false): array
+    {
+        $branchId = $this->resolveAuthorizedBranchId($user, $requestedBranchId);
+        $selectedDate = $this->normalizeDate($date);
+
+        return $this->getStaff($branchId, $selectedDate, $onlyWorking);
+    }
+
+    public function getStaffPageData(User $user, ?int $requestedBranchId, string $date): array
+    {
+        $branchId = $this->resolveAuthorizedBranchId($user, $requestedBranchId);
+        $selectedDate = $this->normalizeDate($date);
+
+        return [
+            'activeBranchId' => $branchId,
+            'selectedDate' => $selectedDate,
+            'staff' => $this->buildStaffPageStaff($branchId, $selectedDate),
+        ];
+    }
+
+    public function resolveBranchIdForUser(User $user, ?int $requestedBranchId): int
+    {
+        return $this->resolveAuthorizedBranchId($user, $requestedBranchId);
+    }
+
+    public function updateStaffAttendance(User $user, ?int $requestedBranchId, string $date, int $staffId, bool $isWorking): array
+    {
+        $branchId = $this->resolveAuthorizedBranchId($user, $requestedBranchId);
+        $selectedDate = $this->normalizeDate($date);
+        $staff = $this->findStaffById($branchId, $staffId);
+
+        if ($staff === null) {
+            throw ValidationException::withMessages([
+                'staff_id' => ['à¹„à¸¡à¹ˆà¸žà¸šà¸žà¸™à¸±à¸à¸‡à¸²à¸™à¹ƒà¸™à¸ªà¸²à¸‚à¸²à¸™à¸µà¹‰'],
+            ]);
+        }
+
+        $this->staffAttendanceService->setAttendance($branchId, $selectedDate, (string) $staffId, $isWorking);
+
+        return [
+            'staff_id' => $staffId,
+            'date' => $selectedDate,
+            'isWorkingToday' => $isWorking,
         ];
     }
 
@@ -170,25 +223,190 @@ class BookingService
         return $this->mapBookingToCheckoutContext($this->mapBookingRow($booking));
     }
 
-    private function getStaff(int $branchId): array
+    private function getStaff(int $branchId, string $date, bool $onlyWorking = false): array
     {
         return DB::table('masseuses as m')
             ->where('m.branch_id', $branchId)
             ->selectRaw(
                 "m.id, " .
                 "COALESCE(NULLIF(m.full_name, ''), NULLIF(m.nickname, ''), CONCAT('Masseuse #', m.id)) as name, " .
-                "m.status"
+                "m.status, m.profile_image"
             )
             ->orderBy('m.id')
             ->get()
-            ->map(function ($row): array {
+            ->map(function ($row) use ($branchId, $date): array {
+                $staffId = (string) $row->id;
+                $isWorkingToday = $this->staffAttendanceService->isWorking($branchId, $date, $staffId);
+
                 return [
-                    'id' => (string) $row->id,
+                    'id' => $staffId,
                     'name' => (string) $row->name,
-                    'role' => $this->translateMasseuseStatus((string) $row->status),
+                    'profileImage' => $row->profile_image !== null ? (string) $row->profile_image : '',
+                    'isWorkingToday' => $isWorkingToday,
+                    'attendanceLabel' => $isWorkingToday ? 'มาทำงานวันนี้' : 'ไม่มาทำงานวันนี้',
+                ];
+            })
+            ->filter(static function (array $staff) use ($onlyWorking): bool {
+                if (!$onlyWorking) {
+                    return true;
+                }
+
+                return (bool) ($staff['isWorkingToday'] ?? false);
+            })
+            ->values()
+            ->all();
+    }
+
+    private function buildStaffPageStaff(int $branchId, string $date): array
+    {
+        $staffRoster = $this->getStaff($branchId, $date, false);
+        $queueByStaff = $this->getQueueByStaff($branchId, $date);
+        $commissionConfigs = $this->getCommissionConfigsByService();
+
+        return array_map(function (array $staff) use ($queueByStaff, $commissionConfigs, $date): array {
+            $staffId = (string) ($staff['id'] ?? '');
+            $queue = $queueByStaff[$staffId]['items'] ?? [];
+            $bookedValue = (float) ($queueByStaff[$staffId]['bookedValue'] ?? 0);
+            $bookedMinutes = (int) ($queueByStaff[$staffId]['bookedMinutes'] ?? 0);
+
+            return [
+                'id' => $staffId,
+                'display_id' => 'MS' . str_pad($staffId, 3, '0', STR_PAD_LEFT),
+                'name' => (string) ($staff['name'] ?? ''),
+                'status' => $this->resolveStaffPageStatus($staff, $queue, $date),
+                'isWorkingToday' => (bool) ($staff['isWorkingToday'] ?? true),
+                'income' => $bookedValue,
+                'commission' => $this->estimateQueueCommission($queue, $commissionConfigs),
+                'avatar' => $this->resolveStaffAvatar((string) ($staff['profileImage'] ?? ''), $staffId),
+                'shift' => '-',
+                'break' => '-',
+                'queueLoad' => (int) min(100, round(($bookedMinutes / 600) * 100)),
+                'queue' => $queue,
+            ];
+        }, $staffRoster);
+    }
+
+    private function getQueueByStaff(int $branchId, string $date): array
+    {
+        $rows = $this->buildBookingQuery($branchId)
+            ->whereDate('b.start_time', $date)
+            ->whereNotNull('b.masseuse_id')
+            ->where('b.status', '!=', 'cancelled')
+            ->orderBy('b.start_time')
+            ->get();
+
+        $queueByStaff = [];
+
+        foreach ($rows as $row) {
+            $staffId = (string) $row->masseuse_id;
+            if (!isset($queueByStaff[$staffId])) {
+                $queueByStaff[$staffId] = [
+                    'items' => [],
+                    'bookedValue' => 0.0,
+                    'bookedMinutes' => 0,
+                ];
+            }
+
+            $startAt = Carbon::parse((string) $row->start_time);
+            $endAt = Carbon::parse((string) $row->end_time);
+            $servicePrice = $row->service_price !== null ? (float) $row->service_price : 0.0;
+
+            $queueByStaff[$staffId]['items'][] = [
+                'booking_id' => (string) $row->id,
+                'customer' => $row->customer_name !== null ? (string) $row->customer_name : '',
+                'service' => $row->service_name !== null ? (string) $row->service_name : '',
+                'service_id' => $row->service_id !== null ? (int) $row->service_id : null,
+                'service_price' => $servicePrice,
+                'start' => $startAt->format('H:i'),
+                'end' => $endAt->format('H:i'),
+                'status' => (string) $row->status,
+            ];
+            $queueByStaff[$staffId]['bookedValue'] += $servicePrice;
+            $queueByStaff[$staffId]['bookedMinutes'] += max(0, $startAt->diffInMinutes($endAt, false));
+        }
+
+        return $queueByStaff;
+    }
+
+    private function getCommissionConfigsByService(): array
+    {
+        return DB::table('commission_configs')
+            ->get(['service_id', 'type', 'value', 'deduct_cost'])
+            ->keyBy('service_id')
+            ->map(static function ($row): array {
+                return [
+                    'type' => (string) $row->type,
+                    'value' => (float) $row->value,
+                    'deduct_cost' => (float) $row->deduct_cost,
                 ];
             })
             ->all();
+    }
+
+    private function estimateQueueCommission(array $queue, array $commissionConfigs): float
+    {
+        $total = 0.0;
+
+        foreach ($queue as $item) {
+            $serviceId = isset($item['service_id']) ? (int) $item['service_id'] : 0;
+            if ($serviceId <= 0 || !isset($commissionConfigs[$serviceId])) {
+                continue;
+            }
+
+            $config = $commissionConfigs[$serviceId];
+            $servicePrice = isset($item['service_price']) ? (float) $item['service_price'] : 0.0;
+
+            if (($config['type'] ?? '') === 'fixed') {
+                $total += (float) ($config['value'] ?? 0);
+                continue;
+            }
+
+            $baseAmount = max(0.0, $servicePrice - (float) ($config['deduct_cost'] ?? 0));
+            $total += $baseAmount * ((float) ($config['value'] ?? 0) / 100);
+        }
+
+        return $total;
+    }
+
+    private function resolveStaffPageStatus(array $staff, array $queue, string $date): string
+    {
+        $isWorkingToday = (bool) ($staff['isWorkingToday'] ?? true);
+        if (!$isWorkingToday) {
+            return 'ไม่มาทำงานวันนี้';
+        }
+
+        foreach ($queue as $item) {
+            if (($item['status'] ?? '') === 'in_service') {
+                return self::STATUSES['in_service'];
+            }
+        }
+
+        if (!empty($queue)) {
+            return $date === Carbon::today()->toDateString() ? 'มีคิววันนี้' : 'มีคิวในวันที่เลือก';
+        }
+
+        return 'มาทำงานวันนี้';
+    }
+
+    private function resolveStaffAvatar(string $profileImage, string $staffId): string
+    {
+        if ($profileImage === '') {
+            return 'https://i.pravatar.cc/150?u=' . rawurlencode($staffId);
+        }
+
+        if (preg_match('#^https?://#i', $profileImage) === 1) {
+            return $profileImage;
+        }
+
+        return '/' . ltrim($profileImage, '/');
+    }
+
+    private function findStaffById(int $branchId, int $staffId): ?object
+    {
+        return DB::table('masseuses')
+            ->where('branch_id', $branchId)
+            ->where('id', $staffId)
+            ->first(['id']);
     }
 
     private function getServiceItems(): array
@@ -280,7 +498,7 @@ class BookingService
             ->selectRaw(
                 "b.id, b.customer_id, b.service_id, b.masseuse_id, b.bed_id, " .
                 "b.start_time, b.end_time, b.status, b.cancel_reason, " .
-                "c.name as customer_name, s.name as service_name, " .
+                "c.name as customer_name, s.name as service_name, s.price as service_price, " .
                 "COALESCE(NULLIF(m.full_name, ''), NULLIF(m.nickname, ''), '') as staff_name, " .
                 "bed.name as bed_name, room.name as room_name"
             );
@@ -508,22 +726,5 @@ class BookingService
         } catch (\Throwable $e) {
             return Carbon::today()->toDateString();
         }
-    }
-
-    private function translateMasseuseStatus(string $status): string
-    {
-        if ($status === 'available') {
-            return 'พร้อมรับงาน';
-        }
-
-        if ($status === 'busy') {
-            return 'กำลังให้บริการ';
-        }
-
-        if ($status === 'on_break') {
-            return 'พักเบรก';
-        }
-
-        return 'ยังไม่เข้าเวร';
     }
 }

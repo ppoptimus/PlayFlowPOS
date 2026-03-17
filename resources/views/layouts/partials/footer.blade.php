@@ -14,9 +14,9 @@
         <i class="bi bi-calendar-check"></i>
         <span>คิว</span>
     </a>
-    <a href="{{ route('staff') }}"
-       class="pf-mobile-nav-item {{ request()->routeIs('staff') ? 'is-active' : '' }}">
+    <a href="{{ route('masseuse') }}"
+       class="pf-mobile-nav-item {{ request()->routeIs('masseuse*') ? 'is-active' : '' }}">
         <i class="bi bi-people"></i>
-        <span>พนักงาน</span>
+        <span>หมอนวด</span>
     </a>
 </nav>

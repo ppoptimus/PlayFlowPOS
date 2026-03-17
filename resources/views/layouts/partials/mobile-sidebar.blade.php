@@ -16,7 +16,7 @@
             'route' => 'masseuse',
             'icon' => 'bi-person-badge',
             'title' => 'หมอนวด',
-            'subtitle' => 'เพิ่ม/ลดพนักงาน, ค่ามือ, ค่าคอม',
+            'subtitle' => 'จัดการข้อมูลหมอนวด ค่ามือ และค่าคอม',
         ],
         [
             'route' => 'booking',
@@ -27,8 +27,8 @@
         [
             'route' => 'promotions',
             'icon' => 'bi-megaphone',
-            'title' => 'แพคเกจโปรโมชั่น',
-            'subtitle' => 'ตั้งค่าโปรและแพคเกจขาย',
+            'title' => 'แพ็กเกจโปรโมชั่น',
+            'subtitle' => 'ตั้งค่าโปรและแพ็กเกจขาย',
         ],
         [
             'route' => 'customers',
