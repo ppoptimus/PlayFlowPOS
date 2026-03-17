@@ -236,7 +236,27 @@
             flex-shrink: 0;
         }
         .mobile-menu-link.active .mobile-menu-arrow { opacity: 1; }
-        .form-control:focus, .form-select:focus { border-color: rgba(31, 115, 224, 0.5); box-shadow: 0 0 0 0.25rem rgba(31, 115, 224, 0.16); }
+        .form-control,
+        .form-select,
+        textarea.form-control {
+            background-color: #ffffff !important;
+            border-color: #c9d8e6;
+            color: #25405c;
+        }
+        .form-control:focus,
+        .form-select:focus,
+        textarea.form-control:focus {
+            background-color: #ffffff !important;
+            border-color: rgba(31, 115, 224, 0.5);
+            box-shadow: 0 0 0 0.25rem rgba(31, 115, 224, 0.16);
+        }
+        .form-control:disabled,
+        .form-select:disabled,
+        .form-control[readonly],
+        .form-select[readonly] {
+            background-color: #e9ecef !important;
+            color: #6b7f93;
+        }
         .pf-toast-container {
             position: fixed;
             top: 1rem;

@@ -5,9 +5,18 @@
 
 @push('head')
 <style>
+    .customers-main-card {
+        overflow: hidden;
+        border: 1px solid rgba(31, 115, 224, 0.15) !important;
+        box-shadow: 0 18px 35px rgba(20, 73, 133, 0.08) !important;
+        background: linear-gradient(180deg, #f8fcff 0%, #f1f7fb 100%);
+    }
+
     .customers-card-header {
-        padding-top: 0.75rem !important;
-        padding-bottom: 0.75rem !important;
+        padding-top: 0.95rem !important;
+        padding-bottom: 0.95rem !important;
+        background: linear-gradient(125deg, rgba(38, 143, 235, 0.12), rgba(20, 184, 154, 0.1)) !important;
+        border-bottom: 1px solid rgba(31, 115, 224, 0.12) !important;
     }
 
     .customers-toolbar {
@@ -19,6 +28,80 @@
         display: inline-flex;
         align-items: center;
         margin-bottom: 0;
+        color: #1f4f84;
+        font-size: 1.2rem;
+    }
+
+    .customers-toolbar .btn {
+        box-shadow: 0 8px 16px rgba(16, 92, 170, 0.2);
+    }
+
+    .customers-hero {
+        border: 1px solid rgba(31, 115, 224, 0.12);
+        border-radius: 1rem;
+        padding: 0.95rem;
+        background: linear-gradient(160deg, rgba(255, 255, 255, 0.95), rgba(233, 245, 252, 0.9));
+    }
+
+    .customers-search-label {
+        color: #1f4f84;
+        font-size: 0.84rem;
+        letter-spacing: 0.02em;
+    }
+
+    .customers-search-group .input-group-text {
+        background-color: #ffffff !important;
+        border-right: 0;
+    }
+
+    .customers-search-group .form-control {
+        border-left: 0;
+        font-size: 0.95rem;
+    }
+
+    .customers-stat-card {
+        border: 1px solid rgba(31, 115, 224, 0.14);
+        border-radius: 0.85rem;
+        padding: 0.72rem 0.78rem;
+        background: #ffffff;
+        box-shadow: 0 5px 14px rgba(19, 84, 148, 0.06);
+        height: 100%;
+    }
+
+    .customers-stat-label {
+        color: #537292;
+        font-size: 0.76rem;
+        margin-bottom: 0.1rem;
+    }
+
+    .customers-stat-value {
+        font-size: 1.7rem;
+        line-height: 1;
+        color: #184f89;
+        font-weight: 700;
+    }
+
+    .customers-table-wrap {
+        border: 1px solid rgba(31, 115, 224, 0.14);
+        border-radius: 0.95rem;
+        overflow: hidden;
+        background: #ffffff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    }
+
+    .customers-table thead.table-light th {
+        background: linear-gradient(180deg, #eef5ff 0%, #e8f2ff 100%);
+        color: #1f5e9d;
+        font-size: 0.88rem;
+        border-bottom-color: rgba(31, 115, 224, 0.18);
+    }
+
+    .customers-table tbody td {
+        border-color: rgba(31, 115, 224, 0.1);
+    }
+
+    .customers-table tbody tr:hover td {
+        background: rgba(31, 115, 224, 0.05);
     }
 
     .customers-table {
@@ -64,14 +147,40 @@
         }
 
         .customers-toolbar h6 {
-            font-size: 1.12rem;
+            font-size: 1.02rem;
         }
 
         .customers-toolbar .btn {
             min-width: 0;
             white-space: nowrap;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
+            padding-left: 0.85rem !important;
+            padding-right: 0.85rem !important;
+            font-size: 0.88rem;
+        }
+
+        .customers-hero {
+            padding: 0.72rem;
+        }
+
+        .customers-search-label {
+            font-size: 0.8rem;
+        }
+
+        .customers-search-group .form-control {
+            font-size: 0.9rem;
+        }
+
+        .customers-stat-card {
+            padding: 0.56rem 0.6rem;
+            border-radius: 0.75rem;
+        }
+
+        .customers-stat-label {
+            font-size: 0.72rem;
+        }
+
+        .customers-stat-value {
+            font-size: 1.42rem;
         }
 
         .customers-table thead th:nth-child(2),
@@ -172,7 +281,7 @@
     @endif
 
     <div class="col-12">
-        <div class="card border-0 shadow-sm rounded-4">
+        <div class="card border-0 shadow-sm rounded-4 customers-main-card">
             <div class="card-header bg-white border-0 pt-3 pb-0 customers-card-header">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 customers-toolbar">
                     <h6 class="fw-bold mb-0"><i class="bi bi-people-fill me-2 text-primary"></i>ฐานข้อมูลลูกค้า</h6>
@@ -182,11 +291,12 @@
                 </div>
             </div>
             <div class="card-body p-3 p-lg-4">
-                <div class="row g-2 mb-3">
+                <div class="customers-hero mb-3 mb-lg-4">
+                <div class="row g-2">
                     <div class="col-12 col-lg-5">
                         <form method="GET" action="{{ route('customers') }}">
-                            <label class="form-label small fw-bold">ค้นหาลูกค้า</label>
-                            <div class="input-group">
+                            <label class="form-label fw-bold customers-search-label">ค้นหาลูกค้า</label>
+                            <div class="input-group customers-search-group">
                                 <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                                 <input type="text"
                                        class="form-control"
@@ -197,20 +307,21 @@
                         </form>
                     </div>
                     <div class="col-6 col-lg-3">
-                        <div class="rounded-3 border p-2 bg-light h-100">
-                            <div class="text-muted small">ลูกค้าทั้งหมด</div>
-                            <div class="fw-bold fs-5">{{ number_format($summary['total_customers'] ?? 0) }}</div>
+                        <div class="customers-stat-card">
+                            <div class="customers-stat-label">ลูกค้าทั้งหมด</div>
+                            <div class="customers-stat-value">{{ number_format($summary['total_customers'] ?? 0) }}</div>
                         </div>
                     </div>
                     <div class="col-6 col-lg-4">
-                        <div class="rounded-3 border p-2 bg-light h-100">
-                            <div class="text-muted small">ลูกค้าเคลื่อนไหว 30 วัน</div>
-                            <div class="fw-bold fs-5">{{ number_format($summary['active_customers_30d'] ?? 0) }}</div>
+                        <div class="customers-stat-card">
+                            <div class="customers-stat-label">ลูกค้าเคลื่อนไหว 30 วัน</div>
+                            <div class="customers-stat-value">{{ number_format($summary['active_customers_30d'] ?? 0) }}</div>
                         </div>
                     </div>
                 </div>
+                </div>
 
-                <div class="table-responsive">
+                <div class="table-responsive customers-table-wrap">
                     <table class="table table-hover align-middle mb-0 customers-table">
                         <thead class="table-light">
                             <tr>
