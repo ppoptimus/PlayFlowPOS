@@ -5,11 +5,14 @@ namespace App\Services;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PosService
 {
     private BookingService $bookingService;
+    private array $tableExistsCache = [];
+    private array $columnExistsCache = [];
 
     public function __construct(BookingService $bookingService)
     {
@@ -131,6 +134,7 @@ class PosService
                 'order_id' => $orderId,
                 'order_no' => $orderNo,
                 'booking' => $booking,
+                'membership' => $this->syncCustomerTierAfterPayment($customerId),
             ];
         });
     }
@@ -403,5 +407,101 @@ class PosService
         }
 
         return 1;
+    }
+
+    private function syncCustomerTierAfterPayment(?int $customerId): ?array
+    {
+        if ($customerId === null || $customerId <= 0) {
+            return null;
+        }
+
+        if (
+            !$this->tableExists('orders') ||
+            !$this->tableExists('customers') ||
+            !$this->tableExists('membership_tiers') ||
+            !$this->hasColumn('customers', 'tier_id')
+        ) {
+            return null;
+        }
+
+        $tiers = DB::table('membership_tiers')
+            ->orderBy('min_spend')
+            ->orderBy('id')
+            ->get(['id', 'name', 'min_spend']);
+
+        if ($tiers->isEmpty()) {
+            return null;
+        }
+
+        $totalSpent = (float) DB::table('orders')
+            ->where('customer_id', $customerId)
+            ->where('status', 'paid')
+            ->sum('grand_total');
+
+        $recommendedTier = null;
+        foreach ($tiers as $tier) {
+            if ($totalSpent >= (float) ($tier->min_spend ?? 0)) {
+                $recommendedTier = $tier;
+            }
+        }
+
+        if ($recommendedTier === null) {
+            return null;
+        }
+
+        $customer = DB::table('customers')
+            ->where('id', $customerId)
+            ->first(['id', 'tier_id']);
+
+        if ($customer === null) {
+            return null;
+        }
+
+        $currentTierMinSpend = -1.0;
+        if ($customer->tier_id !== null) {
+            foreach ($tiers as $tier) {
+                if ((int) $tier->id === (int) $customer->tier_id) {
+                    $currentTierMinSpend = (float) ($tier->min_spend ?? 0);
+                    break;
+                }
+            }
+        }
+
+        $recommendedMinSpend = (float) ($recommendedTier->min_spend ?? 0);
+        if ($recommendedMinSpend > $currentTierMinSpend) {
+            $updates = ['tier_id' => (int) $recommendedTier->id];
+            if ($this->hasColumn('customers', 'updated_at')) {
+                $updates['updated_at'] = now();
+            }
+
+            DB::table('customers')
+                ->where('id', $customerId)
+                ->update($updates);
+        }
+
+        return [
+            'tier_id' => (int) $recommendedTier->id,
+            'tier_name' => (string) ($recommendedTier->name ?? ''),
+            'total_spent' => $totalSpent,
+        ];
+    }
+
+    private function tableExists(string $table): bool
+    {
+        if (!array_key_exists($table, $this->tableExistsCache)) {
+            $this->tableExistsCache[$table] = Schema::hasTable($table);
+        }
+
+        return (bool) $this->tableExistsCache[$table];
+    }
+
+    private function hasColumn(string $table, string $column): bool
+    {
+        $cacheKey = $table . '.' . $column;
+        if (!array_key_exists($cacheKey, $this->columnExistsCache)) {
+            $this->columnExistsCache[$cacheKey] = $this->tableExists($table) && Schema::hasColumn($table, $column);
+        }
+
+        return (bool) $this->columnExistsCache[$cacheKey];
     }
 }

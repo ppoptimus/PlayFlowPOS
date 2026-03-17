@@ -7,6 +7,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
@@ -105,10 +106,16 @@ class CustomerController extends Controller
             $uniquePhoneRule = $uniquePhoneRule->ignore($customerId);
         }
 
+        $tierRules = ['nullable'];
+        if (Schema::hasTable('membership_tiers')) {
+            $tierRules = ['nullable', 'integer', 'exists:membership_tiers,id'];
+        }
+
         return $request->validate([
             'name' => ['required', 'string', 'max:150'],
             'phone' => ['required', 'string', 'max:32', 'regex:/^[0-9\\-\\+\\s\\(\\)]+$/', $uniquePhoneRule],
             'line_id' => ['nullable', 'string', 'max:120'],
+            'tier_id' => $tierRules,
             'preferred_pressure_level' => ['nullable', 'string', Rule::in(['light', 'medium', 'firm'])],
             'health_notes' => ['nullable', 'string', 'max:4000'],
             'contraindications' => ['nullable', 'string', 'max:4000'],

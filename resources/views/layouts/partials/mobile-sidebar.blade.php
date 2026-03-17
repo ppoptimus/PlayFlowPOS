@@ -1,4 +1,7 @@
 @php
+    $mobileSidebarRole = (string) (auth()->user()->role ?? '');
+    $canManageMembershipLevels = in_array($mobileSidebarRole, ['admin', 'super_admin'], true);
+
     $mobileBackofficeMenus = [
         [
             'route' => 'branches',
@@ -49,13 +52,22 @@
             'subtitle' => 'จัดการสิทธิ์ผู้ใช้งาน',
         ],
     ];
+
+    if ($canManageMembershipLevels) {
+        array_splice($mobileBackofficeMenus, 6, 0, [[
+            'route' => 'membership-levels',
+            'icon' => 'bi-sliders',
+            'title' => 'สมาชิก',
+            'subtitle' => 'จัดการระดับสมาชิก',
+        ]]);
+    }
 @endphp
 
 <div class="mobile-menu-panel">
     <p class="mobile-menu-heading mb-3">เมนูหลังบ้าน</p>
     <div class="d-flex flex-column gap-2">
         @foreach($mobileBackofficeMenus as $item)
-        <a href="{{ route($item['route']) }}" class="mobile-menu-link {{ request()->routeIs($item['route']) ? 'active' : '' }}">
+        <a href="{{ route($item['route']) }}" class="mobile-menu-link {{ request()->routeIs($item['route'] . '*') ? 'active' : '' }}">
             <span class="mobile-menu-icon"><i class="bi {{ $item['icon'] }}"></i></span>
             <span class="mobile-menu-content">
                 <span class="mobile-menu-title">{{ $item['title'] }}</span>

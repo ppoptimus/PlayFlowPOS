@@ -35,9 +35,14 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/customers/{customerId}/history', 'CustomerController@history')->name('customers.history');
     Route::put('/customers/{customerId}', 'CustomerController@update')->name('customers.update');
     Route::delete('/customers/{customerId}', 'CustomerController@destroy')->name('customers.destroy');
+    Route::middleware('admin.only')->group(function (): void {
+        Route::get('/membership-levels', 'MembershipLevelController@index')->name('membership-levels');
+        Route::post('/membership-levels', 'MembershipLevelController@store')->name('membership-levels.store');
+        Route::put('/membership-levels/{tierId}', 'MembershipLevelController@update')->name('membership-levels.update');
+    });
 
     $modules = [
-        'membership', 'packages', 'staff',
+        'packages', 'staff',
         'commissions', 'products', 'promotions',
         'reports', 'financial', 'branches', 'users',
     ];

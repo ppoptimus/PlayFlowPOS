@@ -1,7 +1,7 @@
 @extends('layouts.main')
 
-@section('title', 'ลูกค้า (CRM) - PlayFlow')
-@section('page_title', 'ลูกค้า (Customer CRM)')
+@section('title', 'ลูกค้า - PlayFlow')
+@section('page_title', 'ลูกค้า')
 
 @push('head')
 <style>
@@ -19,6 +19,32 @@
         display: inline-flex;
         align-items: center;
         margin-bottom: 0;
+    }
+
+    .customers-table {
+        table-layout: auto;
+    }
+
+    .customers-table .membership-col {
+        width: 12%;
+        min-width: 120px;
+    }
+
+    .customers-table .action-col {
+        min-width: 150px;
+    }
+
+    .customers-table .membership-cell {
+        font-size: 0.86rem;
+        line-height: 1.25;
+    }
+
+    .customers-table .membership-badge {
+        font-size: 0.74rem;
+    }
+
+    .customers-table .membership-next {
+        font-size: 0.78rem;
     }
 
     @media (max-width: 767.98px) {
@@ -50,20 +76,21 @@
 
         .customers-table thead th:nth-child(2),
         .customers-table thead th:nth-child(3),
-        .customers-table thead th:nth-child(4),
         .customers-table thead th:nth-child(5),
+        .customers-table thead th:nth-child(6),
         .customers-table tbody td:nth-child(2),
         .customers-table tbody td:nth-child(3),
-        .customers-table tbody td:nth-child(4),
-        .customers-table tbody td:nth-child(5) {
+        .customers-table tbody td:nth-child(5),
+        .customers-table tbody td:nth-child(6) {
             display: none !important;
         }
 
         .customers-table th,
         .customers-table td {
             vertical-align: middle;
-            padding-left: 0.6rem;
-            padding-right: 0.6rem;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+            font-size: 0.86rem;
         }
 
         .customers-table thead th:first-child,
@@ -74,15 +101,48 @@
         }
 
         .customers-table tbody td:first-child {
+            width: 60%;
             max-width: 180px;
             white-space: normal;
             line-height: 1.25;
+        }
+
+        .customers-table thead th:nth-child(4),
+        .customers-table tbody td:nth-child(4) {
+            width: 15%;
+            max-width: 74px;
+            padding-left: 0.35rem;
+            padding-right: 0.35rem;
+        }
+
+        .customers-table thead th:nth-child(7),
+        .customers-table tbody td:nth-child(7) {
+            width: 25%;
+        }
+
+        .customers-table .membership-badge {
+            display: inline-block;
+            max-width: 100%;
+            white-space: normal;
+            font-size: 0.66rem;
+            line-height: 1.15;
+            padding: 0.2rem 0.35rem;
+        }
+
+        .customers-table .membership-next {
+            display: none;
         }
 
         .customers-action-group {
             justify-content: center !important;
             flex-wrap: wrap;
             width: 100%;
+            gap: 0.35rem !important;
+        }
+
+        .customers-action-group .btn {
+            font-size: 0.76rem;
+            padding: 0.2rem 0.65rem !important;
         }
     }
 </style>
@@ -115,7 +175,7 @@
         <div class="card border-0 shadow-sm rounded-4">
             <div class="card-header bg-white border-0 pt-3 pb-0 customers-card-header">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 customers-toolbar">
-                    <h6 class="fw-bold mb-0"><i class="bi bi-people-fill me-2 text-primary"></i>ฐานข้อมูลลูกค้า CRM</h6>
+                    <h6 class="fw-bold mb-0"><i class="bi bi-people-fill me-2 text-primary"></i>ฐานข้อมูลลูกค้า</h6>
                     <button type="button" class="btn btn-primary rounded-pill px-4" id="open-add-customer-btn">
                         <i class="bi bi-person-plus-fill me-1"></i> เพิ่มลูกค้าใหม่
                     </button>
@@ -132,7 +192,7 @@
                                        class="form-control"
                                        name="search"
                                        value="{{ $search }}"
-                                       placeholder="ชื่อ, เบอร์โทร, LINE ID">
+                                       placeholder="ชื่อ, เบอร์โทร, ไลน์ไอดี">
                             </div>
                         </form>
                     </div>
@@ -144,7 +204,7 @@
                     </div>
                     <div class="col-6 col-lg-4">
                         <div class="rounded-3 border p-2 bg-light h-100">
-                            <div class="text-muted small">ลูกค้า Active 30 วัน</div>
+                            <div class="text-muted small">ลูกค้าเคลื่อนไหว 30 วัน</div>
                             <div class="fw-bold fs-5">{{ number_format($summary['active_customers_30d'] ?? 0) }}</div>
                         </div>
                     </div>
@@ -154,12 +214,13 @@
                     <table class="table table-hover align-middle mb-0 customers-table">
                         <thead class="table-light">
                             <tr>
-                                <th class="px-3">ชื่อลูกค้า</th>
+                                <th class="px-3">ลูกค้า</th>
                                 <th>เบอร์โทร</th>
-                                <th>LINE ID</th>
+                                <th>ไลน์ไอดี</th>
+                                <th class="membership-col">สมาชิก</th>
                                 <th>จำนวนครั้งใช้บริการ</th>
                                 <th>เข้าล่าสุด</th>
-                                <th class="text-end">Action</th>
+                                <th class="text-end action-col">จัดการ</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -170,6 +231,7 @@
                                     'name' => $customer['name'],
                                     'phone' => $customer['phone'],
                                     'line_id' => $customer['line_id'],
+                                    'tier_id' => $customer['tier_id'],
                                     'preferred_pressure_level' => $customer['preferred_pressure_level'],
                                     'health_notes' => $customer['health_notes'],
                                     'contraindications' => $customer['contraindications'],
@@ -179,6 +241,21 @@
                                 <td class="px-3 fw-semibold">{{ $customer['name'] }}</td>
                                 <td>{{ $customer['phone'] !== '' ? $customer['phone'] : '-' }}</td>
                                 <td>{{ $customer['line_id'] !== '' ? $customer['line_id'] : '-' }}</td>
+                                <td class="membership-cell">
+                                    @if($customer['tier_id'] !== null)
+                                    <span class="badge text-bg-primary membership-badge">{{ $customer['tier_name'] }} ({{ number_format($customer['tier_discount_percent'], 2) }}%)</span>
+                                    @else
+                                    <span class="badge text-bg-secondary membership-badge">ไม่มีระดับสมาชิก</span>
+                                    @endif
+                                    @if(!empty($customer['next_tier_name']))
+                                    <div class="text-muted mt-1 membership-next d-none d-md-block">
+                                        อีก {{ number_format((float) ($customer['amount_to_next_tier'] ?? 0), 2) }} บาท
+                                        ถึง {{ $customer['next_tier_name'] }}
+                                    </div>
+                                    @elseif(!empty($customer['is_top_tier']))
+                                    <div class="text-success mt-1 membership-next d-none d-md-block">ถึงระดับสูงสุดแล้ว</div>
+                                    @endif
+                                </td>
                                 <td>{{ number_format($customer['visit_count']) }} ครั้ง</td>
                                 <td>{{ $customer['last_visit_at'] ?? '-' }}</td>
                                 <td class="text-end">
@@ -200,7 +277,7 @@
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="6" class="text-center text-muted py-4">ไม่พบข้อมูลลูกค้า</td>
+                                <td colspan="7" class="text-center text-muted py-4">ไม่พบข้อมูลลูกค้า</td>
                             </tr>
                             @endforelse
                         </tbody>
@@ -232,8 +309,19 @@
                             <input type="text" name="phone" class="form-control rounded-3" value="{{ old('phone') }}" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">LINE ID</label>
+                            <label class="form-label small fw-bold">ไลน์ไอดี</label>
                             <input type="text" name="line_id" class="form-control rounded-3" value="{{ old('line_id') }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">ระดับสมาชิก</label>
+                            <select name="tier_id" class="form-select rounded-3">
+                                <option value="">ไม่มีระดับสมาชิก</option>
+                                @foreach(($membershipTiers ?? []) as $tier)
+                                <option value="{{ $tier['id'] }}" {{ (string) old('tier_id') === (string) $tier['id'] ? 'selected' : '' }}>
+                                    {{ $tier['name'] }} ({{ number_format($tier['discount_percent'], 2) }}%)
+                                </option>
+                                @endforeach
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">น้ำหนักมือที่ชอบ</label>
@@ -290,8 +378,17 @@
                             <input type="text" name="phone" id="edit-customer-phone" class="form-control rounded-3" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">LINE ID</label>
+                            <label class="form-label small fw-bold">ไลน์ไอดี</label>
                             <input type="text" name="line_id" id="edit-customer-line-id" class="form-control rounded-3">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">ระดับสมาชิก</label>
+                            <select name="tier_id" id="edit-customer-tier-id" class="form-select rounded-3">
+                                <option value="">ไม่มีระดับสมาชิก</option>
+                                @foreach(($membershipTiers ?? []) as $tier)
+                                <option value="{{ $tier['id'] }}">{{ $tier['name'] }} ({{ number_format($tier['discount_percent'], 2) }}%)</option>
+                                @endforeach
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">น้ำหนักมือที่ชอบ</label>
@@ -380,6 +477,7 @@
         const nameInput = document.getElementById('edit-customer-name');
         const phoneInput = document.getElementById('edit-customer-phone');
         const lineIdInput = document.getElementById('edit-customer-line-id');
+        const tierSelect = document.getElementById('edit-customer-tier-id');
         const pressureSelect = document.getElementById('edit-customer-pressure');
         const healthNotesInput = document.getElementById('edit-customer-health-notes');
         const contraindicationsInput = document.getElementById('edit-customer-contraindications');
@@ -388,6 +486,7 @@
         if (nameInput) nameInput.value = String(customer.name || '');
         if (phoneInput) phoneInput.value = String(customer.phone || '');
         if (lineIdInput) lineIdInput.value = String(customer.line_id || '');
+        if (tierSelect) tierSelect.value = customer.tier_id ? String(customer.tier_id) : '';
         if (pressureSelect) pressureSelect.value = customer.preferred_pressure_level || '';
         if (healthNotesInput) healthNotesInput.value = String(customer.health_notes || '');
         if (contraindicationsInput) contraindicationsInput.value = String(customer.contraindications || '');
@@ -499,6 +598,7 @@
             name: @json(old('name')),
             phone: @json(old('phone')),
             line_id: @json(old('line_id')),
+            tier_id: @json(old('tier_id')),
             preferred_pressure_level: @json(old('preferred_pressure_level')),
             health_notes: @json(old('health_notes')),
             contraindications: @json(old('contraindications')),

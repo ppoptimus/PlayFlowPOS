@@ -40,6 +40,7 @@ class CustomerService
             'history' => $history,
             'summary' => $this->buildSummary($customers),
             'pressureLevels' => self::PRESSURE_LEVELS,
+            'membershipTiers' => $this->getMembershipTiers(),
         ];
     }
 
@@ -188,11 +189,13 @@ class CustomerService
             });
         }
 
+        $tiers = $this->getMembershipTiers();
+
         return $query
             ->limit(500)
             ->get()
-            ->map(function ($row): array {
-                return $this->mapCustomerRow($row);
+            ->map(function ($row) use ($tiers): array {
+                return $this->appendNextTierInfo($this->mapCustomerRow($row), $tiers);
             })
             ->all();
     }
@@ -211,7 +214,7 @@ class CustomerService
             return null;
         }
 
-        return $this->mapCustomerRow($row);
+        return $this->appendNextTierInfo($this->mapCustomerRow($row), $this->getMembershipTiers());
     }
 
     private function getCustomerOrderHistory(int $customerId): array
@@ -316,9 +319,19 @@ class CustomerService
         $this->addCustomerColumnSelect($query, 'name', "CONCAT('Customer #', c.id)");
         $this->addCustomerColumnSelect($query, 'phone', "''");
         $this->addCustomerColumnSelect($query, 'line_id', "''");
+        $this->addCustomerColumnSelect($query, 'tier_id', 'NULL');
         $this->addCustomerColumnSelect($query, 'preferred_pressure_level', 'NULL');
         $this->addCustomerColumnSelect($query, 'health_notes', 'NULL');
         $this->addCustomerColumnSelect($query, 'contraindications', 'NULL');
+
+        if ($this->tableExists('membership_tiers') && $this->hasColumn('customers', 'tier_id')) {
+            $query->leftJoin('membership_tiers as mt', 'mt.id', '=', 'c.tier_id');
+            $query->addSelect(DB::raw("COALESCE(mt.name, '') as tier_name"));
+            $query->addSelect(DB::raw('COALESCE(mt.discount_percent, 0) as tier_discount_percent'));
+        } else {
+            $query->addSelect(DB::raw("'' as tier_name"));
+            $query->addSelect(DB::raw('0 as tier_discount_percent'));
+        }
 
         if ($this->tableExists('orders')) {
             $query->selectSub(function ($subQuery): void {
@@ -354,6 +367,9 @@ class CustomerService
             'name' => (string) ($row->name ?? ''),
             'phone' => (string) ($row->phone ?? ''),
             'line_id' => (string) ($row->line_id ?? ''),
+            'tier_id' => $row->tier_id !== null ? (int) $row->tier_id : null,
+            'tier_name' => (string) ($row->tier_name ?? ''),
+            'tier_discount_percent' => (float) ($row->tier_discount_percent ?? 0),
             'preferred_pressure_level' => $row->preferred_pressure_level !== null ? (string) $row->preferred_pressure_level : null,
             'health_notes' => $row->health_notes !== null ? (string) $row->health_notes : '',
             'contraindications' => $row->contraindications !== null ? (string) $row->contraindications : '',
@@ -373,6 +389,38 @@ class CustomerService
         $query->selectRaw($fallbackExpression . ' as ' . $column);
     }
 
+    private function appendNextTierInfo(array $customer, array $tiers): array
+    {
+        $totalSpent = (float) ($customer['total_spent'] ?? 0);
+        $nextTier = null;
+
+        foreach ($tiers as $tier) {
+            $minSpend = (float) ($tier['min_spend'] ?? 0);
+            if ($minSpend > $totalSpent) {
+                $nextTier = $tier;
+                break;
+            }
+        }
+
+        if ($nextTier === null) {
+            $customer['next_tier_id'] = null;
+            $customer['next_tier_name'] = null;
+            $customer['next_tier_min_spend'] = null;
+            $customer['amount_to_next_tier'] = 0.0;
+            $customer['is_top_tier'] = !empty($tiers);
+            return $customer;
+        }
+
+        $nextMinSpend = (float) ($nextTier['min_spend'] ?? 0);
+        $customer['next_tier_id'] = (int) $nextTier['id'];
+        $customer['next_tier_name'] = (string) ($nextTier['name'] ?? '');
+        $customer['next_tier_min_spend'] = $nextMinSpend;
+        $customer['amount_to_next_tier'] = max(0.0, $nextMinSpend - $totalSpent);
+        $customer['is_top_tier'] = false;
+
+        return $customer;
+    }
+
     private function sanitizeCustomerData(array $payload): array
     {
         $data = [];
@@ -388,6 +436,11 @@ class CustomerService
         if ($this->hasColumn('customers', 'line_id') && array_key_exists('line_id', $payload)) {
             $lineId = trim((string) ($payload['line_id'] ?? ''));
             $data['line_id'] = $lineId !== '' ? $lineId : null;
+        }
+
+        if ($this->hasColumn('customers', 'tier_id') && array_key_exists('tier_id', $payload)) {
+            $tierId = $payload['tier_id'];
+            $data['tier_id'] = ($tierId === null || $tierId === '') ? null : (int) $tierId;
         }
 
         if ($this->hasColumn('customers', 'preferred_pressure_level') && array_key_exists('preferred_pressure_level', $payload)) {
@@ -483,5 +536,26 @@ class CustomerService
         }
 
         return $status !== '' ? $status : '-';
+    }
+
+    private function getMembershipTiers(): array
+    {
+        if (!$this->tableExists('membership_tiers')) {
+            return [];
+        }
+
+        return DB::table('membership_tiers')
+            ->orderBy('min_spend')
+            ->orderBy('id')
+            ->get(['id', 'name', 'discount_percent', 'min_spend'])
+            ->map(static function ($row): array {
+                return [
+                    'id' => (int) $row->id,
+                    'name' => (string) $row->name,
+                    'discount_percent' => (float) ($row->discount_percent ?? 0),
+                    'min_spend' => (float) ($row->min_spend ?? 0),
+                ];
+            })
+            ->all();
     }
 }
