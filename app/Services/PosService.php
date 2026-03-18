@@ -121,7 +121,7 @@ class PosService
                     ]);
                 }
 
-                $requiredBookingFields = ['queue_date', 'start_time', 'end_time', 'service_id'];
+                $requiredBookingFields = ['queue_date', 'start_time', 'end_time'];
                 foreach ($requiredBookingFields as $field) {
                     if (!isset($bookingContext[$field]) || $bookingContext[$field] === null || $bookingContext[$field] === '') {
                         throw ValidationException::withMessages([
@@ -130,13 +130,16 @@ class PosService
                     }
                 }
 
+                $bookingServiceIds = $this->normalizeBookingServiceIds($bookingContext);
+
                 $booking = $this->bookingService->saveBooking(
                     isset($bookingContext['booking_id']) ? (int) $bookingContext['booking_id'] : null,
                     [
                         'branch_id' => $branchId,
                         'queue_date' => (string) $bookingContext['queue_date'],
                         'customer_id' => isset($bookingContext['customer_id']) ? (int) $bookingContext['customer_id'] : $customerId,
-                        'service_id' => (int) $bookingContext['service_id'],
+                        'service_id' => (int) $bookingServiceIds[0],
+                        'service_ids' => $bookingServiceIds,
                         'masseuse_id' => isset($bookingContext['staff_id']) ? (int) $bookingContext['staff_id'] : $this->firstServiceMasseuseId($normalizedItems),
                         'bed_id' => isset($bookingContext['bed_id']) && $bookingContext['bed_id'] !== null ? (int) $bookingContext['bed_id'] : null,
                         'start_time' => (string) $bookingContext['start_time'],
@@ -667,9 +670,9 @@ class PosService
         }
 
         $queueDate = (string) ($query['queue_date'] ?? Carbon::today()->toDateString());
-        $serviceId = isset($query['service_id']) ? (int) $query['service_id'] : null;
+        $serviceIds = $this->normalizeBookingServiceIds($query);
 
-        if ($serviceId === null || $serviceId <= 0) {
+        if (empty($serviceIds)) {
             return null;
         }
 
@@ -681,10 +684,35 @@ class PosService
             'endTime' => (string) ($query['end_time'] ?? '11:00'),
             'customerId' => isset($query['customer_id']) && (int) $query['customer_id'] > 0 ? (int) $query['customer_id'] : null,
             'staffId' => isset($query['staff_id']) && (int) $query['staff_id'] > 0 ? (int) $query['staff_id'] : null,
-            'serviceId' => $serviceId,
+            'serviceId' => $serviceIds[0],
+            'serviceIds' => $serviceIds,
             'bedId' => isset($query['bed_id']) && (int) $query['bed_id'] > 0 ? (int) $query['bed_id'] : null,
             'isPaid' => false,
         ];
+    }
+
+    private function normalizeBookingServiceIds(array $bookingContext): array
+    {
+        $rawIds = [];
+        if (isset($bookingContext['service_ids']) && is_array($bookingContext['service_ids'])) {
+            $rawIds = $bookingContext['service_ids'];
+        } elseif (isset($bookingContext['service_id'])) {
+            $rawIds = [$bookingContext['service_id']];
+        }
+
+        $serviceIds = [];
+        foreach ($rawIds as $rawId) {
+            $serviceId = (int) $rawId;
+            if ($serviceId <= 0) {
+                continue;
+            }
+
+            if (!in_array($serviceId, $serviceIds, true)) {
+                $serviceIds[] = $serviceId;
+            }
+        }
+
+        return array_slice($serviceIds, 0, 3);
     }
 
     private function normalizePaymentMethod(string $method): string

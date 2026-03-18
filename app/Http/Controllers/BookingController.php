@@ -80,6 +80,8 @@ class BookingController extends Controller
             'queue_date' => 'required|date_format:Y-m-d',
             'customer_id' => 'required|integer|exists:customers,id',
             'service_id' => 'required|integer|exists:services,id',
+            'service_ids' => 'nullable|array|max:3',
+            'service_ids.*' => 'integer|exists:services,id',
             'masseuse_id' => 'nullable|integer|exists:masseuses,id',
             'bed_id' => 'nullable|integer|exists:beds,id',
             'start_time' => 'required|date_format:H:i',

@@ -32,6 +32,7 @@
                             <option value="{{ $s['id'] }}">{{ $s['name'] }}</option>
                             @endforeach
                         </select>
+                        <div class="form-text" id="staff-availability-hint">เลือกช่วงเวลาเพื่อเช็กคิวหมอนวด</div>
                     </div>
                     <div class="col-12 col-md-6">
                         <label class="form-label small fw-bold">ห้อง/เตียง</label>
@@ -41,6 +42,7 @@
                             <option value="{{ $bed['id'] }}">{{ $bed['name'] }}</option>
                             @endforeach
                         </select>
+                        <div class="form-text" id="bed-availability-hint">เลือกช่วงเวลาเพื่อเช็กคิวเตียง</div>
                     </div>
                     <div class="col-6">
                         <label class="form-label small fw-bold">เวลาเริ่ม</label>
@@ -70,6 +72,7 @@
                                 <i class="bi bi-plus-lg"></i> เพิ่ม
                             </button>
                         </div>
+                        <div class="form-text" id="service-selection-hint">เพิ่มบริการได้สูงสุด 3 รายการ</div>
                     </div>
                     <div class="col-12">
                         <label class="form-label small fw-bold">รายการบริการที่เลือก</label>

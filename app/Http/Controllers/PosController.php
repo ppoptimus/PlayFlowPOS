@@ -43,6 +43,8 @@ class PosController extends Controller
             'booking_context.customer_id' => 'nullable|integer',
             'booking_context.staff_id' => 'nullable|integer',
             'booking_context.service_id' => 'nullable|integer',
+            'booking_context.service_ids' => 'nullable|array|max:3',
+            'booking_context.service_ids.*' => 'integer|exists:services,id',
             'booking_context.bed_id' => 'nullable|integer',
             'booking_context.is_paid' => 'nullable|boolean',
         ]);

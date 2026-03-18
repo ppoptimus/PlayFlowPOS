@@ -5,10 +5,12 @@ namespace App\Services;
 use App\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class BookingService
 {
+    private const MAX_SERVICES_PER_BOOKING = 3;
     private const STATUSES = [
         'waiting' => 'รอรับบริการ',
         'in_service' => 'กำลังนวด',
@@ -17,6 +19,7 @@ class BookingService
     ];
 
     private StaffAttendanceService $staffAttendanceService;
+    private array $tableExistsCache = [];
 
     public function __construct(StaffAttendanceService $staffAttendanceService)
     {
@@ -110,7 +113,8 @@ class BookingService
         $startAt = Carbon::createFromFormat('Y-m-d H:i', $queueDate . ' ' . $payload['start_time']);
         $endAt = Carbon::createFromFormat('Y-m-d H:i', $queueDate . ' ' . $payload['end_time']);
         $customerId = (int) $payload['customer_id'];
-        $serviceId = (int) $payload['service_id'];
+        $serviceIds = $this->normalizeServiceIdsFromPayload($payload);
+        $serviceId = (int) $serviceIds[0];
         $masseuseId = isset($payload['masseuse_id']) ? (int) $payload['masseuse_id'] : null;
         $bedId = isset($payload['bed_id']) ? (int) $payload['bed_id'] : null;
         $status = (string) $payload['status'];
@@ -129,7 +133,9 @@ class BookingService
             }
         }
 
-        $this->ensureServiceExists($serviceId);
+        foreach ($serviceIds as $selectedServiceId) {
+            $this->ensureServiceExists((int) $selectedServiceId);
+        }
         $this->ensureCustomerExists($customerId);
         $this->ensureMasseuseInBranch($masseuseId, $branchId);
         $this->ensureBedInBranch($bedId, $branchId);
@@ -147,13 +153,17 @@ class BookingService
             'cancel_reason' => $status === 'cancelled' ? $cancelReason : null,
         ];
 
-        if ($bookingId === null) {
-            $bookingId = (int) DB::table('bookings')->insertGetId($data);
-        } else {
-            DB::table('bookings')
-                ->where('id', $bookingId)
-                ->update($data);
-        }
+        DB::transaction(function () use (&$bookingId, $data, $serviceIds): void {
+            if ($bookingId === null) {
+                $bookingId = (int) DB::table('bookings')->insertGetId($data);
+            } else {
+                DB::table('bookings')
+                    ->where('id', $bookingId)
+                    ->update($data);
+            }
+
+            $this->syncBookingServices($bookingId, $serviceIds);
+        });
 
         return $this->findBookingById($bookingId, $branchId);
     }
@@ -202,16 +212,25 @@ class BookingService
             ]);
         }
 
-        DB::table('bookings')
-            ->where('id', $bookingId)
-            ->delete();
+        DB::transaction(function () use ($bookingId): void {
+            if ($this->tableExists('booking_services')) {
+                DB::table('booking_services')
+                    ->where('booking_id', $bookingId)
+                    ->delete();
+            }
+
+            DB::table('bookings')
+                ->where('id', $bookingId)
+                ->delete();
+        });
     }
 
     public function getBookingContextForCheckout(User $user, int $bookingId, ?int $requestedBranchId = null): array
     {
         $branchId = $this->resolveAuthorizedBranchId($user, $requestedBranchId);
-        $booking = $this->buildBookingQuery($branchId)
+        $booking = $this->enrichBookingRows($this->buildBookingQuery($branchId)
             ->where('b.id', $bookingId)
+            ->get())
             ->first();
 
         if ($booking === null) {
@@ -288,12 +307,12 @@ class BookingService
 
     private function getQueueByStaff(int $branchId, string $date): array
     {
-        $rows = $this->buildBookingQuery($branchId)
+        $rows = $this->enrichBookingRows($this->buildBookingQuery($branchId)
             ->whereDate('b.start_time', $date)
             ->whereNotNull('b.masseuse_id')
             ->where('b.status', '!=', 'cancelled')
             ->orderBy('b.start_time')
-            ->get();
+            ->get());
 
         $queueByStaff = [];
 
@@ -309,13 +328,20 @@ class BookingService
 
             $startAt = Carbon::parse((string) $row->start_time);
             $endAt = Carbon::parse((string) $row->end_time);
-            $servicePrice = $row->service_price !== null ? (float) $row->service_price : 0.0;
+            $services = $this->extractServicesFromRow($row);
+            $servicePrice = array_reduce($services, static function (float $sum, array $service): float {
+                return $sum + (float) ($service['price'] ?? 0);
+            }, 0.0);
 
             $queueByStaff[$staffId]['items'][] = [
                 'booking_id' => (string) $row->id,
                 'customer' => $row->customer_name !== null ? (string) $row->customer_name : '',
-                'service' => $row->service_name !== null ? (string) $row->service_name : '',
-                'service_id' => $row->service_id !== null ? (int) $row->service_id : null,
+                'service' => $this->formatServiceSummary($services),
+                'service_id' => !empty($services) ? (int) $services[0]['id'] : null,
+                'service_ids' => array_map(static function (array $service): int {
+                    return (int) ($service['id'] ?? 0);
+                }, $services),
+                'services' => $services,
                 'service_price' => $servicePrice,
                 'start' => $startAt->format('H:i'),
                 'end' => $endAt->format('H:i'),
@@ -348,21 +374,30 @@ class BookingService
         $total = 0.0;
 
         foreach ($queue as $item) {
-            $serviceId = isset($item['service_id']) ? (int) $item['service_id'] : 0;
-            if ($serviceId <= 0 || !isset($commissionConfigs[$serviceId])) {
-                continue;
+            $services = isset($item['services']) && is_array($item['services'])
+                ? $item['services']
+                : [[
+                    'id' => isset($item['service_id']) ? (int) $item['service_id'] : 0,
+                    'price' => isset($item['service_price']) ? (float) $item['service_price'] : 0.0,
+                ]];
+
+            foreach ($services as $service) {
+                $serviceId = isset($service['id']) ? (int) $service['id'] : 0;
+                if ($serviceId <= 0 || !isset($commissionConfigs[$serviceId])) {
+                    continue;
+                }
+
+                $config = $commissionConfigs[$serviceId];
+                $servicePrice = isset($service['price']) ? (float) $service['price'] : 0.0;
+
+                if (($config['type'] ?? '') === 'fixed') {
+                    $total += (float) ($config['value'] ?? 0);
+                    continue;
+                }
+
+                $baseAmount = max(0.0, $servicePrice - (float) ($config['deduct_cost'] ?? 0));
+                $total += $baseAmount * ((float) ($config['value'] ?? 0) / 100);
             }
-
-            $config = $commissionConfigs[$serviceId];
-            $servicePrice = isset($item['service_price']) ? (float) $item['service_price'] : 0.0;
-
-            if (($config['type'] ?? '') === 'fixed') {
-                $total += (float) ($config['value'] ?? 0);
-                continue;
-            }
-
-            $baseAmount = max(0.0, $servicePrice - (float) ($config['deduct_cost'] ?? 0));
-            $total += $baseAmount * ((float) ($config['value'] ?? 0) / 100);
         }
 
         return $total;
@@ -461,10 +496,10 @@ class BookingService
 
     private function getBookingsByDate(int $branchId, string $date): array
     {
-        return $this->buildBookingQuery($branchId)
+        return $this->enrichBookingRows($this->buildBookingQuery($branchId)
             ->whereDate('b.start_time', $date)
             ->orderBy('b.start_time')
-            ->get()
+            ->get())
             ->map(function ($row): array {
                 return $this->mapBookingRow($row);
             })
@@ -473,8 +508,9 @@ class BookingService
 
     private function findBookingById(int $bookingId, int $branchId): array
     {
-        $booking = $this->buildBookingQuery($branchId)
+        $booking = $this->enrichBookingRows($this->buildBookingQuery($branchId)
             ->where('b.id', $bookingId)
+            ->get())
             ->first();
 
         if ($booking === null) {
@@ -504,12 +540,149 @@ class BookingService
             );
     }
 
+    private function enrichBookingRows($rows)
+    {
+        $bookingIds = $rows->pluck('id')
+            ->map(static function ($id): int {
+                return (int) $id;
+            })
+            ->filter(static function (int $id): bool {
+                return $id > 0;
+            })
+            ->values()
+            ->all();
+
+        if (empty($bookingIds)) {
+            return $rows;
+        }
+
+        $fallbackRows = [];
+        foreach ($rows as $row) {
+            $fallbackRows[(int) $row->id] = $row;
+        }
+
+        $serviceMap = $this->loadBookingServicesMap($bookingIds, $fallbackRows);
+
+        return $rows->map(function ($row) use ($serviceMap) {
+            $bookingId = (int) $row->id;
+            $services = $serviceMap[$bookingId] ?? [];
+            $row->service_details = $services;
+            $row->service_ids = array_map(static function (array $service): string {
+                return (string) ($service['id'] ?? '');
+            }, $services);
+            $row->service_names = array_map(static function (array $service): string {
+                return (string) ($service['name'] ?? '');
+            }, $services);
+            $row->service_total_price = array_reduce($services, static function (float $sum, array $service): float {
+                return $sum + (float) ($service['price'] ?? 0);
+            }, 0.0);
+
+            if (!empty($services)) {
+                $row->service_id = (int) $services[0]['id'];
+                $row->service_name = (string) $services[0]['name'];
+                $row->service_price = (float) $services[0]['price'];
+            }
+
+            return $row;
+        });
+    }
+
+    private function loadBookingServicesMap(array $bookingIds, array $fallbackRows = []): array
+    {
+        $servicesByBooking = [];
+
+        if ($this->tableExists('booking_services')) {
+            $rows = DB::table('booking_services as bs')
+                ->join('services as s', 's.id', '=', 'bs.service_id')
+                ->whereIn('bs.booking_id', $bookingIds)
+                ->orderBy('bs.booking_id')
+                ->orderBy('bs.sort_order')
+                ->orderBy('bs.id')
+                ->get([
+                    'bs.booking_id',
+                    'bs.service_id',
+                    's.name as service_name',
+                    's.price as service_price',
+                ]);
+
+            foreach ($rows as $row) {
+                $bookingId = (int) $row->booking_id;
+                if (!isset($servicesByBooking[$bookingId])) {
+                    $servicesByBooking[$bookingId] = [];
+                }
+
+                $servicesByBooking[$bookingId][] = [
+                    'id' => (int) $row->service_id,
+                    'name' => (string) ($row->service_name ?? ''),
+                    'price' => (float) ($row->service_price ?? 0),
+                ];
+            }
+        }
+
+        foreach ($bookingIds as $bookingId) {
+            if (isset($servicesByBooking[$bookingId]) && !empty($servicesByBooking[$bookingId])) {
+                continue;
+            }
+
+            $fallbackRow = $fallbackRows[$bookingId] ?? null;
+            if ($fallbackRow === null || $fallbackRow->service_id === null) {
+                $servicesByBooking[$bookingId] = [];
+                continue;
+            }
+
+            $servicesByBooking[$bookingId] = [[
+                'id' => (int) $fallbackRow->service_id,
+                'name' => (string) ($fallbackRow->service_name ?? ''),
+                'price' => (float) ($fallbackRow->service_price ?? 0),
+            ]];
+        }
+
+        return $servicesByBooking;
+    }
+
+    private function extractServicesFromRow(object $row): array
+    {
+        if (isset($row->service_details) && is_array($row->service_details)) {
+            return $row->service_details;
+        }
+
+        if ($row->service_id === null) {
+            return [];
+        }
+
+        return [[
+            'id' => (int) $row->service_id,
+            'name' => (string) ($row->service_name ?? ''),
+            'price' => (float) ($row->service_price ?? 0),
+        ]];
+    }
+
+    private function formatServiceSummary(array $services): string
+    {
+        if (empty($services)) {
+            return '-';
+        }
+
+        $firstName = (string) ($services[0]['name'] ?? '-');
+        $extraCount = count($services) - 1;
+
+        if ($extraCount <= 0) {
+            return $firstName;
+        }
+
+        return $firstName . ' +' . $extraCount;
+    }
+
     private function mapBookingRow(object $row): array
     {
         $start = Carbon::parse((string) $row->start_time)->format('H:i');
         $queueDate = Carbon::parse((string) $row->start_time)->toDateString();
         $end = Carbon::parse((string) $row->end_time)->format('H:i');
-        $serviceId = $row->service_id !== null ? (string) $row->service_id : '';
+        $services = $this->extractServicesFromRow($row);
+        $serviceIds = array_values(array_filter(array_map(static function (array $service): string {
+            return isset($service['id']) ? (string) $service['id'] : '';
+        }, $services)));
+        $serviceId = $serviceIds[0] ?? '';
 
         return [
             'id' => (string) $row->id,
@@ -517,7 +690,11 @@ class BookingService
             'customerId' => $row->customer_id !== null ? (string) $row->customer_id : '',
             'customerName' => $row->customer_name !== null ? (string) $row->customer_name : '',
             'serviceId' => $serviceId,
-            'serviceIds' => $serviceId !== '' ? [$serviceId] : [],
+            'serviceIds' => $serviceIds,
+            'serviceNames' => array_values(array_filter(array_map(static function (array $service): string {
+                return (string) ($service['name'] ?? '');
+            }, $services))),
+            'serviceSummary' => $this->formatServiceSummary($services),
             'staffId' => $row->masseuse_id !== null ? (string) $row->masseuse_id : '',
             'staffName' => $row->staff_name !== null ? (string) $row->staff_name : '',
             'bedId' => $row->bed_id !== null ? (string) $row->bed_id : '',
@@ -532,6 +709,12 @@ class BookingService
 
     private function mapBookingToCheckoutContext(array $booking): array
     {
+        $serviceIds = isset($booking['serviceIds']) && is_array($booking['serviceIds'])
+            ? array_values(array_filter(array_map(static function ($serviceId): int {
+                return (int) $serviceId;
+            }, $booking['serviceIds'])))
+            : [];
+
         return [
             'bookingId' => isset($booking['id']) ? (int) $booking['id'] : null,
             'queueDate' => (string) ($booking['queueDate'] ?? Carbon::today()->toDateString()),
@@ -539,7 +722,8 @@ class BookingService
             'endTime' => (string) ($booking['end'] ?? '11:00'),
             'customerId' => isset($booking['customerId']) && $booking['customerId'] !== '' ? (int) $booking['customerId'] : null,
             'staffId' => isset($booking['staffId']) && $booking['staffId'] !== '' ? (int) $booking['staffId'] : null,
-            'serviceId' => isset($booking['serviceId']) && $booking['serviceId'] !== '' ? (int) $booking['serviceId'] : null,
+            'serviceId' => $serviceIds[0] ?? (isset($booking['serviceId']) && $booking['serviceId'] !== '' ? (int) $booking['serviceId'] : null),
+            'serviceIds' => $serviceIds,
             'bedId' => isset($booking['bedId']) && $booking['bedId'] !== '' ? (int) $booking['bedId'] : null,
             'isPaid' => (bool) ($booking['paid'] ?? false),
         ];
@@ -605,6 +789,69 @@ class BookingService
         }
     }
 
+    private function normalizeServiceIdsFromPayload(array $payload): array
+    {
+        $rawIds = [];
+        if (isset($payload['service_ids']) && is_array($payload['service_ids'])) {
+            $rawIds = $payload['service_ids'];
+        } elseif (isset($payload['service_id'])) {
+            $rawIds = [$payload['service_id']];
+        }
+
+        $serviceIds = [];
+        foreach ($rawIds as $rawId) {
+            $serviceId = (int) $rawId;
+            if ($serviceId <= 0) {
+                continue;
+            }
+
+            if (!in_array($serviceId, $serviceIds, true)) {
+                $serviceIds[] = $serviceId;
+            }
+        }
+
+        if (empty($serviceIds)) {
+            throw ValidationException::withMessages([
+                'service_id' => ['กรุณาเลือกอย่างน้อย 1 บริการ'],
+            ]);
+        }
+
+        if (count($serviceIds) > self::MAX_SERVICES_PER_BOOKING) {
+            throw ValidationException::withMessages([
+                'service_ids' => ['เลือกบริการได้สูงสุด ' . self::MAX_SERVICES_PER_BOOKING . ' รายการ'],
+            ]);
+        }
+
+        return $serviceIds;
+    }
+
+    private function syncBookingServices(int $bookingId, array $serviceIds): void
+    {
+        if (!$this->tableExists('booking_services')) {
+            return;
+        }
+
+        DB::table('booking_services')
+            ->where('booking_id', $bookingId)
+            ->delete();
+
+        $now = now();
+        $rows = [];
+        foreach (array_values($serviceIds) as $index => $serviceId) {
+            $rows[] = [
+                'booking_id' => $bookingId,
+                'service_id' => (int) $serviceId,
+                'sort_order' => $index + 1,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if (!empty($rows)) {
+            DB::table('booking_services')->insert($rows);
+        }
+    }
+
     private function ensureCustomerExists(int $customerId): void
     {
         $exists = DB::table('customers')->where('id', $customerId)->exists();
@@ -627,6 +874,15 @@ class BookingService
                 'service_id' => ['ไม่พบข้อมูลบริการ หรือบริการถูกปิดใช้งาน'],
             ]);
         }
+    }
+
+    private function tableExists(string $table): bool
+    {
+        if (!array_key_exists($table, $this->tableExistsCache)) {
+            $this->tableExistsCache[$table] = Schema::hasTable($table);
+        }
+
+        return $this->tableExistsCache[$table];
     }
 
     private function ensureMasseuseInBranch(?int $masseuseId, int $branchId): void

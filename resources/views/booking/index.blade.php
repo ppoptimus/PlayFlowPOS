@@ -430,6 +430,9 @@
     const statusSelectEl = document.getElementById('status-select');
     const serviceSelectEl = document.getElementById('service-select');
     const selectedServicesEl = document.getElementById('selected-services');
+    const serviceSelectionHintEl = document.getElementById('service-selection-hint');
+    const staffAvailabilityHintEl = document.getElementById('staff-availability-hint');
+    const bedAvailabilityHintEl = document.getElementById('bed-availability-hint');
     const bookingTotalEl = document.getElementById('booking-total');
     const bookingTitleEl = document.getElementById('booking-modal-title');
     const bookingSubtitleEl = document.getElementById('booking-modal-subtitle');
@@ -452,6 +455,7 @@
     const BOARD_ZOOM_MAX = 1.9;
     const BOARD_ZOOM_STEP = 0.12;
     const BOARD_ZOOM_STORAGE_KEY = 'playflow-booking-board-zoom';
+    const MAX_BOOKING_SERVICES = 3;
 
     function normalizeId(value) {
         return value === null || value === undefined ? '' : String(value);
@@ -474,6 +478,38 @@
     let pinchZoomState = null;
     let pendingZoomRestore = null;
     let pendingZoomFrame = null;
+
+    function normalizeTimeValue(rawValue, fallback = '10:00') {
+        const value = String(rawValue || '').trim();
+        if (value === '') {
+            return fallback;
+        }
+
+        const twelveHourMatch = value.match(/^(\d{1,2}):(\d{2})(?:\s*([AP]M))$/i);
+        if (twelveHourMatch) {
+            let hours = Number(twelveHourMatch[1]);
+            const minutes = Number(twelveHourMatch[2]);
+            const meridiem = String(twelveHourMatch[3] || '').toUpperCase();
+            if (Number.isFinite(hours) && Number.isFinite(minutes) && minutes >= 0 && minutes < 60) {
+                if (meridiem === 'PM' && hours < 12) hours += 12;
+                if (meridiem === 'AM' && hours === 12) hours = 0;
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            }
+        }
+
+        const match = value.match(/^(\d{1,2}):(\d{2})/);
+        if (!match) {
+            return fallback;
+        }
+
+        const hours = Number(match[1]);
+        const minutes = Number(match[2]);
+        if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+            return fallback;
+        }
+
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
 
     function notifyError(message) {
         if (window.PFPopup && typeof window.PFPopup.error === 'function') {
@@ -572,25 +608,31 @@
     }
 
     function normalizeBooking(input = {}) {
+        const inputServiceIds = Array.isArray(input.serviceIds)
+            ? input.serviceIds
+            : (Array.isArray(input.service_ids) ? input.service_ids : []);
+        const normalizedServiceIds = inputServiceIds.length
+            ? inputServiceIds.map(normalizeId).filter(Boolean)
+            : ((input.serviceId || input.service_id) ? [normalizeId(input.serviceId || input.service_id)] : []);
+
         return {
             id: normalizeId(input.id),
-            customerId: normalizeId(input.customerId),
-            customerName: input.customerName || '',
-            serviceIds: Array.isArray(input.serviceIds)
-                ? input.serviceIds.map(normalizeId).filter(Boolean)
-                : (input.serviceId ? [normalizeId(input.serviceId)] : []),
-            staffId: normalizeId(input.staffId),
-            bedId: normalizeId(input.bedId),
-            start: (input.start || '10:00').slice(0, 5),
-            end: (input.end || '11:00').slice(0, 5),
+            queueDate: input.queueDate || input.queue_date || defaultDate,
+            customerId: normalizeId(input.customerId || input.customer_id),
+            customerName: input.customerName || input.customer_name || '',
+            serviceIds: normalizedServiceIds,
+            staffId: normalizeId(input.staffId || input.masseuse_id),
+            bedId: normalizeId(input.bedId || input.bed_id),
+            start: normalizeTimeValue(input.start || input.startTime || input.start_time || '10:00', '10:00'),
+            end: normalizeTimeValue(input.end || input.endTime || input.end_time || '11:00', '11:00'),
             status: input.status || 'waiting',
-            paid: Boolean(input.paid),
-            cancelReason: input.cancelReason || null,
+            paid: Boolean(input.paid || input.isPaid),
+            cancelReason: input.cancelReason || input.cancel_reason || null,
         };
     }
 
     function toMinutes(hhmm) {
-        const [h, m] = hhmm.split(':').map(Number);
+        const [h, m] = normalizeTimeValue(hhmm, '00:00').split(':').map(Number);
         return (h * 60) + m;
     }
 
@@ -647,11 +689,124 @@
             })
             .filter(Boolean);
         if (!names.length) return '-';
-        return names[0];
+        return names.length > 1 ? `${names[0]} +${names.length - 1}` : names[0];
+    }
+
+    function updateAddServiceState() {
+        if (addServiceBtn) {
+            const reachedMax = selectedServiceIds.length >= MAX_BOOKING_SERVICES;
+            addServiceBtn.disabled = reachedMax;
+            addServiceBtn.innerHTML = reachedMax
+                ? `<i class="bi bi-check2 me-1"></i> ครบ ${MAX_BOOKING_SERVICES}`
+                : '<i class="bi bi-plus-lg"></i> เพิ่ม';
+        }
+
+        if (serviceSelectionHintEl) {
+            serviceSelectionHintEl.textContent = selectedServiceIds.length >= MAX_BOOKING_SERVICES
+                ? `เลือกบริการครบ ${MAX_BOOKING_SERVICES} รายการแล้ว`
+                : `เพิ่มบริการได้สูงสุด ${MAX_BOOKING_SERVICES} รายการ (${selectedServiceIds.length}/${MAX_BOOKING_SERVICES})`;
+        }
+    }
+
+    function setAvailabilityHint(element, message, state = 'muted') {
+        if (!element) return;
+        element.classList.remove('text-muted', 'text-success', 'text-danger', 'text-warning');
+        if (state === 'success') {
+            element.classList.add('text-success');
+        } else if (state === 'danger') {
+            element.classList.add('text-danger');
+        } else if (state === 'warning') {
+            element.classList.add('text-warning');
+        } else {
+            element.classList.add('text-muted');
+        }
+        element.textContent = message;
+    }
+
+    function getBookingConflicts(startTime, endTime, staffId, bedId) {
+        const start = normalizeTimeValue(startTime, '');
+        const end = normalizeTimeValue(endTime, '');
+        if (!start || !end || toMinutes(end) <= toMinutes(start)) {
+            return { staffConflict: null, bedConflict: null };
+        }
+
+        const activeDate = queueDateEl && queueDateEl.value ? queueDateEl.value : defaultDate;
+        const currentBookingId = normalizeId(editingBookingId);
+
+        const overlappingBookings = bookings.filter((booking) => {
+            if ((booking.queueDate || defaultDate) !== activeDate) return false;
+            if (normalizeId(booking.id) === currentBookingId) return false;
+            if ((booking.status || '') === 'cancelled') return false;
+
+            const bookingStart = normalizeTimeValue(booking.start, '');
+            const bookingEnd = normalizeTimeValue(booking.end, '');
+            if (!bookingStart || !bookingEnd) return false;
+
+            return toMinutes(bookingStart) < toMinutes(end) && toMinutes(bookingEnd) > toMinutes(start);
+        });
+
+        const staffConflict = staffId
+            ? overlappingBookings.find((booking) => normalizeId(booking.staffId) === normalizeId(staffId)) || null
+            : null;
+        const bedConflict = bedId
+            ? overlappingBookings.find((booking) => normalizeId(booking.bedId) === normalizeId(bedId)) || null
+            : null;
+
+        return { staffConflict, bedConflict };
+    }
+
+    function updateAvailabilityIndicators() {
+        const start = normalizeTimeValue(startTimeEl ? startTimeEl.value : '', '');
+        const end = normalizeTimeValue(endTimeEl ? endTimeEl.value : '', '');
+        const staffId = normalizeId(staffSelectEl ? staffSelectEl.value : '');
+        const bedId = normalizeId(bedSelectEl ? bedSelectEl.value : '');
+        const isPaidBooking = Boolean(payBookingBtn && payBookingBtn.disabled);
+        let hasConflict = false;
+
+        if (!start || !end || toMinutes(end) <= toMinutes(start)) {
+            setAvailabilityHint(staffAvailabilityHintEl, 'กรุณาเลือกเวลาเริ่มและเวลาสิ้นสุดให้ถูกต้อง', 'warning');
+            setAvailabilityHint(bedAvailabilityHintEl, bedId ? 'กรุณาเลือกเวลาเริ่มและเวลาสิ้นสุดให้ถูกต้อง' : 'ยังไม่ได้เลือกเตียง');
+            if (saveBookingBtn) {
+                saveBookingBtn.disabled = true;
+            }
+            return;
+        }
+
+        const { staffConflict, bedConflict } = getBookingConflicts(start, end, staffId, bedId);
+
+        if (staffId) {
+            setAvailabilityHint(
+                staffAvailabilityHintEl,
+                staffConflict
+                    ? `หมอนวดติดคิว ${staffConflict.start}-${staffConflict.end}`
+                    : 'หมอนวดว่างในช่วงเวลานี้',
+                staffConflict ? 'danger' : 'success'
+            );
+        } else {
+            setAvailabilityHint(staffAvailabilityHintEl, 'กรุณาเลือกหมอนวด', 'warning');
+        }
+
+        if (bedId) {
+            setAvailabilityHint(
+                bedAvailabilityHintEl,
+                bedConflict
+                    ? `เตียงติดคิว ${bedConflict.start}-${bedConflict.end}`
+                    : 'เตียงว่างในช่วงเวลานี้',
+                bedConflict ? 'danger' : 'success'
+            );
+        } else {
+            setAvailabilityHint(bedAvailabilityHintEl, 'ยังไม่ได้เลือกเตียง', 'muted');
+        }
+
+        hasConflict = Boolean(staffConflict || bedConflict || !staffId);
+        if (saveBookingBtn) {
+            saveBookingBtn.disabled = Boolean(isPaidBooking || hasConflict);
+        }
     }
 
     function renderSelectedServices() {
         if (!selectedServiceIds.length) {
+            updateAddServiceState();
             selectedServicesEl.innerHTML = '<span class="small text-muted">ยังไม่มีบริการที่เลือก</span>';
             bookingTotalEl.textContent = '0 บ.';
             return;
@@ -671,6 +826,7 @@
         }).join('');
 
         bookingTotalEl.textContent = `${getTotalPrice(selectedServiceIds).toLocaleString()} บ.`;
+        updateAddServiceState();
     }
 
     function removeService(serviceId) {
@@ -680,11 +836,16 @@
     window.removeService = removeService;
 
     function ensureEndAfterStart() {
-        const start = toMinutes(startTimeEl.value);
-        const end = toMinutes(endTimeEl.value);
+        const normalizedStart = normalizeTimeValue(startTimeEl.value, '10:00');
+        const normalizedEnd = normalizeTimeValue(endTimeEl.value, '11:00');
+        startTimeEl.value = normalizedStart;
+        endTimeEl.value = normalizedEnd;
+        const start = toMinutes(normalizedStart);
+        const end = toMinutes(normalizedEnd);
         if (end <= start) {
-            endTimeEl.value = addMinutes(startTimeEl.value, getTotalDuration(selectedServiceIds));
+            endTimeEl.value = addMinutes(normalizedStart, getTotalDuration(selectedServiceIds));
         }
+        updateAvailabilityIndicators();
     }
 
     function setModalMode(isEditing) {
@@ -703,10 +864,10 @@
         customerSelectEl.value = booking.customerId || defaultCustomerId;
         staffSelectEl.value = normalizeId(booking.staffId || defaultStaffId);
         if (bedSelectEl) bedSelectEl.value = normalizeId(booking.bedId || '');
-        startTimeEl.value = booking.start || '10:00';
-        endTimeEl.value = booking.end || addMinutes(startTimeEl.value, getTotalDuration(booking.serviceIds));
+        startTimeEl.value = normalizeTimeValue(booking.start || '10:00', '10:00');
+        endTimeEl.value = normalizeTimeValue(booking.end || addMinutes(startTimeEl.value, getTotalDuration(booking.serviceIds)), addMinutes(startTimeEl.value, getTotalDuration(booking.serviceIds)));
         statusSelectEl.value = booking.status || 'waiting';
-        selectedServiceIds = [...(booking.serviceIds || [])].map(normalizeId).slice(0, 1);
+        selectedServiceIds = [...(booking.serviceIds || [])].map(normalizeId).slice(0, MAX_BOOKING_SERVICES);
         if (!selectedServiceIds.length && defaultServiceId) selectedServiceIds = [defaultServiceId];
         renderSelectedServices();
         setModalMode(isEditing);
@@ -718,6 +879,7 @@
         payBookingBtn.classList.toggle('btn-success', booking.paid);
         payBookingBtn.classList.toggle('btn-outline-success', !booking.paid);
         deleteBookingBtn.classList.toggle('d-none', !isEditing || Boolean(booking.paid));
+        updateAvailabilityIndicators();
     }
 
     function renderBookings() {
@@ -822,8 +984,8 @@
 
     function collectBookingPayload() {
         if (!hasModalControls()) return null;
-        const start = startTimeEl.value;
-        const end = endTimeEl.value;
+        const start = normalizeTimeValue(startTimeEl.value, '');
+        const end = normalizeTimeValue(endTimeEl.value, '');
         const queueDate = (queueDateEl && queueDateEl.value) ? queueDateEl.value : defaultDate;
 
         if (!customerSelectEl.value || !staffSelectEl.value || !start || !end) {
@@ -841,11 +1003,23 @@
             return null;
         }
 
+        const { staffConflict, bedConflict } = getBookingConflicts(start, end, staffSelectEl.value, bedSelectEl.value);
+        if (staffConflict) {
+            notifyError(`หมอนวดคนนี้ติดคิวช่วง ${staffConflict.start}-${staffConflict.end}`);
+            return null;
+        }
+
+        if (bedConflict) {
+            notifyError(`เตียงนี้ติดคิวช่วง ${bedConflict.start}-${bedConflict.end}`);
+            return null;
+        }
+
         return {
             branch_id: activeBranchId || null,
             queue_date: queueDate,
             customer_id: Number(customerSelectEl.value),
             service_id: Number(selectedServiceIds[0]),
+            service_ids: [...selectedServiceIds].map(id => Number(id)),
             masseuse_id: staffSelectEl.value ? Number(staffSelectEl.value) : null,
             bed_id: bedSelectEl.value ? Number(bedSelectEl.value) : null,
             start_time: start,
@@ -948,6 +1122,10 @@
             end_time: payload.end_time,
         });
 
+        (payload.service_ids || []).forEach((serviceId) => {
+            params.append('service_ids[]', String(serviceId));
+        });
+
         if (activeBranchId) {
             params.set('branch_id', String(activeBranchId));
         }
@@ -1025,7 +1203,7 @@
         }
 
         editingBookingId = null;
-        const startTime = (data.time || '10:00').slice(0, 5);
+        const startTime = normalizeTimeValue(data.time || '10:00', '10:00');
         const initialServices = defaultServiceId ? [defaultServiceId] : [];
         const duration = getTotalDuration(initialServices);
 
@@ -1081,7 +1259,20 @@
         addServiceBtn.addEventListener('click', () => {
             const serviceId = normalizeId(serviceSelectEl.value);
             if (!serviceId) return;
-            selectedServiceIds = [serviceId];
+
+            if (selectedServiceIds.includes(serviceId)) {
+                notifyError('บริการนี้ถูกเลือกแล้ว');
+                updateAddServiceState();
+                return;
+            }
+
+            if (selectedServiceIds.length >= MAX_BOOKING_SERVICES) {
+                notifyError(`เพิ่มบริการได้สูงสุด ${MAX_BOOKING_SERVICES} รายการ`);
+                updateAddServiceState();
+                return;
+            }
+
+            selectedServiceIds = [...selectedServiceIds, serviceId];
             renderSelectedServices();
             ensureEndAfterStart();
         });
@@ -1089,6 +1280,8 @@
 
     if (startTimeEl) startTimeEl.addEventListener('change', ensureEndAfterStart);
     if (endTimeEl) endTimeEl.addEventListener('change', ensureEndAfterStart);
+    if (staffSelectEl) staffSelectEl.addEventListener('change', updateAvailabilityIndicators);
+    if (bedSelectEl) bedSelectEl.addEventListener('change', updateAvailabilityIndicators);
     if (saveBookingBtn) saveBookingBtn.addEventListener('click', saveBookingAndClose);
     if (payBookingBtn) payBookingBtn.addEventListener('click', markAsPaid);
     if (deleteBookingBtn) deleteBookingBtn.addEventListener('click', deleteBooking);
@@ -1101,6 +1294,9 @@
             if (saveBookingBtn) saveBookingBtn.disabled = false;
             if (payBookingBtn) payBookingBtn.disabled = false;
             if (deleteBookingBtn) deleteBookingBtn.disabled = false;
+            renderSelectedServices();
+            updateAvailabilityIndicators();
+            updateAddServiceState();
         });
     }
 
@@ -1200,6 +1396,7 @@
     document.addEventListener('DOMContentLoaded', () => {
         restoreBoardZoom();
         scheduleRenderBookings();
+        updateAddServiceState();
     });
 </script>
 @endpush

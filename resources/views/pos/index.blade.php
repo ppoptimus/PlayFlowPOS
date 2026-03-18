@@ -313,9 +313,15 @@
         box-shadow: 0 8px 16px rgba(16, 84, 153, 0.08) !important;
     }
 
+    .pos-mobile-safe .dropdown {
+        position: relative;
+        z-index: 20;
+    }
+
     .pos-mobile-safe .dropdown-menu {
         border: 1px solid rgba(31, 115, 224, 0.16) !important;
         background: linear-gradient(180deg, #ffffff 0%, #f5fbff 100%);
+        z-index: 30;
     }
 
     .pos-mobile-safe .tab-filter.active {
@@ -420,6 +426,11 @@
     }
 
     @media (max-width: 991.98px) {
+        .pos-mobile-safe > .col-12:first-child {
+            position: relative;
+            z-index: 40;
+        }
+
         .pos-mobile-safe > .col-12 > .card {
             border-radius: 1rem !important;
         }
@@ -710,6 +721,7 @@
             customer_id: getSelectedCustomerId() ?? (bookingContext.customerId || null),
             staff_id: staffSelectEl && staffSelectEl.value ? Number(staffSelectEl.value) : (bookingContext.staffId || null),
             service_id: bookingContext.serviceId || null,
+            service_ids: Array.isArray(bookingContext.serviceIds) ? bookingContext.serviceIds : (bookingContext.serviceId ? [bookingContext.serviceId] : []),
             bed_id: bookingContext.bedId || null,
             is_paid: Boolean(bookingContext.isPaid),
         };
@@ -993,11 +1005,17 @@
             staffSelectEl.value = String(bookingContext.staffId);
         }
 
-        if (bookingContext.serviceId && cart.length === 0) {
-            const service = serviceItems.find(item => Number(item.source_id) === Number(bookingContext.serviceId));
-            if (service) {
-                addToCart(service.id, service.name, Number(service.price), 'service', Number(service.source_id));
-            }
+        if (cart.length === 0) {
+            const serviceIds = Array.isArray(bookingContext.serviceIds) && bookingContext.serviceIds.length > 0
+                ? bookingContext.serviceIds
+                : (bookingContext.serviceId ? [bookingContext.serviceId] : []);
+
+            serviceIds.forEach((serviceId) => {
+                const service = serviceItems.find(item => Number(item.source_id) === Number(serviceId));
+                if (service) {
+                    addToCart(service.id, service.name, Number(service.price), 'service', Number(service.source_id));
+                }
+            });
         }
 
         if (bookingContext.isPaid === true && checkoutBtn) {

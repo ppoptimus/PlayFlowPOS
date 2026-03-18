@@ -1,7 +1,7 @@
 @extends('layouts.main')
 
 @section('title', 'Masseuse | PlayFlow Spa POS')
-@section('page_title', 'Masseuse Management')
+@section('page_title', 'Masseuse')
 @section('page_subtitle', 'จัดการข้อมูลหมอนวด')
 
 @php
