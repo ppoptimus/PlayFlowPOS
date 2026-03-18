@@ -5,16 +5,6 @@
 @section('page_subtitle', 'จัดการข้อมูลหมอนวด')
 
 @php
-    $splitDisplayName = static function (string $name): array {
-        $parts = preg_split('/\s+/u', trim($name)) ?: [];
-        if (count($parts) <= 1) {
-            return [$name, ''];
-        }
-
-        $firstName = array_shift($parts);
-        return [$firstName ?? $name, implode(' ', $parts)];
-    };
-
     $totalIncome = collect($staff ?? [])->sum('income');
     $totalCommission = collect($staff ?? [])->sum('commission');
     $totalQueue = collect($staff ?? [])->sum(static function (array $item): int {
@@ -70,7 +60,7 @@
                 <div class="col-12 col-xl-5">
                     <div class="hero-title">โมดูลหมอนวด</div>
                     <p class="hero-subtitle mb-0 mt-2">
-                        สรุปรายได้ คอมมิชชั่น และคิวงาน พร้อมแยกหน้าเพิ่มหมอนวดและหน้าแก้ไขข้อมูลให้ทำงานชัดเจนขึ้น
+                        สรุปรายได้ คอมมิชชั่น และคิวงาน
                     </p>
                 </div>
                 <div class="col-12 col-xl-7">
@@ -109,7 +99,7 @@
         <div class="section-header mb-1">
             <div>
                 <h3 class="section-title">สรุปผลงานรายคน</h3>
-                <div class="section-subtitle">ดึงจากคิวในวันที่ {{ $selectedDate }}</div>
+                <div class="section-subtitle">ดึงจากคิววันที่ {{ $selectedDate }}</div>
             </div>
             @if($canManage)
             <a href="{{ $createUrl }}" class="btn btn-primary section-action-btn page-action">
@@ -124,8 +114,7 @@
 
     @forelse($staff as $s)
     @php
-        [$firstName, $lastName] = $splitDisplayName((string) $s['name']);
-        $latestQueue = $s['queue'][0] ?? null;
+        $dailyQueueCount = (int) ($s['daily_queue_count'] ?? count($s['queue'] ?? []));
         $statusClass = !empty($s['isWorkingToday'])
             ? (!empty($s['queue']) ? 'is-success' : 'is-warning')
             : 'is-muted';
@@ -137,57 +126,64 @@
             return $value !== null && $value !== '';
         }));
     @endphp
-    <div class="col-12 col-md-6 col-xl-4">
+    <div class="col-12 col-lg-6">
         <section class="staff-card{{ $s['isWorkingToday'] ? '' : ' is-off-duty' }}">
             <div class="staff-toolbar">
                 <div class="staff-head">
                     <img src="{{ $s['avatar'] }}" alt="{{ $s['name'] }}" class="staff-avatar">
                     <div class="min-w-0">
-                        <div class="staff-name">
-                            <span>{{ $firstName }}</span>
-                            @if($lastName !== '')
-                            <span>{{ $lastName }}</span>
-                            @endif
-                        </div>
+                        <div class="staff-name">{{ $s['name'] }}</div>
                         <div class="staff-id">{{ $s['display_id'] }}</div>
                     </div>
                 </div>
 
-                @if($canManage)
-                <a href="{{ $editUrl }}" class="btn btn-outline-primary staff-edit-btn" aria-label="แก้ไขข้อมูลหมอนวด" title="แก้ไขข้อมูลหมอนวด">
-                    <i class="fa-solid fa-pen-to-square"></i>
-                </a>
-                @endif
-            </div>
-
-            <div class="mt-3">
-                <span class="status-pill {{ $statusClass }}">{{ $s['status'] }}</span>
-            </div>
-
-            <div class="stats-grid">
-                <div class="stat-box">
-                    <span class="stat-label">รายได้วันนี้</span>
-                    <div class="stat-value">{{ number_format($s['income']) }} ฿</div>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-label">คอมมิชชั่น</span>
-                    <div class="stat-value">{{ number_format($s['commission']) }} ฿</div>
-                </div>
-                <div class="stat-box">
-                    <span class="stat-label">คิวที่ได้รับ</span>
-                    <div class="stat-value">{{ count($s['queue']) }} คิว</div>
+                <div class="staff-actions">
+                    <span class="status-pill {{ $statusClass }}">{{ $s['status'] }}</span>
+                    
+                    @if($canManage)
+                    <a href="{{ $editUrl }}" class="btn btn-outline-primary staff-edit-btn" aria-label="แก้ไขข้อมูลหมอนวด" title="แก้ไขข้อมูลหมอนวด">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                    </a>
+                    @endif
                 </div>
             </div>
 
-            <div class="queue-box">
-                <div class="queue-title">คิวล่าสุด</div>
-                @if($latestQueue)
-                <span class="queue-meta queue-time">{{ $latestQueue['start'] }} - {{ $latestQueue['end'] }}</span>
-                <span class="queue-meta">{{ $latestQueue['customer'] }}</span>
-                <span class="queue-meta">{{ $latestQueue['service'] }}</span>
-                @else
-                <span class="queue-meta">ยังไม่มีคิวในวันที่เลือก</span>
-                @endif
+            <div class="summary-panels">
+                <div class="summary-panel" id="staff-{{ $s['id'] }}-today">
+                    <div class="summary-panel-title">วันนี้</div>
+                    <div class="summary-metrics is-two-columns">
+                        <div class="summary-metric">
+                            <span class="summary-label">รายได้วันนี้</span>
+                            <div class="summary-value">{{ number_format($s['income']) }} ฿</div>
+                        </div>
+                        <div class="summary-metric">
+                            <span class="summary-label">จำนวนคิว</span>
+                            <div class="summary-value">{{ number_format($dailyQueueCount) }}</div>
+                        </div>
+                        <div class="summary-metric is-full">
+                            <span class="summary-label">ค่ามือ</span>
+                            <div class="summary-value">{{ number_format($s['commission']) }} ฿</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="summary-panel is-month" id="staff-{{ $s['id'] }}-month">
+                    <div class="summary-panel-title">เดือนนี้</div>
+                    <div class="summary-metrics is-two-columns">
+                        <div class="summary-metric">
+                            <span class="summary-label">รายได้เดือนนี้</span>
+                            <div class="summary-value">{{ number_format($s['monthly_income'] ?? 0) }} ฿</div>
+                        </div>
+                        <div class="summary-metric">
+                            <span class="summary-label">จำนวนคิว</span>
+                            <div class="summary-value">{{ number_format($s['monthly_queue_count'] ?? 0) }}</div>
+                        </div>
+                        <div class="summary-metric is-full">
+                            <span class="summary-label">ค่ามือ</span>
+                            <div class="summary-value">{{ number_format($s['monthly_commission'] ?? 0) }} ฿</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </section>
     </div>

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\User;
+use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -32,13 +33,19 @@ class MasseuseService
     {
         $pageData = $this->bookingService->getStaffPageData($user, $requestedBranchId, $date);
         $activeBranchId = (int) ($pageData['activeBranchId'] ?? 0);
+        $staffWithMonthlySummary = $this->appendMonthlySummary(
+            isset($pageData['staff']) && is_array($pageData['staff']) ? $pageData['staff'] : [],
+            $activeBranchId,
+            $date
+        );
 
         return array_merge($pageData, [
+            'staff' => $staffWithMonthlySummary,
             'moduleReady' => $this->tableExists('masseuses'),
             'canManage' => $this->canManage($user),
             'statusOptions' => $this->getStatusOptions(),
             'staffRecords' => $this->tableExists('masseuses')
-                ? $this->getStaffRecords($activeBranchId, $pageData['staff'] ?? [])
+                ? $this->getStaffRecords($activeBranchId, $staffWithMonthlySummary)
                 : [],
         ]);
     }
@@ -268,6 +275,199 @@ class MasseuseService
                 ];
             })
             ->all();
+    }
+
+    private function appendMonthlySummary(array $staffStats, int $branchId, string $date): array
+    {
+        $monthlySummaryByStaff = $this->getMonthlySummaryByStaff($branchId, $date);
+
+        return array_map(static function (array $staff) use ($monthlySummaryByStaff): array {
+            $staffId = (string) ($staff['id'] ?? '');
+            $queue = isset($staff['queue']) && is_array($staff['queue']) ? $staff['queue'] : [];
+            $monthlySummary = $monthlySummaryByStaff[$staffId] ?? [
+                'income' => 0.0,
+                'commission' => 0.0,
+                'queue_count' => 0,
+            ];
+
+            $staff['daily_queue_count'] = count($queue);
+            $staff['monthly_income'] = (float) ($monthlySummary['income'] ?? 0.0);
+            $staff['monthly_commission'] = (float) ($monthlySummary['commission'] ?? 0.0);
+            $staff['monthly_queue_count'] = (int) ($monthlySummary['queue_count'] ?? 0);
+
+            return $staff;
+        }, $staffStats);
+    }
+
+    private function getMonthlySummaryByStaff(int $branchId, string $date): array
+    {
+        if (!$this->tableExists('bookings') || !$this->tableExists('services')) {
+            return [];
+        }
+
+        $selectedDate = Carbon::parse($date);
+        $monthStart = $selectedDate->copy()->startOfMonth()->startOfDay();
+        $nextMonthStart = $selectedDate->copy()->addMonthNoOverflow()->startOfMonth()->startOfDay();
+
+        $bookingRows = DB::table('bookings as b')
+            ->leftJoin('services as s', 's.id', '=', 'b.service_id')
+            ->where('b.branch_id', $branchId)
+            ->whereNotNull('b.masseuse_id')
+            ->where('b.status', '!=', 'cancelled')
+            ->where('b.start_time', '>=', $monthStart->format('Y-m-d H:i:s'))
+            ->where('b.start_time', '<', $nextMonthStart->format('Y-m-d H:i:s'))
+            ->orderBy('b.start_time')
+            ->get([
+                'b.id',
+                'b.masseuse_id',
+                'b.service_id',
+                's.name as service_name',
+                's.price as service_price',
+            ]);
+
+        if ($bookingRows->isEmpty()) {
+            return [];
+        }
+
+        $serviceMap = $this->loadBookingServicesMap($bookingRows);
+        $commissionConfigs = $this->getCommissionConfigsByService();
+        $summaryByStaff = [];
+
+        foreach ($bookingRows as $row) {
+            $staffId = (string) $row->masseuse_id;
+            $bookingId = (int) $row->id;
+            $services = $serviceMap[$bookingId] ?? [];
+
+            if (!isset($summaryByStaff[$staffId])) {
+                $summaryByStaff[$staffId] = [
+                    'income' => 0.0,
+                    'commission' => 0.0,
+                    'queue_count' => 0,
+                ];
+            }
+
+            $summaryByStaff[$staffId]['queue_count']++;
+            $summaryByStaff[$staffId]['income'] += array_reduce($services, static function (float $sum, array $service): float {
+                return $sum + (float) ($service['price'] ?? 0.0);
+            }, 0.0);
+            $summaryByStaff[$staffId]['commission'] += $this->estimateServicesCommission($services, $commissionConfigs);
+        }
+
+        return $summaryByStaff;
+    }
+
+    private function loadBookingServicesMap($bookingRows): array
+    {
+        $bookingIds = [];
+        $fallbackRows = [];
+
+        foreach ($bookingRows as $row) {
+            $bookingId = (int) ($row->id ?? 0);
+            if ($bookingId <= 0) {
+                continue;
+            }
+
+            $bookingIds[] = $bookingId;
+            $fallbackRows[$bookingId] = $row;
+        }
+
+        if (empty($bookingIds)) {
+            return [];
+        }
+
+        $servicesByBooking = [];
+
+        if ($this->tableExists('booking_services')) {
+            $rows = DB::table('booking_services as bs')
+                ->join('services as s', 's.id', '=', 'bs.service_id')
+                ->whereIn('bs.booking_id', $bookingIds)
+                ->orderBy('bs.booking_id')
+                ->orderBy('bs.sort_order')
+                ->orderBy('bs.id')
+                ->get([
+                    'bs.booking_id',
+                    'bs.service_id',
+                    's.name as service_name',
+                    's.price as service_price',
+                ]);
+
+            foreach ($rows as $row) {
+                $bookingId = (int) $row->booking_id;
+                if (!isset($servicesByBooking[$bookingId])) {
+                    $servicesByBooking[$bookingId] = [];
+                }
+
+                $servicesByBooking[$bookingId][] = [
+                    'id' => (int) $row->service_id,
+                    'name' => (string) ($row->service_name ?? ''),
+                    'price' => (float) ($row->service_price ?? 0.0),
+                ];
+            }
+        }
+
+        foreach ($bookingIds as $bookingId) {
+            if (isset($servicesByBooking[$bookingId]) && !empty($servicesByBooking[$bookingId])) {
+                continue;
+            }
+
+            $fallbackRow = $fallbackRows[$bookingId] ?? null;
+            if ($fallbackRow === null || $fallbackRow->service_id === null) {
+                $servicesByBooking[$bookingId] = [];
+                continue;
+            }
+
+            $servicesByBooking[$bookingId] = [[
+                'id' => (int) $fallbackRow->service_id,
+                'name' => (string) ($fallbackRow->service_name ?? ''),
+                'price' => (float) ($fallbackRow->service_price ?? 0.0),
+            ]];
+        }
+
+        return $servicesByBooking;
+    }
+
+    private function getCommissionConfigsByService(): array
+    {
+        if (!$this->tableExists('commission_configs')) {
+            return [];
+        }
+
+        return DB::table('commission_configs')
+            ->get(['service_id', 'type', 'value', 'deduct_cost'])
+            ->keyBy('service_id')
+            ->map(static function ($row): array {
+                return [
+                    'type' => (string) $row->type,
+                    'value' => (float) $row->value,
+                    'deduct_cost' => (float) $row->deduct_cost,
+                ];
+            })
+            ->all();
+    }
+
+    private function estimateServicesCommission(array $services, array $commissionConfigs): float
+    {
+        $total = 0.0;
+
+        foreach ($services as $service) {
+            $serviceId = isset($service['id']) ? (int) $service['id'] : 0;
+            if ($serviceId <= 0 || !isset($commissionConfigs[$serviceId])) {
+                continue;
+            }
+
+            $config = $commissionConfigs[$serviceId];
+            $servicePrice = isset($service['price']) ? (float) $service['price'] : 0.0;
+
+            if (($config['type'] ?? '') === 'fixed') {
+                $total += (float) ($config['value'] ?? 0.0);
+                continue;
+            }
+
+            $baseAmount = max(0.0, $servicePrice - (float) ($config['deduct_cost'] ?? 0.0));
+            $total += $baseAmount * ((float) ($config['value'] ?? 0.0) / 100);
+        }
+
+        return $total;
     }
 
     private function findStaffRow(int $branchId, int $staffId): ?object

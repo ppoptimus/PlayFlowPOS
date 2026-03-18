@@ -132,6 +132,9 @@
 
     .masseuse-page .staff-card {
         height: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
     }
 
     .masseuse-page .staff-card.is-off-duty {
@@ -149,6 +152,48 @@
     .masseuse-page .staff-toolbar {
         justify-content: space-between;
         align-items: flex-start;
+        gap: 0.9rem;
+    }
+
+    .masseuse-page .staff-actions {
+        display: inline-flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.6rem;
+        flex-shrink: 0;
+        margin-left: auto;
+        flex-wrap: wrap;
+    }
+
+    .masseuse-page .staff-period-switches {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+
+    .masseuse-page .period-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2rem;
+        padding: 0.25rem 0.7rem;
+        border-radius: 0.8rem;
+        border: 1px solid rgba(31, 115, 224, 0.14);
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(238, 247, 255, 0.95));
+        color: #1d67bd;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-decoration: none;
+        box-shadow: 0 8px 18px rgba(31, 115, 224, 0.1);
+        transition: transform 0.2s ease, box-shadow 0.2s ease, color 0.2s ease, background 0.2s ease;
+    }
+
+    .masseuse-page .period-chip:hover,
+    .masseuse-page .period-chip:focus {
+        color: #ffffff;
+        background: linear-gradient(135deg, #2d8ff0, #14b89a);
+        box-shadow: 0 10px 20px rgba(31, 115, 224, 0.18);
+        transform: translateY(-1px);
     }
 
     .masseuse-page .staff-avatar {
@@ -166,7 +211,7 @@
         font-weight: 700;
         line-height: 1.1;
         color: #234262;
-        margin-bottom: 0.12rem;
+        margin-bottom: 0.16rem;
     }
 
     .masseuse-page .staff-id {
@@ -194,6 +239,66 @@
         background: rgba(31, 115, 224, 0.08);
         color: #275f9c;
         font-size: 0.74rem;
+    }
+
+    .masseuse-page .summary-panels {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .masseuse-page .summary-panel {
+        padding: 0.9rem 0.95rem;
+        border-radius: 1.05rem;
+        background: linear-gradient(180deg, rgba(245, 250, 255, 0.98), rgba(236, 245, 255, 0.96));
+        border: 1px solid rgba(31, 115, 224, 0.08);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
+
+    .masseuse-page .summary-panel.is-month {
+        background: linear-gradient(180deg, rgba(242, 251, 248, 0.98), rgba(232, 247, 243, 0.96));
+        border-color: rgba(20, 184, 154, 0.12);
+    }
+
+    .masseuse-page .summary-panel-title {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #234262;
+        margin-bottom: 0.65rem;
+    }
+
+    .masseuse-page .summary-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.55rem;
+    }
+
+    .masseuse-page .summary-metrics.is-two-columns {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: 0.75rem;
+    }
+
+    .masseuse-page .summary-metric {
+        min-width: 0;
+    }
+
+    .masseuse-page .summary-metric.is-full {
+        grid-column: 1 / -1;
+    }
+
+    .masseuse-page .summary-label {
+        display: block;
+        font-size: 0.74rem;
+        color: #6d8398;
+        margin-bottom: 0.18rem;
+    }
+
+    .masseuse-page .summary-value {
+        font-size: 1.02rem;
+        font-weight: 700;
+        color: #234262;
+        line-height: 1.2;
+        word-break: break-word;
     }
 
     .masseuse-page .status-pill.is-success {
@@ -508,6 +613,20 @@
             align-items: flex-start;
         }
 
+        .masseuse-page .staff-toolbar {
+            flex-direction: column;
+        }
+
+        .masseuse-page .staff-actions {
+            width: 100%;
+            justify-content: space-between;
+            margin-left: 0;
+        }
+
+        .masseuse-page .staff-period-switches {
+            flex: 1 1 auto;
+        }
+
         .masseuse-page .staff-avatar {
             width: 50px;
             height: 50px;
@@ -529,6 +648,20 @@
 
         .masseuse-page .page-action {
             gap: 0.35rem;
+        }
+
+        .masseuse-page .summary-panel {
+            padding: 0.82rem;
+        }
+
+        .masseuse-page .summary-metrics {
+            grid-template-columns: 1fr;
+            gap: 0.45rem;
+        }
+
+        .masseuse-page .summary-metrics.is-two-columns {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            row-gap: 0.45rem;
         }
     }
 </style>
