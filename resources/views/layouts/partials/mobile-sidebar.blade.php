@@ -22,7 +22,7 @@
             'subtitle' => 'จัดการข้อมูลหมอนวด',
         ],
         [
-            'route' => 'booking',
+            'route' => 'massage-rooms',
             'icon' => 'bi-door-open',
             'title' => 'ห้องนวด',
             'subtitle' => 'จัดการเตียงและห้องนวด',

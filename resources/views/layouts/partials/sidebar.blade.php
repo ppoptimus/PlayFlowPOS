@@ -17,7 +17,6 @@
     <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">Spa Management System</small>
 </div>
 
-
 <div class="nav flex-column nav-pills">
     <small class="text-muted fw-bold mb-2 px-2" style="font-size: 0.75rem;">งานหลัก</small>
     <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : 'link-dark' }}">
@@ -34,7 +33,9 @@
     </a>
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บริหารจัดการ</small>
-    <a href="{{ route('customers') }}" class="nav-link {{ request()->routeIs('customers*') ? 'active' : 'link-dark' }}"><i class="bi bi-people-fill me-2"></i> ลูกค้า (CRM)</a>
+    <a href="{{ route('customers') }}" class="nav-link {{ request()->routeIs('customers*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-people-fill me-2"></i> ลูกค้า (CRM)
+    </a>
     @if($canManageMembershipLevels)
     <a href="{{ route('membership-levels') }}" class="nav-link {{ request()->routeIs('membership-levels*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-sliders me-2"></i> Membership Levels
@@ -46,12 +47,17 @@
     <a href="{{ route('masseuse') }}" class="nav-link {{ request()->routeIs('masseuse*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-person-badge-fill me-2"></i> หมอนวด
     </a>
-    <a href="{{ route('products') }}" class="nav-link link-dark"><i class="bi bi-box-seam-fill me-2"></i> สินค้า & สต็อก</a>
+    <a href="{{ route('massage-rooms') }}" class="nav-link {{ request()->routeIs('massage-rooms*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-door-open-fill me-2"></i> ห้องนวด
+    </a>
+    <a href="{{ route('products') }}" class="nav-link link-dark">
+        <i class="bi bi-box-seam-fill me-2"></i> สินค้า & สต็อก
+    </a>
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บัญชี & รายงาน</small>
     <a href="{{ route('reports') }}" class="nav-link link-dark"><i class="bi bi-bar-chart-line-fill me-2"></i> รายงานวิเคราะห์</a>
-    <a href="{{ route('financial') }}" class="nav-link link-dark"><i class="bi bi-wallet2 me-2"></i> การเงิน/P&L</a>
-    <a href="{{ route('commissions') }}" class="nav-link link-dark"><i class="bi bi-cash-stack me-2"></i> ค่าคอมมิชชั่น</a>
+    <a href="{{ route('financial') }}" class="nav-link link-dark"><i class="bi bi-wallet2 me-2"></i> การเงิน/P&amp;L</a>
+    <a href="{{ route('commissions') }}" class="nav-link link-dark"><i class="bi bi-cash-stack me-2"></i> ค่าคอมมิชชัน</a>
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">ตั้งค่าระบบ</small>
     <a href="{{ route('branches') }}" class="nav-link link-dark"><i class="bi bi-building-fill me-2"></i> จัดการสาขา</a>

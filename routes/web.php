@@ -40,6 +40,15 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/membership-levels', 'MembershipLevelController@store')->name('membership-levels.store');
         Route::put('/membership-levels/{tierId}', 'MembershipLevelController@update')->name('membership-levels.update');
 
+        Route::get('/massage-rooms', 'MassageRoomController@index')->name('massage-rooms');
+        Route::get('/massage-rooms/rooms/{roomId}/edit', 'MassageRoomController@edit')->name('massage-rooms.rooms.edit');
+        Route::post('/massage-rooms/rooms', 'MassageRoomController@storeRoom')->name('massage-rooms.rooms.store');
+        Route::put('/massage-rooms/rooms/{roomId}', 'MassageRoomController@updateRoom')->name('massage-rooms.rooms.update');
+        Route::delete('/massage-rooms/rooms/{roomId}', 'MassageRoomController@destroyRoom')->name('massage-rooms.rooms.destroy');
+        Route::post('/massage-rooms/beds', 'MassageRoomController@storeBed')->name('massage-rooms.beds.store');
+        Route::put('/massage-rooms/beds/{bedId}', 'MassageRoomController@updateBed')->name('massage-rooms.beds.update');
+        Route::delete('/massage-rooms/beds/{bedId}', 'MassageRoomController@destroyBed')->name('massage-rooms.beds.destroy');
+
         Route::get('/masseuse/create', 'MasseuseController@create')->name('masseuse.create');
         Route::get('/masseuse/{staffId}/edit', 'MasseuseController@edit')->name('masseuse.edit');
         Route::post('/masseuse', 'MasseuseController@store')->name('masseuse.store');
