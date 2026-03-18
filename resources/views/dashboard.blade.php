@@ -693,12 +693,24 @@
         .dashboard-page .range-shell {
             width: 100%;
             border-radius: 1rem;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            align-items: stretch;
+            gap: 0.25rem;
+            padding: 0.25rem;
         }
 
         .dashboard-page .range-btn {
-            flex: 1 1 0;
+            min-width: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             text-align: center;
-            padding-inline: 0.65rem;
+            min-height: 3.1rem;
+            padding: 0.45rem 0.45rem;
+            font-size: 0.76rem;
+            line-height: 1.15;
+            white-space: nowrap;
         }
 
         .dashboard-page .chart-stage {

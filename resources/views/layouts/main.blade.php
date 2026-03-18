@@ -38,7 +38,7 @@
             --bs-link-hover-color: #165bb3;
             --bs-body-bg: #eef8fb;
             --bs-body-color: #25405c;
-            --pf-mobile-nav-height: 84px;
+            --pf-mobile-nav-height: 76px;
             --pf-mobile-nav-offset: calc(var(--pf-mobile-nav-height) + env(safe-area-inset-bottom));
         }
         body { font-family: 'Prompt', sans-serif; background: radial-gradient(circle at top right, #d4edf9 0%, #e4f1f8 45%, #edf5fa 100%); color: #25405c; }
@@ -75,8 +75,8 @@
             background: rgba(253, 255, 255, 0.98);
             backdrop-filter: blur(8px);
             box-shadow: 0 -10px 28px rgba(89, 157, 216, 0.12);
-            padding-top: 0.25rem;
-            padding-bottom: calc(0.4rem + env(safe-area-inset-bottom));
+            padding-top: 0.16rem;
+            padding-bottom: calc(0.18rem + env(safe-area-inset-bottom));
         }
         body.modal-open .pf-mobile-nav,
         body.offcanvas-open .pf-mobile-nav {
@@ -93,15 +93,18 @@
             gap: 0.3rem;
             text-decoration: none;
             color: #5f7ea5;
-            padding: 0.55rem 0.2rem 0.65rem;
-            font-size: 0.82rem;
+            padding: 0.38rem 0.18rem 0.34rem;
+            font-size: 0.8rem;
             font-weight: 700;
             transition: color 0.18s ease, transform 0.18s ease;
         }
         .pf-mobile-nav-item::before {
             content: "";
             position: absolute;
-            inset: 0.22rem 0.3rem;
+            top: 0.16rem;
+            right: 0.24rem;
+            bottom: 0.08rem;
+            left: 0.24rem;
             border-radius: 1rem;
             background: transparent;
             box-shadow: none;
@@ -111,7 +114,7 @@
         .pf-mobile-nav-item::after {
             content: "";
             position: absolute;
-            top: 0.42rem;
+            top: 0.32rem;
             left: 50%;
             width: 2rem;
             height: 0.22rem;
@@ -123,8 +126,8 @@
             z-index: 1;
         }
         .pf-mobile-nav-item i {
-            width: 2.2rem;
-            height: 2.2rem;
+            width: 2rem;
+            height: 2rem;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -145,7 +148,7 @@
         .pf-mobile-nav-item.is-active {
             color: #ffffff;
             font-weight: 700;
-            transform: translateY(-2px);
+            transform: translateY(-1px);
         }
         .pf-mobile-nav-item.is-active::before {
             background: linear-gradient(180deg, #4da2ff 0%, #2d8ff0 52%, #1f73e0 100%);
