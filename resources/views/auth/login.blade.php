@@ -2,11 +2,17 @@
 <html lang="th">
 
 <head>
+    @php
+        $fontAwesomeCssVersion = @filemtime(public_path('vendor/fontawesome/css/all.min.css')) ?: time();
+        $iconBridgeCssVersion = @filemtime(public_path('css/icon-bridge.css')) ?: time();
+        $iconBridgeJsVersion = @filemtime(public_path('js/icon-bridge.js')) ?: time();
+    @endphp
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Login | PlayFlow POS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="{{ asset('vendor/fontawesome/css/all.min.css') }}?v={{ $fontAwesomeCssVersion }}">
+    <link rel="stylesheet" href="{{ asset('css/icon-bridge.css') }}?v={{ $iconBridgeCssVersion }}">
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -102,6 +108,7 @@
                 class="btn btn-primary w-100">เข้าสู่ระบบ <i class="bi bi-chevron-right fs-5"></i></button>
         </form>
     </div>
+    <script src="{{ asset('js/icon-bridge.js') }}?v={{ $iconBridgeJsVersion }}"></script>
 </body>
 
 </html>

@@ -19,7 +19,7 @@
             'route' => 'masseuse',
             'icon' => 'bi-person-badge',
             'title' => 'หมอนวด',
-            'subtitle' => 'จัดการข้อมูลหมอนวด ค่ามือ และค่าคอม',
+            'subtitle' => 'จัดการข้อมูลหมอนวด',
         ],
         [
             'route' => 'booking',

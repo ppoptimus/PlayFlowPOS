@@ -4,5 +4,8 @@
         "dev": "echo \"No frontend build step is required for the current mock UI.\"",
         "prod": "echo \"No frontend build step is required for the current mock UI.\"",
         "watch": "npm run dev"
+    },
+    "dependencies": {
+        "@fortawesome/fontawesome-free": "^7.2.0"
     }
 }

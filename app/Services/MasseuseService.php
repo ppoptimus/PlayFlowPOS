@@ -43,6 +43,29 @@ class MasseuseService
         ]);
     }
 
+    public function getEmptyFormRecord(): array
+    {
+        return [
+            'id' => null,
+            'display_id' => 'NEW',
+            'nickname' => '',
+            'full_name' => '',
+            'name' => '',
+            'profile_image' => '',
+            'avatar' => '',
+            'skills_description' => '',
+            'status_value' => 'available',
+            'status_label' => $this->formatStatusLabel('available'),
+            'income' => 0.0,
+            'commission' => 0.0,
+            'queue_count' => 0,
+            'queue_load' => 0,
+            'is_working_today' => false,
+            'performance_status' => $this->formatStatusLabel('available'),
+            'latest_queue' => null,
+        ];
+    }
+
     public function createMasseuse(User $user, ?int $requestedBranchId, array $payload, ?UploadedFile $profileImage): void
     {
         $this->assertModuleReady();

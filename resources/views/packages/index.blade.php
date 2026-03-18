@@ -119,7 +119,7 @@
     @if(session('success'))
     <div class="col-12">
         <div class="alert alert-success border-0 shadow-sm rounded-4 mb-0">
-            <i class="bi bi-check-circle-fill me-1"></i> {{ session('success') }}
+            <i class="fa-solid fa-circle-check me-1"></i> {{ session('success') }}
         </div>
     </div>
     @endif
@@ -154,7 +154,7 @@
                             <form method="GET" action="{{ route('packages') }}">
                                 <label class="form-label small fw-bold">ค้นหาแพ็กเกจ</label>
                                 <div class="input-group">
-                                    <span class="input-group-text bg-white"><span class="icon-chip icon-chip--blue"><i class="bi bi-search"></i></span></span>
+                                    <span class="input-group-text bg-white"><span class="icon-chip icon-chip--blue"><i class="fa-solid fa-magnifying-glass"></i></span></span>
                                     <input type="text" name="search" class="form-control" value="{{ $search }}" placeholder="ชื่อแพ็กเกจ">
                                 </div>
                             </form>
@@ -183,7 +183,7 @@
                                     <input type="number" min="1" name="valid_days" class="form-control" value="{{ old('valid_days') }}" placeholder="เว้นว่าง = ไม่หมดอายุ">
                                 </div>
                                 <div class="col-12 d-grid mt-2">
-                                    <button type="submit" class="btn gradient-btn rounded-3">เพิ่มแพ็กเกจ</button>
+                                    <button type="submit" class="btn gradient-btn rounded-3"><i class="fa-solid fa-plus me-1"></i>เพิ่มแพ็กเกจ</button>
                                 </div>
                             </form>
                         </div>
@@ -196,7 +196,7 @@
     <div class="col-12 col-xl-8">
         <div class="card border-0 shadow-sm table-card">
             <div class="card-header bg-white border-0 pt-3 pb-2">
-                <h6 class="fw-bold mb-0"><span class="icon-chip icon-chip--pink me-2"><i class="bi bi-box2-heart"></i></span>จัดการแพ็กเกจ</h6>
+                <h6 class="fw-bold mb-0"><span class="icon-chip icon-chip--pink me-2"><i class="fa-solid fa-box-open"></i></span>จัดการแพ็กเกจ</h6>
             </div>
             <div class="card-body p-2 p-lg-3">
                 <div class="table-responsive">
@@ -230,7 +230,7 @@
                                     <input form="package-form-{{ $package['id'] }}" type="number" min="1" name="valid_days" class="form-control" value="{{ $package['valid_days'] }}" placeholder="ไม่หมดอายุ">
                                 </td>
                                 <td class="text-end">
-                                    <button form="package-form-{{ $package['id'] }}" type="submit" class="btn btn-outline-primary rounded-pill px-3">อัปเดต</button>
+                                    <button form="package-form-{{ $package['id'] }}" type="submit" class="btn btn-outline-primary rounded-pill px-3"><i class="fa-solid fa-floppy-disk me-1"></i>อัปเดต</button>
                                 </td>
                             </tr>
                             @empty
@@ -248,7 +248,7 @@
     <div class="col-12 col-xl-4">
         <div class="card border-0 shadow-sm table-card h-100">
             <div class="card-header bg-white border-0 pt-3 pb-2">
-                <h6 class="fw-bold mb-0"><span class="icon-chip icon-chip--mint me-2"><i class="bi bi-wallet2"></i></span>ยอดคงเหลือล่าสุด</h6>
+                <h6 class="fw-bold mb-0"><span class="icon-chip icon-chip--mint me-2"><i class="fa-solid fa-wallet"></i></span>ยอดคงเหลือล่าสุด</h6>
             </div>
             <div class="card-body p-2 p-lg-3" style="max-height: 520px; overflow: auto;">
                 <div class="d-flex flex-column gap-2">
@@ -272,7 +272,7 @@
     <div class="col-12">
         <div class="card border-0 shadow-sm table-card">
             <div class="card-header bg-white border-0 pt-3 pb-2">
-                <h6 class="fw-bold mb-0"><span class="icon-chip icon-chip--violet me-2"><i class="bi bi-clock-history"></i></span>ประวัติการตัดยอดแพ็กเกจ</h6>
+                <h6 class="fw-bold mb-0"><span class="icon-chip icon-chip--violet me-2"><i class="fa-solid fa-clock-rotate-left"></i></span>ประวัติการตัดยอดแพ็กเกจ</h6>
             </div>
             <div class="card-body p-2 p-lg-3">
                 <div class="table-responsive">

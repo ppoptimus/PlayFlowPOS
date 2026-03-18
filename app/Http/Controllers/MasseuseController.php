@@ -28,6 +28,30 @@ class MasseuseController extends Controller
         ));
     }
 
+    public function create(Request $request): View
+    {
+        $requestedBranchId = $request->has('branch_id') ? (int) $request->query('branch_id') : null;
+        $selectedDate = (string) $request->query('date', now()->toDateString());
+
+        return view('masseuse.create', array_merge(
+            $this->masseuseService->getPageData($request->user(), $requestedBranchId, $selectedDate),
+            ['formRecord' => $this->masseuseService->getEmptyFormRecord()]
+        ));
+    }
+
+    public function edit(Request $request, int $staffId): View
+    {
+        $requestedBranchId = $request->has('branch_id') ? (int) $request->query('branch_id') : null;
+        $selectedDate = (string) $request->query('date', now()->toDateString());
+        $pageData = $this->masseuseService->getPageData($request->user(), $requestedBranchId, $selectedDate);
+        $formRecord = collect($pageData['staffRecords'] ?? [])->firstWhere('id', $staffId);
+
+        abort_if(!($pageData['moduleReady'] ?? false), 404);
+        abort_if(!is_array($formRecord), 404);
+
+        return view('masseuse.edit', array_merge($pageData, ['formRecord' => $formRecord]));
+    }
+
     public function updateAttendance(Request $request): RedirectResponse
     {
         $validated = $request->validate([
