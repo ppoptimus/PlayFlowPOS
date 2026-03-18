@@ -39,10 +39,14 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/membership-levels', 'MembershipLevelController@index')->name('membership-levels');
         Route::post('/membership-levels', 'MembershipLevelController@store')->name('membership-levels.store');
         Route::put('/membership-levels/{tierId}', 'MembershipLevelController@update')->name('membership-levels.update');
+
+        Route::get('/packages', 'PackageController@index')->name('packages');
+        Route::post('/packages', 'PackageController@store')->name('packages.store');
+        Route::put('/packages/{packageId}', 'PackageController@update')->name('packages.update');
     });
 
     $modules = [
-        'packages', 'staff',
+        'staff',
         'commissions', 'products', 'promotions',
         'reports', 'financial', 'branches', 'users',
     ];

@@ -11,12 +11,14 @@ use Illuminate\Validation\ValidationException;
 class PosService
 {
     private BookingService $bookingService;
+    private PackageService $packageService;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    public function __construct(BookingService $bookingService)
+    public function __construct(BookingService $bookingService, PackageService $packageService)
     {
         $this->bookingService = $bookingService;
+        $this->packageService = $packageService;
     }
 
     public function getPageData(User $user, array $query = []): array
@@ -30,6 +32,7 @@ class PosService
             'serviceItems' => $this->getServiceItems(),
             'staff' => $this->getStaff($branchId),
             'customers' => $this->getCustomers(),
+            'customerPackageBalances' => $this->packageService->getCustomerPackageBalancesMap(),
             'bookingContext' => $this->resolveBookingContext($user, $query, $branchId),
         ];
     }
@@ -49,36 +52,42 @@ class PosService
 
         if (empty($items)) {
             throw ValidationException::withMessages([
-                'items' => ['กรุณาเลือกรายการอย่างน้อย 1 รายการก่อนชำระเงิน'],
+                'items' => ['à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸­à¸¢à¹ˆà¸²à¸‡à¸™à¹‰à¸­à¸¢ 1 à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹ˆà¸­à¸™à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™'],
             ]);
         }
-
-        $normalizedItems = $this->normalizeCartItems($items, $staffId);
-        $subtotal = array_reduce($normalizedItems, static function (float $carry, array $item): float {
-            return $carry + (float) $item['line_total'];
-        }, 0.0);
-        $discount = max(0.0, $discountAmount);
-        $grandTotal = max(0.0, $subtotal - $discount);
 
         return DB::transaction(function () use (
             $user,
             $branchId,
-            $normalizedItems,
+            $items,
+            $staffId,
             $customerId,
-            $discount,
-            $grandTotal,
+            $discountAmount,
             $paymentMethod,
             $bookingContext
         ): array {
+            $normalized = $this->normalizeCartItems($items, $staffId, $customerId);
+            $normalizedItems = $normalized['items'];
+            $discount = max(0.0, $discountAmount);
+            $subtotal = array_reduce($normalizedItems, static function (float $carry, array $item): float {
+                return $carry + (float) $item['line_total'];
+            }, 0.0);
+            $grandTotal = max(0.0, $subtotal - $discount);
+
+            $finalPaymentMethod = $paymentMethod;
+            if ($normalized['has_package_redemption'] && $grandTotal <= 0.0) {
+                $finalPaymentMethod = 'package_redeem';
+            }
+
             $orderNo = $this->generateOrderNo($branchId);
             $orderId = (int) DB::table('orders')->insertGetId([
                 'branch_id' => $branchId,
                 'order_no' => $orderNo,
                 'customer_id' => $customerId,
-                'total_amount' => $grandTotal + $discount,
+                'total_amount' => $subtotal,
                 'discount_amount' => $discount,
                 'grand_total' => $grandTotal,
-                'payment_method' => $paymentMethod,
+                'payment_method' => $finalPaymentMethod,
                 'status' => 'paid',
                 'created_at' => now(),
             ]);
@@ -94,11 +103,21 @@ class PosService
                 ]);
             }
 
+            $packagePurchaseSummary = $this->grantPurchasedPackages(
+                $customerId,
+                $normalized['package_purchase_plan']
+            );
+            $packageRedeemSummary = $this->applyPackageRedemptions(
+                $normalized['package_usage_plan'],
+                $orderId,
+                isset($user->id) ? (int) $user->id : null
+            );
+
             $booking = null;
             if ($bookingContext !== null) {
                 if (!empty($bookingContext['is_paid'])) {
                     throw ValidationException::withMessages([
-                        'booking_context' => ['คิวนี้ชำระเงินแล้ว ไม่สามารถชำระซ้ำได้'],
+                        'booking_context' => ['à¸„à¸´à¸§à¸™à¸µà¹‰à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™à¹à¸¥à¹‰à¸§ à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸Šà¸³à¸£à¸°à¸‹à¹‰à¸³à¹„à¸”à¹‰'],
                     ]);
                 }
 
@@ -106,7 +125,7 @@ class PosService
                 foreach ($requiredBookingFields as $field) {
                     if (!isset($bookingContext[$field]) || $bookingContext[$field] === null || $bookingContext[$field] === '') {
                         throw ValidationException::withMessages([
-                            'booking_context' => ['ข้อมูลจองไม่ครบถ้วนสำหรับการชำระเงิน'],
+                            'booking_context' => ['à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ˆà¸­à¸‡à¹„à¸¡à¹ˆà¸„à¸£à¸šà¸–à¹‰à¸§à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™'],
                         ]);
                     }
                 }
@@ -130,10 +149,17 @@ class PosService
             }
 
             return [
-                'message' => 'ชำระเงินสำเร็จ',
+                'message' => 'à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ',
                 'order_id' => $orderId,
                 'order_no' => $orderNo,
                 'booking' => $booking,
+                'customer_package_balances' => $customerId !== null
+                    ? ($this->packageService->getCustomerPackageBalancesMap()[(string) $customerId] ?? [])
+                    : [],
+                'packages' => [
+                    'purchased' => $packagePurchaseSummary,
+                    'redeemed' => $packageRedeemSummary,
+                ],
                 'membership' => $this->syncCustomerTierAfterPayment($customerId),
             ];
         });
@@ -141,7 +167,11 @@ class PosService
 
     private function getPosItems(): array
     {
-        return array_merge($this->getServiceItems(), $this->getProductItems());
+        return array_merge(
+            $this->getServiceItems(),
+            $this->getProductItems(),
+            $this->packageService->getPackagesForPos()
+        );
     }
 
     private function getServiceItems(): array
@@ -213,9 +243,13 @@ class PosService
             ->all();
     }
 
-    private function normalizeCartItems(array $items, ?int $staffId): array
+
+    private function normalizeCartItems(array $items, ?int $staffId, ?int $customerId): array
     {
         $normalized = [];
+        $packageUsagePlan = [];
+        $packagePurchasePlan = [];
+        $availablePackageBalances = $this->loadCustomerPackageBalancesForRedeem($customerId);
 
         foreach ($items as $index => $item) {
             $type = isset($item['type']) ? (string) $item['type'] : '';
@@ -224,13 +258,13 @@ class PosService
 
             if (!in_array($type, ['service', 'product', 'package'], true)) {
                 throw ValidationException::withMessages([
-                    'items' => ["ประเภทสินค้า/บริการไม่ถูกต้องที่รายการลำดับ " . ($index + 1)],
+                    'items' => ["ข้อมูลประเภทรายการไม่ถูกต้อง ที่ลำดับ " . ($index + 1)],
                 ]);
             }
 
             if ($itemId <= 0 || $qty <= 0) {
                 throw ValidationException::withMessages([
-                    'items' => ["ข้อมูลรายการไม่ครบถ้วนที่ลำดับ " . ($index + 1)],
+                    'items' => ["ข้อมูลรายการไม่ครบถ้วน ที่ลำดับ " . ($index + 1)],
                 ]);
             }
 
@@ -238,7 +272,7 @@ class PosService
                 $service = DB::table('services')
                     ->where('id', $itemId)
                     ->where('is_active', 1)
-                    ->first(['id', 'price']);
+                    ->first(['id', 'name', 'price']);
 
                 if ($service === null) {
                     throw ValidationException::withMessages([
@@ -247,14 +281,36 @@ class PosService
                 }
 
                 $unitPrice = (float) $service->price;
-                $normalized[] = [
-                    'item_type' => 'service',
-                    'item_id' => (int) $service->id,
-                    'qty' => $qty,
-                    'unit_price' => $unitPrice,
-                    'line_total' => $unitPrice * $qty,
-                    'masseuse_id' => $staffId,
-                ];
+                $remainingQty = $qty;
+                $coveredQty = $this->reservePackageCoverageForService(
+                    (string) $service->name,
+                    $qty,
+                    $availablePackageBalances,
+                    $packageUsagePlan
+                );
+                $remainingQty -= $coveredQty;
+
+                if ($coveredQty > 0) {
+                    $normalized[] = [
+                        'item_type' => 'service',
+                        'item_id' => (int) $service->id,
+                        'qty' => $coveredQty,
+                        'unit_price' => 0.0,
+                        'line_total' => 0.0,
+                        'masseuse_id' => $staffId,
+                    ];
+                }
+
+                if ($remainingQty > 0) {
+                    $normalized[] = [
+                        'item_type' => 'service',
+                        'item_id' => (int) $service->id,
+                        'qty' => $remainingQty,
+                        'unit_price' => $unitPrice,
+                        'line_total' => $unitPrice * $remainingQty,
+                        'masseuse_id' => $staffId,
+                    ];
+                }
                 continue;
             }
 
@@ -281,12 +337,316 @@ class PosService
                 continue;
             }
 
-            throw ValidationException::withMessages([
-                'items' => ['ระบบยังไม่รองรับการชำระแพ็กเกจในขั้นตอนนี้'],
-            ]);
+            if ($customerId === null || $customerId <= 0) {
+                throw ValidationException::withMessages([
+                    'customer_id' => ['กรุณาเลือกลูกค้าก่อนขายแพ็กเกจ'],
+                ]);
+            }
+
+            $package = DB::table('packages')
+                ->where('id', $itemId)
+                ->first(['id', 'price']);
+
+            if ($package === null) {
+                throw ValidationException::withMessages([
+                    'items' => ['ไม่พบแพ็กเกจที่เลือก'],
+                ]);
+            }
+
+            $unitPrice = (float) ($package->price ?? 0);
+            $normalized[] = [
+                'item_type' => 'package',
+                'item_id' => (int) $package->id,
+                'qty' => $qty,
+                'unit_price' => $unitPrice,
+                'line_total' => $unitPrice * $qty,
+                'masseuse_id' => null,
+            ];
+
+            $packagePurchasePlan[] = [
+                'package_id' => (int) $package->id,
+                'qty' => $qty,
+            ];
         }
 
-        return $normalized;
+        return [
+            'items' => $normalized,
+            'package_usage_plan' => $packageUsagePlan,
+            'package_purchase_plan' => $packagePurchasePlan,
+            'has_package_redemption' => !empty($packageUsagePlan),
+        ];
+    }
+
+    private function loadCustomerPackageBalancesForRedeem(?int $customerId): array
+    {
+        if (
+            $customerId === null ||
+            $customerId <= 0 ||
+            !$this->tableExists('customer_packages') ||
+            !$this->tableExists('packages')
+        ) {
+            return [];
+        }
+
+        return DB::table('customer_packages as cp')
+            ->join('packages as p', 'p.id', '=', 'cp.package_id')
+            ->where('cp.customer_id', $customerId)
+            ->where('cp.remaining_qty', '>', 0)
+            ->where(function ($query): void {
+                $query->whereNull('cp.expired_at')
+                    ->orWhere('cp.expired_at', '>=', Carbon::today()->toDateString());
+            })
+            ->orderBy('cp.bought_at')
+            ->orderBy('cp.id')
+            ->lockForUpdate()
+            ->get([
+                'cp.id as customer_package_id',
+                'cp.package_id',
+                'cp.remaining_qty',
+                'p.name as package_name',
+            ])
+            ->map(static function ($row): array {
+                return [
+                    'customer_package_id' => (int) ($row->customer_package_id ?? 0),
+                    'package_id' => (int) ($row->package_id ?? 0),
+                    'remaining_qty' => (int) ($row->remaining_qty ?? 0),
+                    'package_name' => (string) ($row->package_name ?? ''),
+                ];
+            })
+            ->all();
+    }
+
+    private function reservePackageCoverageForService(
+        string $serviceName,
+        int $serviceQty,
+        array &$availableBalances,
+        array &$usagePlan
+    ): int {
+        if ($serviceQty <= 0 || empty($availableBalances)) {
+            return 0;
+        }
+
+        $remainingToCover = $serviceQty;
+        while ($remainingToCover > 0) {
+            $matchIndex = $this->findBestPackageMatchIndex($serviceName, $availableBalances);
+            if ($matchIndex === null) {
+                break;
+            }
+
+            $balance = $availableBalances[$matchIndex];
+            if ((int) ($balance['remaining_qty'] ?? 0) <= 0) {
+                break;
+            }
+
+            $consumeQty = min($remainingToCover, (int) $balance['remaining_qty']);
+            if ($consumeQty <= 0) {
+                break;
+            }
+
+            $availableBalances[$matchIndex]['remaining_qty'] -= $consumeQty;
+            $remainingToCover -= $consumeQty;
+
+            $key = (string) $balance['customer_package_id'];
+            if (!array_key_exists($key, $usagePlan)) {
+                $usagePlan[$key] = [
+                    'customer_package_id' => (int) $balance['customer_package_id'],
+                    'package_id' => (int) $balance['package_id'],
+                    'package_name' => (string) ($balance['package_name'] ?? ''),
+                    'qty' => 0,
+                ];
+            }
+            $usagePlan[$key]['qty'] += $consumeQty;
+        }
+
+        return $serviceQty - $remainingToCover;
+    }
+
+    private function findBestPackageMatchIndex(string $serviceName, array $balances): ?int
+    {
+        $serviceKey = $this->normalizeMatchKey($serviceName);
+        if ($serviceKey === '') {
+            return null;
+        }
+
+        $bestIndex = null;
+        $bestScore = 0;
+
+        foreach ($balances as $index => $balance) {
+            $remainingQty = (int) ($balance['remaining_qty'] ?? 0);
+            if ($remainingQty <= 0) {
+                continue;
+            }
+
+            $packageName = (string) ($balance['package_name'] ?? '');
+            $packageKey = $this->normalizeMatchKey($packageName);
+            $keywordKey = $this->extractPackageKeyword($packageKey);
+            $score = $this->calculatePackageMatchScore($serviceKey, $packageKey, $keywordKey);
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestIndex = $index;
+            }
+        }
+
+        if ($bestIndex !== null) {
+            return $bestIndex;
+        }
+
+        if (count($balances) === 1 && ((int) ($balances[0]['remaining_qty'] ?? 0) > 0)) {
+            return 0;
+        }
+
+        return null;
+    }
+
+    private function calculatePackageMatchScore(string $serviceKey, string $packageKey, string $keywordKey): int
+    {
+        if ($packageKey === '' || $serviceKey === '') {
+            return 0;
+        }
+
+        if ($serviceKey === $packageKey) {
+            return 100;
+        }
+
+        if (str_contains($packageKey, $serviceKey) || str_contains($serviceKey, $packageKey)) {
+            return 90;
+        }
+
+        if ($keywordKey !== '' && str_contains($serviceKey, $keywordKey)) {
+            return 80;
+        }
+
+        return 0;
+    }
+
+    private function normalizeMatchKey(string $value): string
+    {
+        $normalized = trim($value);
+        if ($normalized === '') {
+            return '';
+        }
+
+        if (function_exists('mb_strtolower')) {
+            $normalized = mb_strtolower($normalized, 'UTF-8');
+        } else {
+            $normalized = strtolower($normalized);
+        }
+
+        return preg_replace('/[^[:alnum:]ก-๙]+/u', '', $normalized) ?? '';
+    }
+
+    private function extractPackageKeyword(string $packageKey): string
+    {
+        $keyword = preg_replace('/[0-9]+/u', '', $packageKey) ?? '';
+        $noiseWords = ['ครั้ง', 'คอร์ส', 'แพ็กเกจ', 'แพคเกจ', 'package', 'course', 'ฟรี', 'แถม'];
+
+        foreach ($noiseWords as $noise) {
+            $noiseKey = $this->normalizeMatchKey($noise);
+            if ($noiseKey !== '') {
+                $keyword = str_replace($noiseKey, '', $keyword);
+            }
+        }
+
+        return trim($keyword);
+    }
+
+    private function grantPurchasedPackages(?int $customerId, array $purchasePlan): array
+    {
+        if (empty($purchasePlan)) {
+            return [];
+        }
+
+        if ($customerId === null || $customerId <= 0 || !$this->tableExists('customer_packages')) {
+            return [];
+        }
+
+        $summary = [];
+        foreach ($purchasePlan as $plan) {
+            $packageId = isset($plan['package_id']) ? (int) $plan['package_id'] : 0;
+            $qty = isset($plan['qty']) ? (int) $plan['qty'] : 0;
+            if ($packageId <= 0 || $qty <= 0) {
+                continue;
+            }
+
+            $package = DB::table('packages')
+                ->where('id', $packageId)
+                ->first(['id', 'name', 'total_qty', 'valid_days']);
+
+            if ($package === null) {
+                continue;
+            }
+
+            $remainingQty = max(1, (int) ($package->total_qty ?? 1));
+            $now = now();
+            $expiredAt = null;
+            if (($package->valid_days ?? null) !== null && (int) $package->valid_days > 0) {
+                $expiredAt = Carbon::parse($now)->addDays((int) $package->valid_days)->toDateString();
+            }
+
+            for ($i = 0; $i < $qty; $i++) {
+                DB::table('customer_packages')->insert([
+                    'customer_id' => $customerId,
+                    'package_id' => (int) $package->id,
+                    'remaining_qty' => $remainingQty,
+                    'expired_at' => $expiredAt,
+                    'bought_at' => $now,
+                ]);
+            }
+
+            $summary[] = [
+                'package_id' => (int) $package->id,
+                'package_name' => (string) ($package->name ?? ''),
+                'qty' => $qty,
+            ];
+        }
+
+        return $summary;
+    }
+
+    private function applyPackageRedemptions(array $usagePlan, int $orderId, ?int $actorUserId): array
+    {
+        if (empty($usagePlan) || !$this->tableExists('customer_packages')) {
+            return [];
+        }
+
+        $summary = [];
+        foreach ($usagePlan as $plan) {
+            $customerPackageId = isset($plan['customer_package_id']) ? (int) $plan['customer_package_id'] : 0;
+            $packageId = isset($plan['package_id']) ? (int) $plan['package_id'] : 0;
+            $qty = isset($plan['qty']) ? (int) $plan['qty'] : 0;
+            if ($customerPackageId <= 0 || $packageId <= 0 || $qty <= 0) {
+                continue;
+            }
+
+            $affectedRows = DB::table('customer_packages')
+                ->where('id', $customerPackageId)
+                ->where('remaining_qty', '>=', $qty)
+                ->decrement('remaining_qty', $qty);
+
+            if ($affectedRows <= 0) {
+                throw ValidationException::withMessages([
+                    'package_redeem' => ['ยอดคงเหลือแพ็กเกจไม่เพียงพอ กรุณาตรวจสอบอีกครั้ง'],
+                ]);
+            }
+
+            DB::table('order_items')->insert([
+                'order_id' => $orderId,
+                'item_type' => 'package',
+                'item_id' => $packageId,
+                'qty' => $qty,
+                'unit_price' => 0,
+                'masseuse_id' => $actorUserId,
+            ]);
+
+            $summary[] = [
+                'package_id' => $packageId,
+                'package_name' => (string) ($plan['package_name'] ?? ''),
+                'qty' => $qty,
+            ];
+        }
+
+        return $summary;
     }
 
     private function resolveBookingContext(User $user, array $query, int $branchId): ?array
@@ -505,3 +865,4 @@ class PosService
         return (bool) $this->columnExistsCache[$cacheKey];
     }
 }
+

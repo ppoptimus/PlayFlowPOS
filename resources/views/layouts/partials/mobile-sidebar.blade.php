@@ -59,6 +59,11 @@
             'icon' => 'bi-sliders',
             'title' => 'สมาชิก',
             'subtitle' => 'จัดการระดับสมาชิก',
+        ], [
+            'route' => 'packages',
+            'icon' => 'bi-box2-heart',
+            'title' => 'แพ็กเกจ',
+            'subtitle' => 'จัดการแพ็กเกจและยอดคงเหลือ',
         ]]);
     }
 @endphp

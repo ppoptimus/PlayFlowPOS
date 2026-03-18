@@ -39,6 +39,9 @@
     <a href="{{ route('membership-levels') }}" class="nav-link {{ request()->routeIs('membership-levels*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-sliders me-2"></i> Membership Levels
     </a>
+    <a href="{{ route('packages') }}" class="nav-link {{ request()->routeIs('packages*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-box2-heart me-2"></i> Packages
+    </a>
     @endif
     <a href="{{ route('masseuse') }}" class="nav-link {{ request()->routeIs('masseuse*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-person-badge-fill me-2"></i> หมอนวด

@@ -51,17 +51,29 @@
                 <div class="row g-2" id="item-grid">
                     @foreach($items as $item)
                     <div class="col-6 col-md-4 item-card-wrap" data-type="{{ $item['type'] }}" data-name="{{ strtolower($item['name']) }}">
+                        @php
+                            $itemType = (string) ($item['type'] ?? 'product');
+                            $badgeClass = $itemType === 'service'
+                                ? 'bg-info-subtle text-info'
+                                : ($itemType === 'package' ? 'bg-primary-subtle text-primary' : 'bg-success-subtle text-success');
+                            $badgeLabel = $itemType === 'service'
+                                ? 'Service'
+                                : ($itemType === 'package' ? 'Package' : 'Product');
+                            $metaLabel = $itemType === 'service'
+                                ? (($item['duration'] ?? null) ? $item['duration'].' นาที' : 'Service')
+                                : ($itemType === 'package' ? 'Package' : 'Retail');
+                        @endphp
                         <div class="card h-100 border shadow-none rounded-4 item-card"
                              data-item-id="{{ $item['id'] }}"
                              style="cursor: pointer;"
                              onclick='addToCart(@json($item["id"]), @json($item["name"]), {{ $item["price"] }}, @json($item["type"]), {{ $item["source_id"] }})'>
                             <div class="card-body p-3">
-                                <span class="badge {{ $item['type'] == 'service' ? 'bg-info-subtle text-info' : 'bg-success-subtle text-success' }} mb-2 rounded-pill">
-                                    {{ $item['type'] == 'service' ? 'Service' : 'Product' }}
+                                <span class="badge {{ $badgeClass }} mb-2 rounded-pill">
+                                    {{ $badgeLabel }}
                                 </span>
                                 <h6 class="fw-bold mb-1 text-truncate">{{ $item['name'] }}</h6>
                                 <div class="d-flex justify-content-between align-items-end mt-3">
-                                    <small class="text-muted">{{ $item['duration'] ? $item['duration'].' นาที' : 'Retail' }}</small>
+                                    <small class="text-muted">{{ $metaLabel }}</small>
                                     <span class="fw-bold text-primary">{{ number_format($item['price']) }}฿</span>
                                 </div>
                             </div>
@@ -91,6 +103,7 @@
                         </div>
                         <input type="hidden" id="customer-id-hidden" value="">
                         <div class="small text-muted mt-1" id="customer-match-hint">Walk-in</div>
+                        <div class="small text-primary mt-1" id="package-balance-hint"></div>
                     </div>
                     <div class="col-5">
                         <label class="small fw-bold text-muted">หมอนวด/ผู้ขาย</label>
@@ -435,6 +448,7 @@
     const bookingContext = @json($bookingContext);
     const serviceItems = @json($serviceItems);
     const customers = @json($customers ?? []);
+    const customerPackageBalances = @json($customerPackageBalances ?? []);
     const checkoutUrl = "{{ route('pos.checkout') }}";
     const quickCreateCustomerUrl = "{{ route('customers.quick-create') }}";
     const bookingUrl = "{{ route('booking') }}";
@@ -445,6 +459,7 @@
     const customerNameInputEl = document.getElementById('customer-name-input');
     const customerIdHiddenEl = document.getElementById('customer-id-hidden');
     const customerMatchHintEl = document.getElementById('customer-match-hint');
+    const packageBalanceHintEl = document.getElementById('package-balance-hint');
     const staffSelectEl = document.getElementById('staff-select');
     const discountInputEl = document.getElementById('discount-input');
     const checkoutBtn = document.getElementById('checkout-btn');
@@ -573,6 +588,30 @@
         return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
     }
 
+    function updateCustomerPackageHint(customerId = null) {
+        if (!packageBalanceHintEl) return;
+
+        const resolvedCustomerId = customerId !== null ? Number(customerId) : getSelectedCustomerId();
+        if (!Number.isFinite(resolvedCustomerId) || resolvedCustomerId <= 0) {
+            packageBalanceHintEl.textContent = '';
+            return;
+        }
+
+        const balances = customerPackageBalances[String(resolvedCustomerId)] || [];
+        if (!Array.isArray(balances) || balances.length === 0) {
+            packageBalanceHintEl.textContent = 'ไม่มีแพ็กเกจคงเหลือ';
+            return;
+        }
+
+        const previews = balances.slice(0, 2).map((balance) => {
+            const name = String(balance.package_name || 'Package');
+            const qty = Number(balance.remaining_qty || 0).toLocaleString('th-TH');
+            return `${name} (${qty} สิทธิ์)`;
+        });
+        const tail = balances.length > 2 ? ` +${balances.length - 2}` : '';
+        packageBalanceHintEl.textContent = `แพ็กเกจคงเหลือ: ${previews.join(', ')}${tail}`;
+    }
+
     function syncCustomerIdentityFromInput() {
         if (!customerNameInputEl || !customerIdHiddenEl) return;
 
@@ -580,6 +619,7 @@
         if (value === '' || value.toLowerCase() === 'walk-in') {
             customerIdHiddenEl.value = '';
             updateCustomerMatchHint('Walk-in', 'muted');
+            updateCustomerPackageHint(null);
             return;
         }
 
@@ -587,11 +627,13 @@
         if (!matchedCustomer) {
             customerIdHiddenEl.value = '';
             updateCustomerMatchHint('ลูกค้าใหม่ (ไม่ผูก CRM)', 'warning');
+            updateCustomerPackageHint(null);
             return;
         }
 
         customerIdHiddenEl.value = String(matchedCustomer.id);
         updateCustomerMatchHint(`ผูก CRM: ${matchedCustomer.name}`, 'success');
+        updateCustomerPackageHint(Number(matchedCustomer.id));
     }
 
     function remove(id) {
@@ -865,6 +907,24 @@
             }
 
             notifySuccess(`ชำระเงินสำเร็จ\nเลขที่บิล: ${data.order_no}`);
+            if (payload.customer_id && Array.isArray(data.customer_package_balances)) {
+                customerPackageBalances[String(payload.customer_id)] = data.customer_package_balances;
+                updateCustomerPackageHint(Number(payload.customer_id));
+            }
+
+            if (data.packages && Array.isArray(data.packages.purchased) && data.packages.purchased.length > 0) {
+                const purchasedText = data.packages.purchased
+                    .map((row) => `${row.package_name} x${row.qty}`)
+                    .join(', ');
+                notifyInfo(`เพิ่มสิทธิ์แพ็กเกจให้ลูกค้าแล้ว: ${purchasedText}`);
+            }
+            if (data.packages && Array.isArray(data.packages.redeemed) && data.packages.redeemed.length > 0) {
+                const redeemedText = data.packages.redeemed
+                    .map((row) => `${row.package_name} -${row.qty}`)
+                    .join(', ');
+                notifyInfo(`ตัดยอดแพ็กเกจอัตโนมัติ: ${redeemedText}`);
+            }
+
             const shouldPrint = await askPrintChoice(data.order_no);
 
             if (shouldPrint) {
@@ -926,6 +986,7 @@
                 bookingCustomer ? `ผูก CRM: ${bookingCustomer.name}` : 'ผูก CRM จากคิวเดิม',
                 'success'
             );
+            updateCustomerPackageHint(Number(bookingContext.customerId));
         }
 
         if (bookingContext.staffId && staffSelectEl) {
@@ -1072,6 +1133,7 @@
                     customerIdHiddenEl.value = String(customer.id);
                 }
                 updateCustomerMatchHint(`ผูก CRM: ${customer.name || ''}`, 'success');
+                updateCustomerPackageHint(Number(customer.id));
             }
 
             notifySuccess(data.message || 'บันทึกลูกค้าเรียบร้อยแล้ว');
@@ -1092,4 +1154,3 @@
     renderCart();
 </script>
 @endpush
-
