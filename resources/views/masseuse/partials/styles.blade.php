@@ -664,4 +664,41 @@
             row-gap: 0.45rem;
         }
     }
+
+    .masseuse-page .day-toggle-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.2rem;
+        border-radius: 0.75rem;
+        background: rgba(31, 115, 224, 0.06);
+        border: 1px solid rgba(31, 115, 224, 0.1);
+    }
+
+    .masseuse-page .day-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 1.8rem;
+        padding: 0.2rem 0.7rem;
+        border-radius: 0.6rem;
+        border: none;
+        background: transparent;
+        color: #5f7e9c;
+        font-size: 0.78rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.22s ease;
+    }
+
+    .masseuse-page .day-toggle-btn:hover {
+        color: #1d67bd;
+        background: rgba(255, 255, 255, 0.6);
+    }
+
+    .masseuse-page .day-toggle-btn.is-active {
+        color: #ffffff;
+        background: linear-gradient(135deg, #2d8ff0, #14b89a);
+        box-shadow: 0 6px 14px rgba(31, 115, 224, 0.22);
+    }
 </style>

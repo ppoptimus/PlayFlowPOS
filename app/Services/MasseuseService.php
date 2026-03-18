@@ -38,14 +38,15 @@ class MasseuseService
             $activeBranchId,
             $date
         );
+        $staffWithYesterday = $this->appendYesterdaySummary($staffWithMonthlySummary, $activeBranchId, $date);
 
         return array_merge($pageData, [
-            'staff' => $staffWithMonthlySummary,
+            'staff' => $staffWithYesterday,
             'moduleReady' => $this->tableExists('masseuses'),
             'canManage' => $this->canManage($user),
             'statusOptions' => $this->getStatusOptions(),
             'staffRecords' => $this->tableExists('masseuses')
-                ? $this->getStaffRecords($activeBranchId, $staffWithMonthlySummary)
+                ? $this->getStaffRecords($activeBranchId, $staffWithYesterday)
                 : [],
         ]);
     }
@@ -297,6 +298,83 @@ class MasseuseService
 
             return $staff;
         }, $staffStats);
+    }
+
+    private function appendYesterdaySummary(array $staffStats, int $branchId, string $date): array
+    {
+        $yesterdaySummaryByStaff = $this->getYesterdaySummaryByStaff($branchId, $date);
+
+        return array_map(static function (array $staff) use ($yesterdaySummaryByStaff): array {
+            $staffId = (string) ($staff['id'] ?? '');
+            $yesterdaySummary = $yesterdaySummaryByStaff[$staffId] ?? [
+                'income' => 0.0,
+                'commission' => 0.0,
+                'queue_count' => 0,
+            ];
+
+            $staff['yesterday_income'] = (float) ($yesterdaySummary['income'] ?? 0.0);
+            $staff['yesterday_commission'] = (float) ($yesterdaySummary['commission'] ?? 0.0);
+            $staff['yesterday_queue_count'] = (int) ($yesterdaySummary['queue_count'] ?? 0);
+
+            return $staff;
+        }, $staffStats);
+    }
+
+    private function getYesterdaySummaryByStaff(int $branchId, string $date): array
+    {
+        if (!$this->tableExists('bookings') || !$this->tableExists('services')) {
+            return [];
+        }
+
+        $selectedDate = Carbon::parse($date);
+        $yesterday = $selectedDate->copy()->subDay()->startOfDay();
+        $yesterdayEnd = $yesterday->copy()->addDay();
+
+        $bookingRows = DB::table('bookings as b')
+            ->leftJoin('services as s', 's.id', '=', 'b.service_id')
+            ->where('b.branch_id', $branchId)
+            ->whereNotNull('b.masseuse_id')
+            ->where('b.status', '!=', 'cancelled')
+            ->where('b.start_time', '>=', $yesterday->format('Y-m-d H:i:s'))
+            ->where('b.start_time', '<', $yesterdayEnd->format('Y-m-d H:i:s'))
+            ->orderBy('b.start_time')
+            ->get([
+                'b.id',
+                'b.masseuse_id',
+                'b.service_id',
+                's.name as service_name',
+                's.price as service_price',
+            ]);
+
+        if ($bookingRows->isEmpty()) {
+            return [];
+        }
+
+        $serviceMap = $this->loadBookingServicesMap($bookingRows);
+        $commissionConfigs = $this->getCommissionConfigsByService();
+        $summaryByStaff = [];
+
+        foreach ($bookingRows as $row) {
+            $staffId = (string) $row->masseuse_id;
+            $bookingId = (int) $row->id;
+            $services = $serviceMap[$bookingId] ?? [];
+
+            if (!isset($summaryByStaff[$staffId])) {
+                $summaryByStaff[$staffId] = [
+                    'income' => 0.0,
+                    'commission' => 0.0,
+                    'queue_count' => 0,
+                ];
+            }
+
+            $summaryByStaff[$staffId]['queue_count']++;
+            $summaryByStaff[$staffId]['income'] += array_reduce($services, static function (float $sum, array $service): float {
+                return $sum + (float) ($service['price'] ?? 0.0);
+            }, 0.0);
+            $summaryByStaff[$staffId]['commission'] += $this->estimateServicesCommission($services, $commissionConfigs);
+        }
+
+        return $summaryByStaff;
     }
 
     private function getMonthlySummaryByStaff(int $branchId, string $date): array

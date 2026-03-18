@@ -17,6 +17,10 @@
     ], static function ($value): bool {
         return $value !== null && $value !== '';
     }));
+
+    $todayDate = \Carbon\Carbon::today()->toDateString();
+    $yesterdayDate = \Carbon\Carbon::yesterday()->toDateString();
+    $currentDate = $selectedDate ?? $todayDate;
 @endphp
 
 @push('head')
@@ -150,19 +154,42 @@
 
             <div class="summary-panels">
                 <div class="summary-panel" id="staff-{{ $s['id'] }}-today">
-                    <div class="summary-panel-title">วันนี้</div>
-                    <div class="summary-metrics is-two-columns">
-                        <div class="summary-metric">
-                            <span class="summary-label">รายได้วันนี้</span>
-                            <div class="summary-value">{{ number_format($s['income']) }} ฿</div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="day-toggle-group" data-staff-id="{{ $s['id'] }}">
+                            <button type="button" class="day-toggle-btn is-active" data-target="today" data-staff="{{ $s['id'] }}">วันนี้</button>
+                            <button type="button" class="day-toggle-btn" data-target="yesterday" data-staff="{{ $s['id'] }}">เมื่อวาน</button>
                         </div>
-                        <div class="summary-metric">
-                            <span class="summary-label">จำนวนคิว</span>
-                            <div class="summary-value">{{ number_format($dailyQueueCount) }}</div>
+                    </div>
+                    <div class="day-panel" id="dp-today-{{ $s['id'] }}">
+                        <div class="summary-metrics is-two-columns">
+                            <div class="summary-metric">
+                                <span class="summary-label">รายได้วันนี้</span>
+                                <div class="summary-value">{{ number_format($s['income']) }} ฿</div>
+                            </div>
+                            <div class="summary-metric">
+                                <span class="summary-label">จำนวนคิว</span>
+                                <div class="summary-value">{{ number_format($dailyQueueCount) }}</div>
+                            </div>
+                            <div class="summary-metric is-full">
+                                <span class="summary-label">ค่ามือ</span>
+                                <div class="summary-value">{{ number_format($s['commission']) }} ฿</div>
+                            </div>
                         </div>
-                        <div class="summary-metric is-full">
-                            <span class="summary-label">ค่ามือ</span>
-                            <div class="summary-value">{{ number_format($s['commission']) }} ฿</div>
+                    </div>
+                    <div class="day-panel" id="dp-yesterday-{{ $s['id'] }}" style="display:none;">
+                        <div class="summary-metrics is-two-columns">
+                            <div class="summary-metric">
+                                <span class="summary-label">รายได้เมื่อวาน</span>
+                                <div class="summary-value">{{ number_format($s['yesterday_income'] ?? 0) }} ฿</div>
+                            </div>
+                            <div class="summary-metric">
+                                <span class="summary-label">จำนวนคิว</span>
+                                <div class="summary-value">{{ number_format($s['yesterday_queue_count'] ?? 0) }}</div>
+                            </div>
+                            <div class="summary-metric is-full">
+                                <span class="summary-label">ค่ามือ</span>
+                                <div class="summary-value">{{ number_format($s['yesterday_commission'] ?? 0) }} ฿</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -262,3 +289,30 @@
     @endif
 </div>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.day-toggle-btn');
+        if (!btn) return;
+
+        var staffId = btn.getAttribute('data-staff');
+        var target = btn.getAttribute('data-target');
+        var group = btn.closest('.day-toggle-group');
+        if (!group) return;
+
+        group.querySelectorAll('.day-toggle-btn').forEach(function (b) {
+            b.classList.remove('is-active');
+        });
+        btn.classList.add('is-active');
+
+        var todayPanel = document.getElementById('dp-today-' + staffId);
+        var yesterdayPanel = document.getElementById('dp-yesterday-' + staffId);
+
+        if (todayPanel) todayPanel.style.display = target === 'today' ? '' : 'none';
+        if (yesterdayPanel) yesterdayPanel.style.display = target === 'yesterday' ? '' : 'none';
+    });
+})();
+</script>
+@endpush
