@@ -18,6 +18,9 @@
     $todayClients = (int) ($stats['today_clients'] ?? 0);
     $dailyMasseuseFee = (int) ($stats['daily_masseuse_fee'] ?? 0);
     $monthlyMasseuseFee = (int) ($stats['monthly_masseuse_fee'] ?? 0);
+    $todayServiceSales = (int) ($stats['today_service_sales'] ?? 0);
+    $todayPackageSales = (int) ($stats['today_package_sales'] ?? 0);
+    $netProfit = (int) ($stats['net_profit'] ?? 0);
     $topServices = $stats['top_services'] ?? [];
     $topMasseuses = $stats['top_masseuses'] ?? [];
     $salesChart = $stats['sales_chart'] ?? ['labels' => [], 'data' => []];
@@ -895,24 +898,40 @@
                 <div class="section-head">
                     <div>
                         <h2 class="section-title">ภาพรวมค่ามือและยอดขาย</h2>
-                        <div class="section-note">ใช้ดูสมดุลระหว่างยอดที่เข้าร้านกับต้นทุนค่ามือหมอนวด</div>
+                        <div class="section-note">ดูสมดุลระหว่างยอดที่เข้าร้านกับต้นทุนค่ามือหมอนวด</div>
                     </div>
                 </div>
 
                 <div class="row g-3">
-                    <div class="col-12 col-md-6">
+                    {{-- === กลุ่มวันนี้ === --}}
+                    <div class="col-12">
+                        <div class="service-name" style="font-size:0.85rem; color:var(--dash-muted); margin-bottom:0.25rem;"><i class="fa-solid fa-sun" style="margin-right:0.35rem;"></i>สรุปวันนี้</div>
+                    </div>
+                    <div class="col-12 col-md-4">
                         <div class="service-item h-100">
                             <div class="service-row mb-2">
                                 <div>
-                                    <div class="service-name">ยอดขายวันนี้</div>
-                                    <div class="service-meta">บิลที่ชำระแล้วของวันนี้</div>
+                                    <div class="service-name">ยอดใช้บริการวันนี้</div>
+                                    <div class="service-meta">ยอดขายบริการ (service) วันนี้</div>
                                 </div>
-                                <span class="soft-tag"><i class="fa-solid fa-bolt"></i> วันนี้</span>
+                                <span class="soft-tag"><i class="fa-solid fa-spa"></i> วันนี้</span>
                             </div>
-                            <div class="spotlight-value mb-0" style="font-size: clamp(1.5rem, 1.15rem + 1vw, 2.3rem);">{{ number_format($todaySales) }} ฿</div>
+                            <div class="spotlight-value mb-0" style="font-size: clamp(1.5rem, 1.15rem + 1vw, 2.3rem);">{{ number_format($todayServiceSales) }} ฿</div>
                         </div>
                     </div>
-                    <div class="col-12 col-md-6">
+                    <div class="col-12 col-md-4">
+                        <div class="service-item h-100">
+                            <div class="service-row mb-2">
+                                <div>
+                                    <div class="service-name">ยอดขายแพคเกจวันนี้</div>
+                                    <div class="service-meta">ยอดขายแพคเกจวันนี้</div>
+                                </div>
+                                <span class="soft-tag"><i class="fa-solid fa-box-open"></i> วันนี้</span>
+                            </div>
+                            <div class="spotlight-value mb-0" style="font-size: clamp(1.5rem, 1.15rem + 1vw, 2.3rem);">{{ number_format($todayPackageSales) }} ฿</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
                         <div class="service-item h-100">
                             <div class="service-row mb-2">
                                 <div>
@@ -924,19 +943,24 @@
                             <div class="spotlight-value mb-0" style="font-size: clamp(1.5rem, 1.15rem + 1vw, 2.3rem);">{{ number_format($dailyMasseuseFee) }} ฿</div>
                         </div>
                     </div>
-                    <div class="col-12 col-md-6">
+
+                    {{-- === กลุ่มเดือนนี้ === --}}
+                    <div class="col-12" style="margin-top:0.6rem;">
+                        <div class="service-name mt-4" style="font-size:0.85rem; color:var(--dash-muted); margin-bottom:0.25rem;"><i class="fa-solid fa-calendar-days" style="margin-right:0.35rem;"></i>สรุปเดือนนี้</div>
+                    </div>
+                    <div class="col-12 col-md-4">
                         <div class="service-item h-100">
                             <div class="service-row mb-2">
                                 <div>
-                                    <div class="service-name">ยอดขายเดือนนี้</div>
+                                    <div class="service-name">ยอดขายรวมเดือนนี้</div>
                                     <div class="service-meta">สะสมตั้งแต่ต้นเดือน</div>
                                 </div>
-                                <span class="soft-tag"><i class="fa-solid fa-calendar"></i> เดือนนี้</span>
+                                <span class="soft-tag"><i class="fa-solid fa-chart-line"></i> เดือนนี้</span>
                             </div>
                             <div class="spotlight-value mb-0" style="font-size: clamp(1.5rem, 1.15rem + 1vw, 2.3rem);">{{ number_format($monthlySales) }} ฿</div>
                         </div>
                     </div>
-                    <div class="col-12 col-md-6">
+                    <div class="col-12 col-md-4">
                         <div class="service-item h-100">
                             <div class="service-row mb-2">
                                 <div>
@@ -946,6 +970,20 @@
                                 <span class="soft-tag"><i class="fa-solid fa-sack-dollar"></i> เดือนนี้</span>
                             </div>
                             <div class="spotlight-value mb-0" style="font-size: clamp(1.5rem, 1.15rem + 1vw, 2.3rem);">{{ number_format($monthlyMasseuseFee) }} ฿</div>
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <div class="service-item h-100" style="border-color: {{ $netProfit >= 0 ? 'rgba(20,184,154,0.25)' : 'rgba(220,83,102,0.25)' }};">
+                            <div class="service-row mb-2">
+                                <div>
+                                    <div class="service-name">กำไรสุทธิ</div>
+                                    <div class="service-meta">ยอดขาย - ค่ามือหมอ</div>
+                                </div>
+                                <span class="soft-tag" style="background:{{ $netProfit >= 0 ? 'rgba(20,184,154,0.12)' : 'rgba(220,83,102,0.12)' }}; color:{{ $netProfit >= 0 ? '#118671' : '#be4255' }};">
+                                    <i class="fa-solid {{ $netProfit >= 0 ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down' }}"></i> เดือนนี้
+                                </span>
+                            </div>
+                            <div class="spotlight-value mb-0" style="font-size: clamp(1.5rem, 1.15rem + 1vw, 2.3rem); color:{{ $netProfit >= 0 ? '#118671' : '#be4255' }};">{{ number_format($netProfit) }} ฿</div>
                         </div>
                     </div>
                 </div>

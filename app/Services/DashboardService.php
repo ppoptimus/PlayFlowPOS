@@ -37,6 +37,12 @@ class DashboardService
         $topMasseuses = $this->buildTopMasseuses($resolvedBranchId, $today, $tomorrow);
         $salesChart = $this->buildSalesChart($resolvedBranchId);
 
+        $todayServiceSales = (int) round($this->sumSalesByItemType($resolvedBranchId, $today, $tomorrow, 'service'));
+        $todayPackageSales = (int) round($this->sumSalesByItemType($resolvedBranchId, $today, $tomorrow, 'package'));
+        $dailyMasseuseFee = (int) round($this->sumCommissions($resolvedBranchId, $today, $tomorrow));
+        $monthlyMasseuseFee = (int) round($this->sumCommissions($resolvedBranchId, $monthStart));
+        $netProfit = (int) round($monthlySales) - $monthlyMasseuseFee;
+
         return [
             'branch_id' => $resolvedBranchId,
             'branch_name' => (string) $branch->name,
@@ -51,8 +57,11 @@ class DashboardService
             'selected_range_label' => $rangeLabel,
             'selected_range_sales' => (int) round($rangeSales),
             'monthly_sales' => (int) round($monthlySales),
-            'daily_masseuse_fee' => (int) round($this->sumCommissions($resolvedBranchId, $today, $tomorrow)),
-            'monthly_masseuse_fee' => (int) round($this->sumCommissions($resolvedBranchId, $monthStart)),
+            'daily_masseuse_fee' => $dailyMasseuseFee,
+            'monthly_masseuse_fee' => $monthlyMasseuseFee,
+            'today_service_sales' => $todayServiceSales,
+            'today_package_sales' => $todayPackageSales,
+            'net_profit' => $netProfit,
             'last_sync' => Carbon::now()->format('H:i'),
             'top_services' => $topServices,
             'top_masseuses' => $topMasseuses,
@@ -286,6 +295,20 @@ class DashboardService
         $query = $this->applyPaidScope($query, 'o');
 
         return (float) $query->sum('c.amount');
+    }
+
+    private function sumSalesByItemType(int $branchId, Carbon $from, Carbon $to, string $itemType): float
+    {
+        $query = DB::table('order_items as oi')
+            ->join('orders as o', 'o.id', '=', 'oi.order_id')
+            ->where('o.branch_id', $branchId)
+            ->where('oi.item_type', $itemType)
+            ->where('o.created_at', '>=', $from)
+            ->where('o.created_at', '<', $to);
+
+        $query = $this->applyPaidScope($query, 'o');
+
+        return (float) $query->sum(DB::raw('oi.qty * oi.unit_price'));
     }
 
     private function buildSalesChart(int $branchId): array

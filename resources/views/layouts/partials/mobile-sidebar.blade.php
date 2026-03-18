@@ -33,6 +33,12 @@
             'title' => 'แพ็กเกจโปรโมชั่น',
             'subtitle' => 'ตั้งค่าโปรและแพ็กเกจขาย',
         ],
+         [
+            'route' => 'products',
+            'icon' => 'bi-box-seam-fill',
+            'title' => 'สินค้า & สต็อก',
+            'subtitle' => 'จัดการสินค้าและสต็อก',
+        ],
         [
             'route' => 'customers',
             'icon' => 'bi-people',
