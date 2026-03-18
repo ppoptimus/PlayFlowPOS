@@ -69,7 +69,7 @@
         height: 1.9rem;
         border-radius: 999px;
         font-size: 0.95rem;
-        box-shadow: 0 8px 14px rgba(16, 76, 136, 0.18);
+        box-shadow: 0 2px 6px rgba(16, 76, 136, 0.18);
     }
 
     .packages-page .icon-chip i {

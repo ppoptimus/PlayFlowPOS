@@ -40,6 +40,10 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/membership-levels', 'MembershipLevelController@store')->name('membership-levels.store');
         Route::put('/membership-levels/{tierId}', 'MembershipLevelController@update')->name('membership-levels.update');
 
+        Route::post('/masseuse', 'MasseuseController@store')->name('masseuse.store');
+        Route::put('/masseuse/{staffId}', 'MasseuseController@update')->name('masseuse.update');
+        Route::delete('/masseuse/{staffId}', 'MasseuseController@destroy')->name('masseuse.destroy');
+
         Route::get('/packages', 'PackageController@index')->name('packages');
         Route::post('/packages', 'PackageController@store')->name('packages.store');
         Route::put('/packages/{packageId}', 'PackageController@update')->name('packages.update');
