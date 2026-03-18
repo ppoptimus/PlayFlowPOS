@@ -9,7 +9,11 @@
                 aria-controls="mobileSidebar"
                 aria-label="เปิดเมนูหลัก"
             >
-                <i class="bi bi-list fs-4"></i>
+                <span class="mobile-menu-btn-icon" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
             </button>
             <div>
                 <h5 class="mb-0 fw-bold text-dark">@yield('page_title', 'PlayFlow System')</h5>

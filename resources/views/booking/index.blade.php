@@ -339,7 +339,7 @@
     }
     @media (max-width: 991.98px) {
         .booking-mobile-safe {
-            padding-bottom: 5.4rem;
+            padding-bottom: var(--pf-mobile-nav-offset, calc(84px + env(safe-area-inset-bottom)));
         }
         .booking-page {
             margin-left: -0.9rem;
