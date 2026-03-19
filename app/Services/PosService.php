@@ -12,13 +12,15 @@ class PosService
 {
     private BookingService $bookingService;
     private PackageService $packageService;
+    private CommissionService $commissionService;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    public function __construct(BookingService $bookingService, PackageService $packageService)
+    public function __construct(BookingService $bookingService, PackageService $packageService, CommissionService $commissionService)
     {
         $this->bookingService = $bookingService;
         $this->packageService = $packageService;
+        $this->commissionService = $commissionService;
     }
 
     public function getPageData(User $user, array $query = []): array
@@ -102,6 +104,9 @@ class PosService
                     'masseuse_id' => $item['masseuse_id'],
                 ]);
             }
+
+            // สั่งให้ระบบคำนวณคอมมิชชันทันทีหลังบันทึก Order
+            $this->commissionService->processOrderCommissions($orderId);
 
             $packagePurchaseSummary = $this->grantPurchasedPackages(
                 $customerId,

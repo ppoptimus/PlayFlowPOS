@@ -41,6 +41,7 @@
         'bi-list': ['fa-solid', 'fa-bars'],
         'bi-list-stars': ['fa-solid', 'fa-list-check'],
         'bi-megaphone': ['fa-solid', 'fa-bullhorn'],
+        'bi-percent': ['fa-solid', 'fa-percent'],
         'bi-pencil-square': ['fa-solid', 'fa-pen-to-square'],
         'bi-people': ['fa-solid', 'fa-users'],
         'bi-people-fill': ['fa-solid', 'fa-users'],

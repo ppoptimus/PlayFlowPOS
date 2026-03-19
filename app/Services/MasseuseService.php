@@ -322,7 +322,8 @@ class MasseuseService
 
     private function getYesterdaySummaryByStaff(int $branchId, string $date): array
     {
-        if (!$this->tableExists('bookings') || !$this->tableExists('services')) {
+        // เปลี่ยนมาเช็คตารางที่เกี่ยวข้องจริง
+        if (!$this->tableExists('commissions') || !$this->tableExists('orders')) {
             return [];
         }
 
@@ -330,56 +331,35 @@ class MasseuseService
         $yesterday = $selectedDate->copy()->subDay()->startOfDay();
         $yesterdayEnd = $yesterday->copy()->addDay();
 
-        $bookingRows = DB::table('bookings as b')
-            ->leftJoin('services as s', 's.id', '=', 'b.service_id')
-            ->where('b.branch_id', $branchId)
-            ->whereNotNull('b.masseuse_id')
-            ->where('b.status', '!=', 'cancelled')
-            ->where('b.start_time', '>=', $yesterday->format('Y-m-d H:i:s'))
-            ->where('b.start_time', '<', $yesterdayEnd->format('Y-m-d H:i:s'))
-            ->orderBy('b.start_time')
-            ->get([
-                'b.id',
-                'b.masseuse_id',
-                'b.service_id',
-                's.name as service_name',
-                's.price as service_price',
-            ]);
-
-        if ($bookingRows->isEmpty()) {
-            return [];
-        }
-
-        $serviceMap = $this->loadBookingServicesMap($bookingRows);
-        $commissionConfigs = $this->getCommissionConfigsByService();
-        $summaryByStaff = [];
-
-        foreach ($bookingRows as $row) {
-            $staffId = (string) $row->masseuse_id;
-            $bookingId = (int) $row->id;
-            $services = $serviceMap[$bookingId] ?? [];
-
-            if (!isset($summaryByStaff[$staffId])) {
-                $summaryByStaff[$staffId] = [
-                    'income' => 0.0,
-                    'commission' => 0.0,
-                    'queue_count' => 0,
+        // ดึงยอดรวมจากฐานข้อมูลโดยตรง (แม่นยำและเร็วกว่า)
+        return DB::table('commissions as c')
+            ->join('order_items as oi', 'oi.id', '=', 'c.order_item_id')
+            ->join('orders as o', 'o.id', '=', 'oi.order_id')
+            ->where('o.branch_id', $branchId)
+            ->where('o.status', 'paid') // นับเฉพาะบิลที่จ่ายเงินแล้ว
+            ->whereBetween('o.created_at', [$yesterday->toDateTimeString(), $yesterdayEnd->toDateTimeString()])
+            ->select(
+                'c.masseuse_id',
+                DB::raw('SUM(c.amount) as total_commission'), // ยอดคอมมิชชันจริง
+                DB::raw('COUNT(oi.id) as queue_count'),       // จำนวนรอบนวดจริง
+                DB::raw('SUM(oi.unit_price * oi.qty) as total_income') // ยอดขายที่พนักงานทำได้
+            )
+            ->groupBy('c.masseuse_id')
+            ->get()
+            ->keyBy('masseuse_id')
+            ->map(function ($row) {
+                return [
+                    'income' => (float) $row->total_income,
+                    'commission' => (float) $row->total_commission,
+                    'queue_count' => (int) $row->queue_count,
                 ];
-            }
-
-            $summaryByStaff[$staffId]['queue_count']++;
-            $summaryByStaff[$staffId]['income'] += array_reduce($services, static function (float $sum, array $service): float {
-                return $sum + (float) ($service['price'] ?? 0.0);
-            }, 0.0);
-            $summaryByStaff[$staffId]['commission'] += $this->estimateServicesCommission($services, $commissionConfigs);
-        }
-
-        return $summaryByStaff;
+            })
+            ->toArray();
     }
 
     private function getMonthlySummaryByStaff(int $branchId, string $date): array
     {
-        if (!$this->tableExists('bookings') || !$this->tableExists('services')) {
+        if (!$this->tableExists('commissions') || !$this->tableExists('orders')) {
             return [];
         }
 
@@ -387,51 +367,29 @@ class MasseuseService
         $monthStart = $selectedDate->copy()->startOfMonth()->startOfDay();
         $nextMonthStart = $selectedDate->copy()->addMonthNoOverflow()->startOfMonth()->startOfDay();
 
-        $bookingRows = DB::table('bookings as b')
-            ->leftJoin('services as s', 's.id', '=', 'b.service_id')
-            ->where('b.branch_id', $branchId)
-            ->whereNotNull('b.masseuse_id')
-            ->where('b.status', '!=', 'cancelled')
-            ->where('b.start_time', '>=', $monthStart->format('Y-m-d H:i:s'))
-            ->where('b.start_time', '<', $nextMonthStart->format('Y-m-d H:i:s'))
-            ->orderBy('b.start_time')
-            ->get([
-                'b.id',
-                'b.masseuse_id',
-                'b.service_id',
-                's.name as service_name',
-                's.price as service_price',
-            ]);
-
-        if ($bookingRows->isEmpty()) {
-            return [];
-        }
-
-        $serviceMap = $this->loadBookingServicesMap($bookingRows);
-        $commissionConfigs = $this->getCommissionConfigsByService();
-        $summaryByStaff = [];
-
-        foreach ($bookingRows as $row) {
-            $staffId = (string) $row->masseuse_id;
-            $bookingId = (int) $row->id;
-            $services = $serviceMap[$bookingId] ?? [];
-
-            if (!isset($summaryByStaff[$staffId])) {
-                $summaryByStaff[$staffId] = [
-                    'income' => 0.0,
-                    'commission' => 0.0,
-                    'queue_count' => 0,
+        return DB::table('commissions as c')
+            ->join('order_items as oi', 'oi.id', '=', 'c.order_item_id')
+            ->join('orders as o', 'o.id', '=', 'oi.order_id')
+            ->where('o.branch_id', $branchId)
+            ->where('o.status', 'paid')
+            ->whereBetween('o.created_at', [$monthStart->toDateTimeString(), $nextMonthStart->toDateTimeString()])
+            ->select(
+                'c.masseuse_id',
+                DB::raw('SUM(c.amount) as total_commission'),
+                DB::raw('COUNT(oi.id) as queue_count'),
+                DB::raw('SUM(oi.unit_price * oi.qty) as total_income')
+            )
+            ->groupBy('c.masseuse_id')
+            ->get()
+            ->keyBy('masseuse_id')
+            ->map(function ($row) {
+                return [
+                    'income' => (float) $row->total_income,
+                    'commission' => (float) $row->total_commission,
+                    'queue_count' => (int) $row->queue_count,
                 ];
-            }
-
-            $summaryByStaff[$staffId]['queue_count']++;
-            $summaryByStaff[$staffId]['income'] += array_reduce($services, static function (float $sum, array $service): float {
-                return $sum + (float) ($service['price'] ?? 0.0);
-            }, 0.0);
-            $summaryByStaff[$staffId]['commission'] += $this->estimateServicesCommission($services, $commissionConfigs);
-        }
-
-        return $summaryByStaff;
+            })
+            ->toArray();
     }
 
     private function loadBookingServicesMap($bookingRows): array

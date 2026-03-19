@@ -67,6 +67,14 @@ Route::middleware('auth')->group(function (): void {
         Route::put('/products/categories/{categoryId}', 'ProductController@updateCategory')->name('products.categories.update');
         Route::delete('/products/categories/{categoryId}', 'ProductController@deleteCategory')->name('products.categories.destroy');
         Route::post('/products/{productId}/adjust-stock', 'ProductController@adjustStock')->name('products.adjust-stock');
+
+        // โซนจัดการการตั้งค่าระบบ (Admin Only)
+        Route::group(['middleware' => ['auth']], function () {
+            Route::get('/admin/commission', 'CommissionConfigController@index')->name('admin.commission');
+            Route::post('/admin/commission/store', 'CommissionConfigController@store')->name('admin.commission.store');
+            Route::post('/admin/commission/update', 'CommissionConfigController@update')->name('admin.commission.update');
+            Route::delete('/admin/commission/{id}', 'CommissionConfigController@destroy')->name('admin.commission.destroy');
+        });
     });
 
     $modules = [

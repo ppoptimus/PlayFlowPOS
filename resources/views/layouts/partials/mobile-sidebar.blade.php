@@ -22,16 +22,16 @@
             'subtitle' => 'จัดการข้อมูลหมอนวด',
         ],
         [
+            'route' => 'admin.commission',
+            'icon' => 'bi-percent',
+            'title' => 'ตั้งค่าคอมมิชชัน',
+            'subtitle' => 'จัดการตั้งค่าคอมมิชชัน',
+        ],
+        [
             'route' => 'massage-rooms',
             'icon' => 'bi-door-open',
             'title' => 'ห้องนวด',
             'subtitle' => 'จัดการเตียงและห้องนวด',
-        ],
-        [
-            'route' => 'promotions',
-            'icon' => 'bi-megaphone',
-            'title' => 'แพ็กเกจโปรโมชั่น',
-            'subtitle' => 'ตั้งค่าโปรและแพ็กเกจขาย',
         ],
          [
             'route' => 'products',
