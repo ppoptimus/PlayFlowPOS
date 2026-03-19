@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\User;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 
 class BranchContextService
@@ -35,15 +36,11 @@ class BranchContextService
         }
 
         $userBranchId = $this->getUserBranchId($user);
-        if ($userBranchId !== null && $this->branchExists($userBranchId)) {
+        if ($userBranchId !== null) {
             return $userBranchId;
         }
 
-        if ($requestedBranchId !== null && $requestedBranchId > 0 && $this->branchExists($requestedBranchId)) {
-            return $requestedBranchId;
-        }
-
-        return $this->getDefaultBranchId();
+        throw new AuthorizationException('บัญชีนี้ยังไม่ได้ผูกกับสาขา จึงไม่สามารถเข้าถึงข้อมูลสาขาได้');
     }
 
     public function getAccessibleBranches(?User $user, bool $activeOnly = false): array
@@ -59,6 +56,8 @@ class BranchContextService
             $userBranchId = $this->getUserBranchId($user);
             if ($userBranchId !== null) {
                 $query->where('id', $userBranchId);
+            } else {
+                return [];
             }
         }
 

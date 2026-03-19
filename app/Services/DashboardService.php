@@ -165,6 +165,13 @@ class DashboardService
             }
         }
 
+        if (!$this->branchContext->canManageAllBranches($user)) {
+            return (object) [
+                'id' => $authorizedBranchId,
+                'name' => 'Assigned Branch',
+            ];
+        }
+
         $branch = $branchQuery
             ->orderBy('id')
             ->first();

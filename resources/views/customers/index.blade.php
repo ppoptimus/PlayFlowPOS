@@ -84,7 +84,9 @@
     .customers-table-wrap {
         border: 1px solid rgba(31, 115, 224, 0.14);
         border-radius: 0.95rem;
-        overflow: hidden;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
         background: #ffffff;
         box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
     }
@@ -106,6 +108,7 @@
 
     .customers-table {
         table-layout: auto;
+        min-width: 980px;
     }
 
     .customers-table .membership-col {
