@@ -200,6 +200,7 @@ class PosService
     {
         return DB::table('products')
             ->where('type', 'retail')
+            ->where('is_active', 1)
             ->orderBy('id')
             ->get(['id', 'name', 'sell_price'])
             ->map(static function ($row): array {

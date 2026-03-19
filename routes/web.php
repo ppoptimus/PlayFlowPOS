@@ -58,11 +58,20 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/packages', 'PackageController@index')->name('packages');
         Route::post('/packages', 'PackageController@store')->name('packages.store');
         Route::put('/packages/{packageId}', 'PackageController@update')->name('packages.update');
+
+        Route::get('/products', 'ProductController@index')->name('products');
+        Route::post('/products', 'ProductController@store')->name('products.store');
+        Route::put('/products/{productId}', 'ProductController@update')->name('products.update');
+        Route::delete('/products/{productId}', 'ProductController@destroy')->name('products.destroy');
+        Route::post('/products/categories', 'ProductController@storeCategory')->name('products.categories.store');
+        Route::put('/products/categories/{categoryId}', 'ProductController@updateCategory')->name('products.categories.update');
+        Route::delete('/products/categories/{categoryId}', 'ProductController@deleteCategory')->name('products.categories.destroy');
+        Route::post('/products/{productId}/adjust-stock', 'ProductController@adjustStock')->name('products.adjust-stock');
     });
 
     $modules = [
         'staff',
-        'commissions', 'products', 'promotions',
+        'commissions', 'promotions',
         'reports', 'financial', 'branches', 'users',
     ];
 

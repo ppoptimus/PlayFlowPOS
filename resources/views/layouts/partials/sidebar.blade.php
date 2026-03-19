@@ -50,7 +50,7 @@
     <a href="{{ route('massage-rooms') }}" class="nav-link {{ request()->routeIs('massage-rooms*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-door-open-fill me-2"></i> ห้องนวด
     </a>
-    <a href="{{ route('products') }}" class="nav-link link-dark">
+    <a href="{{ route('products') }}" class="nav-link {{ request()->routeIs('products*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-box-seam-fill me-2"></i> สินค้า & สต็อก
     </a>
 
