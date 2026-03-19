@@ -16,7 +16,13 @@ class ServiceManagementService
         $this->branchContext = $branchContext;
     }
 
-    public function getPageData(User $user, string $search = '', ?int $categoryId = null, ?int $requestedBranchId = null): array
+    public function getPageData(
+        User $user,
+        string $search = '',
+        ?int $categoryId = null,
+        ?int $requestedBranchId = null,
+        bool $includeInactive = false
+    ): array
     {
         $branchId = $this->branchContext->resolveAuthorizedBranchId($user, $requestedBranchId);
         $normalizedSearch = trim($search);
@@ -36,6 +42,10 @@ class ServiceManagementService
             $query->where('category_id', $categoryId);
         }
 
+        if (Schema::hasColumn('services', 'is_active') && !$includeInactive) {
+            $query->where('is_active', 1);
+        }
+
         $services = $query
             ->get(['id', 'name', 'category_id', 'duration_minutes', 'price', 'is_active'])
             ->map(static function ($row): array {
@@ -53,6 +63,7 @@ class ServiceManagementService
         return [
             'search' => $normalizedSearch,
             'categoryFilter' => $categoryId,
+            'includeInactive' => $includeInactive,
             'services' => $services,
             'categories' => $this->getCategories($branchId),
             'activeBranchId' => $branchId,
@@ -138,7 +149,7 @@ class ServiceManagementService
             ]);
     }
 
-    public function deleteService(User $user, int $serviceId): void
+    public function deleteService(User $user, int $serviceId): string
     {
         $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
         $existing = $this->findScopedService($serviceId, $branchId);
@@ -159,10 +170,14 @@ class ServiceManagementService
             DB::table('services')
                 ->where('id', $serviceId)
                 ->update(['is_active' => false]);
+
+            return 'archived';
         } else {
             DB::table('services')
                 ->where('id', $serviceId)
                 ->delete();
+
+            return 'deleted';
         }
     }
 

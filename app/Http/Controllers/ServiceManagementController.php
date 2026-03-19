@@ -25,8 +25,15 @@ class ServiceManagementController extends Controller
         $branchId = $request->has('branch_id') && $request->query('branch_id') !== ''
             ? (int) $request->query('branch_id')
             : null;
+        $includeInactive = $request->boolean('include_inactive');
 
-        $pageData = $this->serviceManagement->getPageData($request->user(), $search, $categoryId, $branchId);
+        $pageData = $this->serviceManagement->getPageData(
+            $request->user(),
+            $search,
+            $categoryId,
+            $branchId,
+            $includeInactive
+        );
 
         return view('services.index', $pageData);
     }
@@ -64,13 +71,16 @@ class ServiceManagementController extends Controller
             ->with('success', 'อัปเดตบริการเรียบร้อยแล้ว');
     }
 
-    public function destroy(int $serviceId): RedirectResponse
+    public function destroy(Request $request, int $serviceId): RedirectResponse
     {
-        $this->serviceManagement->deleteService($request->user(), $serviceId);
+        $result = $this->serviceManagement->deleteService($request->user(), $serviceId);
+        $message = $result === 'archived'
+            ? 'บริการนี้มีประวัติการขายอยู่ จึงปิดใช้งานและซ่อนจากรายการหลักแล้ว'
+            : 'ลบบริการเรียบร้อยแล้ว';
 
         return redirect()
             ->route('services.index')
-            ->with('success', 'ลบบริการเรียบร้อยแล้ว');
+            ->with('success', $message);
     }
 
     public function storeCategory(Request $request): RedirectResponse
@@ -99,7 +109,7 @@ class ServiceManagementController extends Controller
             ->with('success', 'อัปเดตหมวดหมู่เรียบร้อยแล้ว');
     }
 
-    public function deleteCategory(int $categoryId): RedirectResponse
+    public function deleteCategory(Request $request, int $categoryId): RedirectResponse
     {
         $this->serviceManagement->deleteCategory($request->user(), $categoryId);
 

@@ -130,6 +130,41 @@
         font-size: 0.78rem;
     }
 
+    .customers-action-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .customers-action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+    }
+
+    .customers-action-btn .bi {
+        font-size: 0.9rem;
+    }
+
+    .customers-action-btn .customers-action-text {
+        line-height: 1;
+    }
+
+    .customers-action-group .edit-customer-btn .bi,
+    .customers-action-group .history-customer-btn .bi {
+        display: none;
+    }
+
+    .customers-action-group form[data-role="delete-customer"] .customers-action-text {
+        display: none;
+    }
+
+    .customers-action-group form[data-role="delete-customer"] .btn {
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+    }
+
     @media (max-width: 767.98px) {
         .customers-toolbar {
             flex-direction: row;
@@ -183,59 +218,32 @@
             font-size: 1.42rem;
         }
 
-        .customers-table thead th:nth-child(2),
-        .customers-table thead th:nth-child(3),
-        .customers-table thead th:nth-child(5),
-        .customers-table thead th:nth-child(6),
-        .customers-table tbody td:nth-child(2),
-        .customers-table tbody td:nth-child(3),
-        .customers-table tbody td:nth-child(5),
-        .customers-table tbody td:nth-child(6) {
-            display: none !important;
-        }
-
         .customers-table th,
         .customers-table td {
             vertical-align: middle;
             padding-left: 0.5rem;
             padding-right: 0.5rem;
             font-size: 0.86rem;
-        }
-
-        .customers-table thead th:first-child,
-        .customers-table thead th:last-child,
-        .customers-table tbody td:first-child,
-        .customers-table tbody td:last-child {
-            text-align: center !important;
+            white-space: nowrap;
         }
 
         .customers-table tbody td:first-child {
-            width: 60%;
-            max-width: 180px;
+            min-width: 160px;
             white-space: normal;
             line-height: 1.25;
         }
 
-        .customers-table thead th:nth-child(4),
-        .customers-table tbody td:nth-child(4) {
-            width: 15%;
-            max-width: 74px;
-            padding-left: 0.35rem;
-            padding-right: 0.35rem;
+        .customers-table .membership-col {
+            min-width: 140px;
         }
 
-        .customers-table thead th:nth-child(7),
-        .customers-table tbody td:nth-child(7) {
-            width: 25%;
+        .customers-table .action-col {
+            min-width: 150px;
         }
 
         .customers-table .membership-badge {
             display: inline-block;
-            max-width: 100%;
-            white-space: normal;
-            font-size: 0.66rem;
-            line-height: 1.15;
-            padding: 0.2rem 0.35rem;
+            font-size: 0.7rem;
         }
 
         .customers-table .membership-next {
@@ -243,15 +251,18 @@
         }
 
         .customers-action-group {
-            justify-content: center !important;
-            flex-wrap: wrap;
-            width: 100%;
-            gap: 0.35rem !important;
+            justify-content: flex-end !important;
+            flex-wrap: nowrap;
+            width: auto;
+        }
+
+        .customers-action-group form {
+            margin: 0;
         }
 
         .customers-action-group .btn {
-            font-size: 0.76rem;
-            padding: 0.2rem 0.65rem !important;
+            font-size: 0.8rem;
+            padding: 0.22rem 0.7rem !important;
         }
     }
 </style>
@@ -362,6 +373,15 @@
                                     <div class="text-muted mt-1 membership-next d-none d-md-block">
                                         อีก {{ number_format((float) ($customer['amount_to_next_tier'] ?? 0), 2) }} บาท
                                         ถึง {{ $customer['next_tier_name'] }}
+                                        <form method="POST"
+                                              action="{{ route('customers.destroy', ['customerId' => $customer['id']]) }}"
+                                              onsubmit="return confirm(@js('ยืนยันการลบลูกค้า ' . $customer['name'] . ' ?'))">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3">
+                                                ลบ
+                                            </button>
+                                        </form>
                                     </div>
                                     @elseif(!empty($customer['is_top_tier']))
                                     <div class="text-success mt-1 membership-next d-none d-md-block">ถึงระดับสูงสุดแล้ว</div>
@@ -560,6 +580,8 @@
     const openAddCustomerBtn = document.getElementById('open-add-customer-btn');
     const editUpdateUrlTemplate = @json(route('customers.update', ['customerId' => '__ID__']));
     const historyUrlTemplate = @json(route('customers.history', ['customerId' => '__ID__']));
+    const deleteUrlTemplate = @json(route('customers.destroy', ['customerId' => '__ID__']));
+    const csrfToken = @json(csrf_token());
     const oldForm = @json(old('_form'));
     const oldEditCustomerId = @json(old('edit_customer_id'));
 
@@ -697,6 +719,128 @@
                 String(button.dataset.customerName || '')
             );
         });
+    });
+
+    document.querySelectorAll('.customers-action-group').forEach((group) => {
+        if (!group || group.querySelector('form[data-role="delete-customer"]')) {
+            return;
+        }
+
+        const historyButton = group.querySelector('.history-customer-btn');
+        const customerId = Number(historyButton?.dataset.customerId || 0);
+        const customerName = String(historyButton?.dataset.customerName || '').trim();
+
+        if (!customerId) {
+            return;
+        }
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = resolveTemplateUrl(deleteUrlTemplate, customerId);
+        form.dataset.role = 'delete-customer';
+        form.addEventListener('submit', (event) => {
+            const confirmed = window.confirm(`ยืนยันการลบลูกค้า ${customerName || '-'} ?`);
+            if (!confirmed) {
+                event.preventDefault();
+            }
+        });
+
+        const tokenInput = document.createElement('input');
+        tokenInput.type = 'hidden';
+        tokenInput.name = '_token';
+        tokenInput.value = csrfToken;
+
+        const methodInput = document.createElement('input');
+        methodInput.type = 'hidden';
+        methodInput.name = '_method';
+        methodInput.value = 'DELETE';
+
+        const button = document.createElement('button');
+        button.type = 'submit';
+        button.className = 'btn btn-sm btn-outline-danger rounded-pill px-3';
+        button.textContent = 'ลบ';
+
+        form.appendChild(tokenInput);
+        form.appendChild(methodInput);
+        form.appendChild(button);
+        group.appendChild(form);
+    });
+
+    document.querySelectorAll('.membership-next form').forEach((form) => form.remove());
+
+    document.querySelectorAll('.customers-action-group').forEach((group) => {
+        if (!group) {
+            return;
+        }
+
+        const editButton = group.querySelector('.edit-customer-btn');
+        const historyButton = group.querySelector('.history-customer-btn');
+        const existingDeleteForm = group.querySelector('form[data-role="delete-customer"]');
+        const customerId = Number(historyButton?.dataset.customerId || 0);
+        const customerName = String(historyButton?.dataset.customerName || '').trim();
+
+        const decorateActionButton = (button, iconClass, fallbackLabel) => {
+            if (!button) {
+                return;
+            }
+
+            button.classList.add('customers-action-btn');
+            const label = String(button.textContent || '').trim() || fallbackLabel;
+            button.textContent = '';
+
+            const icon = document.createElement('i');
+            icon.className = iconClass;
+
+            const text = document.createElement('span');
+            text.className = 'customers-action-text';
+            text.textContent = label;
+
+            button.appendChild(icon);
+            button.appendChild(text);
+        };
+
+        decorateActionButton(editButton, 'bi bi-pencil-square', 'แก้ไข');
+        decorateActionButton(historyButton, 'bi bi-clock-history', 'ประวัติ');
+
+        if (!customerId) {
+            return;
+        }
+
+        if (existingDeleteForm) {
+            existingDeleteForm.remove();
+        }
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = resolveTemplateUrl(deleteUrlTemplate, customerId);
+        form.dataset.role = 'delete-customer';
+        form.addEventListener('submit', (event) => {
+            const confirmed = window.confirm(`ยืนยันการลบลูกค้า ${customerName || '-'} ?`);
+            if (!confirmed) {
+                event.preventDefault();
+            }
+        });
+
+        const tokenInput = document.createElement('input');
+        tokenInput.type = 'hidden';
+        tokenInput.name = '_token';
+        tokenInput.value = csrfToken;
+
+        const methodInput = document.createElement('input');
+        methodInput.type = 'hidden';
+        methodInput.name = '_method';
+        methodInput.value = 'DELETE';
+
+        const button = document.createElement('button');
+        button.type = 'submit';
+        button.className = 'btn btn-sm btn-outline-danger rounded-pill px-3 customers-action-btn';
+
+        form.appendChild(tokenInput);
+        form.appendChild(methodInput);
+        form.appendChild(button);
+        group.appendChild(form);
+
+        decorateActionButton(button, 'bi bi-trash', 'ลบ');
     });
 
     if (oldForm === 'add_customer') {
