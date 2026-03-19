@@ -22,7 +22,7 @@
             'subtitle' => 'จัดการข้อมูลหมอนวด',
         ],
         [
-            'route' => 'admin.commission',
+            'route' => 'admin.commission.index',
             'icon' => 'bi-percent',
             'title' => 'ตั้งค่าคอมมิชชัน',
             'subtitle' => 'จัดการตั้งค่าคอมมิชชัน',

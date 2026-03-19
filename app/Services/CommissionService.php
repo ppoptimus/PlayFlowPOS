@@ -12,41 +12,44 @@ class CommissionService
      */
     public function processOrderCommissions(int $orderId): void
     {
-        // ดึงรายการใน Order ที่มีการระบุ "หมอนวด" (รองรับทั้ง service และ product)
+        // ดึง branch_id ของ Order เพื่อบันทึกลง commissions
+        $order = DB::table('orders')->where('id', $orderId)->first(['branch_id']);
+        $branchId = $order ? ($order->branch_id ?? null) : null;
+
+        // ดึงรายการใน Order ที่มีการระบุ "หมอนวด" (รองรับทั้ง service, product, package)
         $items = DB::table('order_items')
             ->where('order_id', $orderId)
             ->whereNotNull('masseuse_id')
             ->get();
 
         foreach ($items as $item) {
-            $this->calculateAndSave($item);
+            $this->calculateAndSave($item, $branchId);
         }
     }
 
     /**
      * คำนวณรายรายการ (Item) และบันทึกลงฐานข้อมูล
      */
-    private function calculateAndSave($item): void
+    private function calculateAndSave($item, ?int $branchId): void
     {
-        // 1. ดึงการตั้งค่าคอมมิชชัน (ตรวจสอบทั้ง service_id และ product_id)
-        $column = $item->item_type === 'service' ? 'service_id' : 'product_id';
-
+        // 1. ดึงการตั้งค่าคอมมิชชัน โดยใช้ item_type + item_id
         $config = DB::table('commission_configs')
-            ->where('item_type', $item->item_type) 
+            ->where('item_type', $item->item_type)
             ->where('item_id', $item->item_id)
             ->first();
 
+        // ไม่พบ config = รายการนี้ไม่คิดค่าคอม → ข้ามไป
         if (!$config) return;
 
         $amount = 0;
 
         // 2. คำนวณตามประเภท (Fixed หรือ Percent)
         if ($config->type === 'fixed') {
-            // แบบรายรอบ: (ค่าตอบแทนคงที่) x (จำนวนครั้งที่นวด)
+            // แบบรายรอบ: (ค่าตอบแทนคงที่) x (จำนวนครั้งที่ขาย)
             $amount = (float) $config->value * (int) $item->qty;
         } 
         else if ($config->type === 'percent') {
-            // แบบเปอร์เซ็นต์: หักต้นทุนร้านก่อน (Deduct Cost) ตาม SRS
+            // แบบเปอร์เซ็นต์: หักต้นทุนร้านก่อน (Deduct Cost)
             $unitPrice = (float) $item->unit_price;
             $deductCost = (float) ($config->deduct_cost ?? 0);
             
@@ -61,6 +64,7 @@ class CommissionService
         DB::table('commissions')->updateOrInsert(
             ['order_item_id' => $item->id], // เงื่อนไขตรวจสอบ
             [
+                'branch_id' => $branchId,
                 'masseuse_id' => $item->masseuse_id,
                 'amount' => round($amount, 2), // ปัดเศษ 2 ตำแหน่งตามมาตรฐานบัญชี
                 'calculated_at' => Carbon::now()

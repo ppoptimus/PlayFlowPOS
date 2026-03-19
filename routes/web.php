@@ -69,17 +69,13 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/products/{productId}/adjust-stock', 'ProductController@adjustStock')->name('products.adjust-stock');
 
         // โซนจัดการการตั้งค่าระบบ (Admin Only)
-        Route::group(['middleware' => ['auth']], function () {
-            Route::get('/admin/commission', 'CommissionConfigController@index')->name('admin.commission');
-            Route::post('/admin/commission/store', 'CommissionConfigController@store')->name('admin.commission.store');
-            Route::post('/admin/commission/update', 'CommissionConfigController@update')->name('admin.commission.update');
-            Route::delete('/admin/commission/{id}', 'CommissionConfigController@destroy')->name('admin.commission.destroy');
-        });
+        Route::get('/admin/commission', 'CommissionConfigController@index')->name('admin.commission.index');
+        Route::post('/admin/commission', 'CommissionConfigController@store')->name('admin.commission.store');
+        Route::delete('/admin/commission/{id}', 'CommissionConfigController@destroy')->name('admin.commission.destroy');
     });
 
     $modules = [
-        'staff',
-        'commissions', 'promotions',
+        'staff', 'promotions',
         'reports', 'financial', 'branches', 'users',
     ];
 
