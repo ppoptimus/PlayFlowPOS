@@ -58,7 +58,7 @@
     </a>
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บัญชี & รายงาน</small>
-    <a href="{{ route('reports') }}" class="nav-link link-dark"><i class="bi bi-bar-chart-line-fill me-2"></i> รายงานวิเคราะห์</a>
+    <a href="{{ route('reports') }}" class="nav-link {{ request()->routeIs('reports*') ? 'active' : 'link-dark' }}"><i class="bi bi-bar-chart-line-fill me-2"></i> รายงานวิเคราะห์</a>
     <a href="{{ route('financial') }}" class="nav-link link-dark"><i class="bi bi-wallet2 me-2"></i> การเงิน/P&amp;L</a>
     <a href="{{ route('admin.commission.index') }}" class="nav-link {{ request()->routeIs('admin.commission.*') ? 'active' : 'link-dark' }}"><i class="bi bi-cash-stack me-2"></i> ค่าคอมมิชชัน</a>
 

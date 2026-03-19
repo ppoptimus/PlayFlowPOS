@@ -82,9 +82,13 @@ Route::middleware('auth')->group(function (): void {
         Route::delete('/admin/commission/{id}', 'CommissionConfigController@destroy')->name('admin.commission.destroy');
     });
 
+    // Reports
+    Route::get('/reports', 'ReportController@index')->name('reports');
+    Route::get('/reports/export-csv', 'ReportController@exportCsv')->name('reports.export-csv');
+
     $modules = [
         'staff', 'promotions',
-        'reports', 'financial', 'branches', 'users',
+        'financial', 'branches', 'users',
     ];
 
     foreach ($modules as $module) {

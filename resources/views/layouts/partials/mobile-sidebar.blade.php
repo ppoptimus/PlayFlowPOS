@@ -52,6 +52,12 @@
             'subtitle' => 'ตรวจสอบย้อนหลังและพิมพ์บิล',
         ],
         [
+            'route' => 'reports',
+            'icon' => 'bi-bar-chart-line-fill',
+            'title' => 'รายงานวิเคราะห์',
+            'subtitle' => 'ยอดขาย บริการ หมอนวด สินค้า',
+        ],
+        [
             'route' => 'users',
             'icon' => 'bi-shield-check',
             'title' => 'สิทธิ์เข้าใช้',
