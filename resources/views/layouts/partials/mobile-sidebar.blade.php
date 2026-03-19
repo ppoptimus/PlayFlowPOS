@@ -10,7 +10,7 @@
             'subtitle' => 'ตั้งค่าข้อมูลสาขาและร้าน',
         ],
         [
-            'route' => 'products',
+            'route' => 'services.index',
             'icon' => 'bi-list-stars',
             'title' => 'บริการ',
             'subtitle' => 'จัดการบริการและราคา',
@@ -22,16 +22,16 @@
             'subtitle' => 'จัดการข้อมูลหมอนวด',
         ],
         [
-            'route' => 'admin.commission.index',
-            'icon' => 'bi-percent',
-            'title' => 'ตั้งค่าคอมมิชชัน',
-            'subtitle' => 'จัดการตั้งค่าคอมมิชชัน',
-        ],
-        [
             'route' => 'massage-rooms',
             'icon' => 'bi-door-open',
             'title' => 'ห้องนวด',
             'subtitle' => 'จัดการเตียงและห้องนวด',
+        ],
+        [
+            'route' => 'admin.commission.index',
+            'icon' => 'bi-percent',
+            'title' => 'ตั้งค่าคอมมิชชัน',
+            'subtitle' => 'จัดการตั้งค่าคอมมิชชัน',
         ],
          [
             'route' => 'products',
@@ -60,7 +60,7 @@
     ];
 
     if ($canManageMembershipLevels) {
-        array_splice($mobileBackofficeMenus, 6, 0, [[
+        array_splice($mobileBackofficeMenus, 7, 0, [[
             'route' => 'membership-levels',
             'icon' => 'bi-sliders',
             'title' => 'สมาชิก',
@@ -68,8 +68,8 @@
         ], [
             'route' => 'packages',
             'icon' => 'bi-box2-heart',
-            'title' => 'แพ็กเกจ',
-            'subtitle' => 'จัดการแพ็กเกจและยอดคงเหลือ',
+            'title' => 'แพ็กเกจ & โปรโมชั่น',
+            'subtitle' => 'จัดการแพ็กเกจและโปรโมชั่น',
         ]]);
     }
 @endphp

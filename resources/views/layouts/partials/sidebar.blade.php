@@ -48,7 +48,10 @@
         <i class="bi bi-person-badge-fill me-2"></i> หมอนวด
     </a>
     <a href="{{ route('massage-rooms') }}" class="nav-link {{ request()->routeIs('massage-rooms*') ? 'active' : 'link-dark' }}">
-        <i class="bi bi-door-open-fill me-2"></i> ห้องนวด
+        <i class="bi bi-door-open me-2"></i> ห้องนวด
+    </a>
+    <a href="{{ route('services.index') }}" class="nav-link {{ request()->routeIs('services.*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-list-stars me-2"></i> บริการ
     </a>
     <a href="{{ route('products') }}" class="nav-link {{ request()->routeIs('products*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-box-seam-fill me-2"></i> สินค้า & สต็อก

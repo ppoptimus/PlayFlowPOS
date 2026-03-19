@@ -68,6 +68,14 @@ Route::middleware('auth')->group(function (): void {
         Route::delete('/products/categories/{categoryId}', 'ProductController@deleteCategory')->name('products.categories.destroy');
         Route::post('/products/{productId}/adjust-stock', 'ProductController@adjustStock')->name('products.adjust-stock');
 
+        Route::get('/services', 'ServiceManagementController@index')->name('services.index');
+        Route::post('/services', 'ServiceManagementController@store')->name('services.store');
+        Route::put('/services/{serviceId}', 'ServiceManagementController@update')->name('services.update');
+        Route::delete('/services/{serviceId}', 'ServiceManagementController@destroy')->name('services.destroy');
+        Route::post('/services/categories', 'ServiceManagementController@storeCategory')->name('services.categories.store');
+        Route::put('/services/categories/{categoryId}', 'ServiceManagementController@updateCategory')->name('services.categories.update');
+        Route::delete('/services/categories/{categoryId}', 'ServiceManagementController@deleteCategory')->name('services.categories.destroy');
+
         // โซนจัดการการตั้งค่าระบบ (Admin Only)
         Route::get('/admin/commission', 'CommissionConfigController@index')->name('admin.commission.index');
         Route::post('/admin/commission', 'CommissionConfigController@store')->name('admin.commission.store');
