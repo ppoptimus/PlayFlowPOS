@@ -356,7 +356,7 @@
         }
         .mobile-menu-link.active .mobile-menu-arrow { opacity: 1; }
         .mobile-menu-link--logout {
-            border-color: rgba(220, 53, 69, 0.18);
+            border-color: rgba(214, 15, 35, 0.18);
             background: linear-gradient(135deg, rgba(255, 243, 245, 0.98), rgba(255, 250, 250, 0.98));
             color: #c2364d;
             box-shadow: 0 10px 20px rgba(176, 53, 71, 0.08);

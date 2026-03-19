@@ -709,7 +709,7 @@
             align-items: center;
             justify-content: center;
             text-align: center;
-            min-height: 3.1rem;
+            min-height: 1.1rem;
             padding: 0.45rem 0.45rem;
             font-size: 0.76rem;
             line-height: 1.15;

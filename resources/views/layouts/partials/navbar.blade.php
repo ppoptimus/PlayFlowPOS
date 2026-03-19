@@ -154,7 +154,7 @@
                     alt="{{ $navbarProfile['display_name'] }}"
                     width="38"
                     height="38"
-                    class="rounded-circle me-2 border border-primary object-fit-cover"
+                    class="rounded-circle border border-primary object-fit-cover"
                 >
                 <span class="d-none d-md-flex flex-column lh-sm text-start">
                     <span class="small fw-bold">{{ $navbarProfile['display_name'] }}</span>
