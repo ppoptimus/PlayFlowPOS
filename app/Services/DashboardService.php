@@ -2,15 +2,23 @@
 
 namespace App\Services;
 
+use App\User;
 use Carbon\Carbon;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 class DashboardService
 {
-    public function getDashboardStats(?int $branchId = null, string $range = 'today'): array
+    private BranchContextService $branchContext;
+
+    public function __construct(BranchContextService $branchContext)
     {
-        $branch = $this->resolveBranch($branchId);
+        $this->branchContext = $branchContext;
+    }
+
+    public function getDashboardStats(User $user, ?int $branchId = null, string $range = 'today'): array
+    {
+        $branch = $this->resolveBranch($user, $branchId);
         $resolvedBranchId = (int) $branch->id;
         $selectedRange = $this->normalizeRange($range);
         $today = Carbon::today();
@@ -140,15 +148,16 @@ class DashboardService
         ];
     }
 
-    private function resolveBranch(?int $branchId): object
+    private function resolveBranch(User $user, ?int $branchId): object
     {
+        $authorizedBranchId = $this->branchContext->resolveAuthorizedBranchId($user, $branchId);
         $branchQuery = DB::table('branches')
             ->select('id', 'name')
             ->where('is_active', 1);
 
-        if ($branchId !== null && $branchId > 0) {
+        if ($authorizedBranchId > 0) {
             $branch = (clone $branchQuery)
-                ->where('id', $branchId)
+                ->where('id', $authorizedBranchId)
                 ->first();
 
             if ($branch !== null) {

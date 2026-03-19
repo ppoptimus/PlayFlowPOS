@@ -18,6 +18,7 @@ class ReportController extends Controller
     public function index(Request $request)
     {
         $branchId = $this->reportService->resolveBranchId(
+            $request->user(),
             $request->input('branch_id') ? (int) $request->input('branch_id') : null
         );
 
@@ -63,6 +64,7 @@ class ReportController extends Controller
     public function exportCsv(Request $request): StreamedResponse
     {
         $branchId = $this->reportService->resolveBranchId(
+            $request->user(),
             $request->input('branch_id') ? (int) $request->input('branch_id') : null
         );
 

@@ -612,7 +612,7 @@ class MasseuseService
 
     private function canManage(User $user): bool
     {
-        return in_array((string) ($user->role ?? ''), ['admin', 'super_admin'], true);
+        return in_array((string) ($user->role ?? ''), ['super_admin', 'branch_manager'], true);
     }
 
     private function tableExists(string $table): bool

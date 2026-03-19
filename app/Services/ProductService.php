@@ -2,18 +2,23 @@
 
 namespace App\Services;
 
+use App\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ProductService
 {
+    private BranchContextService $branchContext;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    // ─── Page Data ───────────────────────────────────────────────
+    public function __construct(BranchContextService $branchContext)
+    {
+        $this->branchContext = $branchContext;
+    }
 
-    public function getPageData(string $search = '', string $typeFilter = '', ?int $categoryId = null): array
+    public function getPageData(User $user, string $search = '', string $typeFilter = '', ?int $categoryId = null, ?int $requestedBranchId = null): array
     {
         if (!$this->tableExists('products')) {
             return [
@@ -24,12 +29,19 @@ class ProductService
                 'products' => [],
                 'categories' => [],
                 'lowStockProducts' => [],
+                'activeBranchId' => $this->branchContext->resolveAuthorizedBranchId($user, $requestedBranchId),
             ];
         }
 
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user, $requestedBranchId);
         $normalizedSearch = trim($search);
 
-        $query = DB::table('products')->orderBy('id');
+        $query = DB::table('products')
+            ->orderBy('id');
+
+        if ($this->hasColumn('products', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
 
         if ($normalizedSearch !== '' && $this->hasColumn('products', 'name')) {
             $query->where(function ($q) use ($normalizedSearch): void {
@@ -78,12 +90,18 @@ class ProductService
 
         $lowStockProducts = [];
         if ($this->hasColumn('products', 'min_stock')) {
-            $lowStockProducts = DB::table('products')
+            $lowStockQuery = DB::table('products')
                 ->whereColumn('stock_qty', '<', DB::raw('min_stock'))
                 ->where('min_stock', '>', 0)
                 ->where('is_active', 1)
                 ->orderBy('stock_qty')
-                ->limit(50)
+                ->limit(50);
+
+            if ($this->hasColumn('products', 'branch_id')) {
+                $lowStockQuery->where('branch_id', $branchId);
+            }
+
+            $lowStockProducts = $lowStockQuery
                 ->get(['id', 'name', 'stock_qty', 'min_stock', 'type'])
                 ->map(static function ($row): array {
                     return [
@@ -105,14 +123,14 @@ class ProductService
             'products' => $products,
             'categories' => $categories,
             'lowStockProducts' => $lowStockProducts,
+            'activeBranchId' => $branchId,
         ];
     }
 
-    // ─── Product CRUD ────────────────────────────────────────────
-
-    public function createProduct(array $payload): void
+    public function createProduct(User $user, array $payload): void
     {
         $this->assertModuleReady();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
 
         $name = trim((string) ($payload['name'] ?? ''));
         if ($name === '') {
@@ -121,25 +139,29 @@ class ProductService
             ]);
         }
 
-        $exists = DB::table('products')
-            ->where('name', $name)
-            ->exists();
+        $existsQuery = DB::table('products')
+            ->where('name', $name);
+        if ($this->hasColumn('products', 'branch_id')) {
+            $existsQuery->where('branch_id', $branchId);
+        }
 
-        if ($exists) {
+        if ($existsQuery->exists()) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อสินค้านี้มีอยู่แล้ว'],
+                'name' => ['ชื่อสินค้านี้มีอยู่แล้วในสาขานี้'],
             ]);
         }
 
         $sku = $this->normalizeNullableString($payload['sku'] ?? null);
         if ($sku !== null) {
             $skuExists = DB::table('products')
-                ->where('sku', $sku)
-                ->exists();
+                ->where('sku', $sku);
+            if ($this->hasColumn('products', 'branch_id')) {
+                $skuExists->where('branch_id', $branchId);
+            }
 
-            if ($skuExists) {
+            if ($skuExists->exists()) {
                 throw ValidationException::withMessages([
-                    'sku' => ['รหัส SKU นี้มีอยู่แล้ว'],
+                    'sku' => ['รหัส SKU นี้มีอยู่แล้วในสาขานี้'],
                 ]);
             }
         }
@@ -147,12 +169,14 @@ class ProductService
         $barcode = $this->normalizeNullableString($payload['barcode'] ?? null);
         if ($barcode !== null) {
             $barcodeExists = DB::table('products')
-                ->where('barcode', $barcode)
-                ->exists();
+                ->where('barcode', $barcode);
+            if ($this->hasColumn('products', 'branch_id')) {
+                $barcodeExists->where('branch_id', $branchId);
+            }
 
-            if ($barcodeExists) {
+            if ($barcodeExists->exists()) {
                 throw ValidationException::withMessages([
-                    'barcode' => ['บาร์โค้ดนี้มีอยู่แล้ว'],
+                    'barcode' => ['บาร์โค้ดนี้มีอยู่แล้วในสาขานี้'],
                 ]);
             }
         }
@@ -170,6 +194,9 @@ class ProductService
             'is_active' => true,
         ];
 
+        if ($this->hasColumn('products', 'branch_id')) {
+            $row['branch_id'] = $branchId;
+        }
         if ($this->hasColumn('products', 'created_at')) {
             $row['created_at'] = now();
         }
@@ -180,17 +207,15 @@ class ProductService
         DB::table('products')->insert($row);
     }
 
-    public function updateProduct(int $productId, array $payload): void
+    public function updateProduct(User $user, int $productId, array $payload): void
     {
         $this->assertModuleReady();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
 
-        $existing = DB::table('products')
-            ->where('id', $productId)
-            ->first(['id']);
-
+        $existing = $this->findScopedProduct($productId, $branchId);
         if ($existing === null) {
             throw ValidationException::withMessages([
-                'product' => ['ไม่พบสินค้าที่ต้องการแก้ไข'],
+                'product' => ['ไม่พบสินค้าที่ต้องการแก้ไขในสาขานี้'],
             ]);
         }
 
@@ -203,12 +228,14 @@ class ProductService
 
         $nameExists = DB::table('products')
             ->where('name', $name)
-            ->where('id', '!=', $productId)
-            ->exists();
+            ->where('id', '!=', $productId);
+        if ($this->hasColumn('products', 'branch_id')) {
+            $nameExists->where('branch_id', $branchId);
+        }
 
-        if ($nameExists) {
+        if ($nameExists->exists()) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อสินค้านี้มีอยู่แล้ว'],
+                'name' => ['ชื่อสินค้านี้มีอยู่แล้วในสาขานี้'],
             ]);
         }
 
@@ -216,12 +243,14 @@ class ProductService
         if ($sku !== null) {
             $skuExists = DB::table('products')
                 ->where('sku', $sku)
-                ->where('id', '!=', $productId)
-                ->exists();
+                ->where('id', '!=', $productId);
+            if ($this->hasColumn('products', 'branch_id')) {
+                $skuExists->where('branch_id', $branchId);
+            }
 
-            if ($skuExists) {
+            if ($skuExists->exists()) {
                 throw ValidationException::withMessages([
-                    'sku' => ['รหัส SKU นี้มีอยู่แล้ว'],
+                    'sku' => ['รหัส SKU นี้มีอยู่แล้วในสาขานี้'],
                 ]);
             }
         }
@@ -230,12 +259,14 @@ class ProductService
         if ($barcode !== null) {
             $barcodeExists = DB::table('products')
                 ->where('barcode', $barcode)
-                ->where('id', '!=', $productId)
-                ->exists();
+                ->where('id', '!=', $productId);
+            if ($this->hasColumn('products', 'branch_id')) {
+                $barcodeExists->where('branch_id', $branchId);
+            }
 
-            if ($barcodeExists) {
+            if ($barcodeExists->exists()) {
                 throw ValidationException::withMessages([
-                    'barcode' => ['บาร์โค้ดนี้มีอยู่แล้ว'],
+                    'barcode' => ['บาร์โค้ดนี้มีอยู่แล้วในสาขานี้'],
                 ]);
             }
         }
@@ -262,17 +293,15 @@ class ProductService
             ->update($updates);
     }
 
-    public function deleteProduct(int $productId): void
+    public function deleteProduct(User $user, int $productId): void
     {
         $this->assertModuleReady();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
 
-        $existing = DB::table('products')
-            ->where('id', $productId)
-            ->first(['id']);
-
+        $existing = $this->findScopedProduct($productId, $branchId);
         if ($existing === null) {
             throw ValidationException::withMessages([
-                'product' => ['ไม่พบสินค้าที่ต้องการลบ'],
+                'product' => ['ไม่พบสินค้าที่ต้องการลบในสาขานี้'],
             ]);
         }
 
@@ -283,12 +312,14 @@ class ProductService
                 ->exists();
 
         if ($usedInOrders) {
+            $updates = ['is_active' => false];
+            if ($this->hasColumn('products', 'updated_at')) {
+                $updates['updated_at'] = now();
+            }
+
             DB::table('products')
                 ->where('id', $productId)
-                ->update([
-                    'is_active' => false,
-                    'updated_at' => $this->hasColumn('products', 'updated_at') ? now() : null,
-                ]);
+                ->update($updates);
         } else {
             DB::table('products')
                 ->where('id', $productId)
@@ -296,19 +327,15 @@ class ProductService
         }
     }
 
-    // ─── Stock Adjustment ────────────────────────────────────────
-
-    public function adjustStock(int $productId, int $adjustQty): void
+    public function adjustStock(User $user, int $productId, int $adjustQty): void
     {
         $this->assertModuleReady();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
 
-        $existing = DB::table('products')
-            ->where('id', $productId)
-            ->first(['id', 'stock_qty']);
-
+        $existing = $this->findScopedProduct($productId, $branchId, ['id', 'stock_qty']);
         if ($existing === null) {
             throw ValidationException::withMessages([
-                'product' => ['ไม่พบสินค้าที่ต้องการปรับสต็อก'],
+                'product' => ['ไม่พบสินค้าที่ต้องการปรับสต็อกในสาขานี้'],
             ]);
         }
 
@@ -332,8 +359,6 @@ class ProductService
             ->where('id', $productId)
             ->update($updates);
     }
-
-    // ─── Category CRUD ───────────────────────────────────────────
 
     public function getCategories(): array
     {
@@ -375,7 +400,6 @@ class ProductService
         }
 
         $row = ['name' => $name];
-
         if ($this->hasColumn('product_categories', 'created_at')) {
             $row['created_at'] = now();
         }
@@ -453,7 +477,17 @@ class ProductService
             ->delete();
     }
 
-    // ─── Internal Helpers ────────────────────────────────────────
+    private function findScopedProduct(int $productId, int $branchId, array $columns = ['id']): ?object
+    {
+        $query = DB::table('products')
+            ->where('id', $productId);
+
+        if ($this->hasColumn('products', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query->first($columns);
+    }
 
     private function assertModuleReady(): void
     {

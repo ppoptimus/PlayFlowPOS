@@ -30,11 +30,11 @@ class PosService
 
         return [
             'activeBranchId' => $branchId,
-            'items' => $this->getPosItems(),
-            'serviceItems' => $this->getServiceItems(),
+            'items' => $this->getPosItems($branchId),
+            'serviceItems' => $this->getServiceItems($branchId),
             'staff' => $this->getStaff($branchId),
             'customers' => $this->getCustomers(),
-            'customerPackageBalances' => $this->packageService->getCustomerPackageBalancesMap(),
+            'customerPackageBalances' => $this->packageService->getCustomerPackageBalancesMap($branchId),
             'bookingContext' => $this->resolveBookingContext($user, $query, $branchId),
         ];
     }
@@ -68,7 +68,7 @@ class PosService
             $paymentMethod,
             $bookingContext
         ): array {
-            $normalized = $this->normalizeCartItems($items, $staffId, $customerId);
+            $normalized = $this->normalizeCartItems($branchId, $items, $staffId, $customerId);
             $normalizedItems = $normalized['items'];
             $discount = max(0.0, $discountAmount);
             $subtotal = array_reduce($normalizedItems, static function (float $carry, array $item): float {
@@ -96,6 +96,7 @@ class PosService
 
             foreach ($normalizedItems as $item) {
                 DB::table('order_items')->insert([
+                    'branch_id' => $branchId,
                     'order_id' => $orderId,
                     'item_type' => $item['item_type'],
                     'item_id' => $item['item_id'],
@@ -109,10 +110,12 @@ class PosService
             $this->commissionService->processOrderCommissions($orderId);
 
             $packagePurchaseSummary = $this->grantPurchasedPackages(
+                $branchId,
                 $customerId,
                 $normalized['package_purchase_plan']
             );
             $packageRedeemSummary = $this->applyPackageRedemptions(
+                $branchId,
                 $normalized['package_usage_plan'],
                 $orderId,
                 isset($user->id) ? (int) $user->id : null
@@ -162,7 +165,7 @@ class PosService
                 'order_no' => $orderNo,
                 'booking' => $booking,
                 'customer_package_balances' => $customerId !== null
-                    ? ($this->packageService->getCustomerPackageBalancesMap()[(string) $customerId] ?? [])
+                    ? ($this->packageService->getCustomerPackageBalancesMap($branchId)[(string) $customerId] ?? [])
                     : [],
                 'packages' => [
                     'purchased' => $packagePurchaseSummary,
@@ -173,20 +176,27 @@ class PosService
         });
     }
 
-    private function getPosItems(): array
+    private function getPosItems(int $branchId): array
     {
         return array_merge(
-            $this->getServiceItems(),
-            $this->getProductItems(),
-            $this->packageService->getPackagesForPos()
+            $this->getServiceItems($branchId),
+            $this->getProductItems($branchId),
+            $this->packageService->getPackagesForPos($branchId)
         );
     }
 
-    private function getServiceItems(): array
+    private function getServiceItems(int $branchId): array
     {
-        return DB::table('services')
+        $query = DB::table('services')
             ->where('is_active', 1)
             ->orderBy('id')
+            ;
+
+        if ($this->hasColumn('services', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query
             ->get(['id', 'name', 'duration_minutes', 'price'])
             ->map(static function ($row): array {
                 return [
@@ -201,12 +211,18 @@ class PosService
             ->all();
     }
 
-    private function getProductItems(): array
+    private function getProductItems(int $branchId): array
     {
-        return DB::table('products')
+        $query = DB::table('products')
             ->where('type', 'retail')
             ->where('is_active', 1)
-            ->orderBy('id')
+            ->orderBy('id');
+
+        if ($this->hasColumn('products', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query
             ->get(['id', 'name', 'sell_price'])
             ->map(static function ($row): array {
                 return [
@@ -253,12 +269,12 @@ class PosService
     }
 
 
-    private function normalizeCartItems(array $items, ?int $staffId, ?int $customerId): array
+    private function normalizeCartItems(int $branchId, array $items, ?int $staffId, ?int $customerId): array
     {
         $normalized = [];
         $packageUsagePlan = [];
         $packagePurchasePlan = [];
-        $availablePackageBalances = $this->loadCustomerPackageBalancesForRedeem($customerId);
+        $availablePackageBalances = $this->loadCustomerPackageBalancesForRedeem($branchId, $customerId);
 
         foreach ($items as $index => $item) {
             $type = isset($item['type']) ? (string) $item['type'] : '';
@@ -281,6 +297,7 @@ class PosService
                 $service = DB::table('services')
                     ->where('id', $itemId)
                     ->where('is_active', 1)
+                    ->where('branch_id', $branchId)
                     ->first(['id', 'name', 'price']);
 
                 if ($service === null) {
@@ -326,6 +343,7 @@ class PosService
             if ($type === 'product') {
                 $product = DB::table('products')
                     ->where('id', $itemId)
+                    ->where('branch_id', $branchId)
                     ->first(['id', 'sell_price']);
 
                 if ($product === null) {
@@ -354,6 +372,7 @@ class PosService
 
             $package = DB::table('packages')
                 ->where('id', $itemId)
+                ->where('branch_id', $branchId)
                 ->first(['id', 'price']);
 
             if ($package === null) {
@@ -386,7 +405,7 @@ class PosService
         ];
     }
 
-    private function loadCustomerPackageBalancesForRedeem(?int $customerId): array
+    private function loadCustomerPackageBalancesForRedeem(int $branchId, ?int $customerId): array
     {
         if (
             $customerId === null ||
@@ -399,6 +418,7 @@ class PosService
 
         return DB::table('customer_packages as cp')
             ->join('packages as p', 'p.id', '=', 'cp.package_id')
+            ->where('cp.branch_id', $branchId)
             ->where('cp.customer_id', $customerId)
             ->where('cp.remaining_qty', '>', 0)
             ->where(function ($query): void {
@@ -560,7 +580,7 @@ class PosService
         return trim($keyword);
     }
 
-    private function grantPurchasedPackages(?int $customerId, array $purchasePlan): array
+    private function grantPurchasedPackages(int $branchId, ?int $customerId, array $purchasePlan): array
     {
         if (empty($purchasePlan)) {
             return [];
@@ -580,7 +600,8 @@ class PosService
 
             $package = DB::table('packages')
                 ->where('id', $packageId)
-                ->first(['id', 'name', 'total_qty', 'valid_days']);
+                ->where('branch_id', $branchId)
+                ->first(['id', 'name', 'branch_id', 'total_qty', 'valid_days']);
 
             if ($package === null) {
                 continue;
@@ -595,6 +616,7 @@ class PosService
 
             for ($i = 0; $i < $qty; $i++) {
                 DB::table('customer_packages')->insert([
+                    'branch_id' => (int) ($package->branch_id ?? $branchId),
                     'customer_id' => $customerId,
                     'package_id' => (int) $package->id,
                     'remaining_qty' => $remainingQty,
@@ -613,7 +635,7 @@ class PosService
         return $summary;
     }
 
-    private function applyPackageRedemptions(array $usagePlan, int $orderId, ?int $actorUserId): array
+    private function applyPackageRedemptions(int $branchId, array $usagePlan, int $orderId, ?int $actorUserId): array
     {
         if (empty($usagePlan) || !$this->tableExists('customer_packages')) {
             return [];
@@ -630,6 +652,7 @@ class PosService
 
             $affectedRows = DB::table('customer_packages')
                 ->where('id', $customerPackageId)
+                ->where('branch_id', $branchId)
                 ->where('remaining_qty', '>=', $qty)
                 ->decrement('remaining_qty', $qty);
 
@@ -640,6 +663,7 @@ class PosService
             }
 
             DB::table('order_items')->insert([
+                'branch_id' => $branchId,
                 'order_id' => $orderId,
                 'item_type' => 'package',
                 'item_id' => $packageId,
@@ -899,4 +923,3 @@ class PosService
         return (bool) $this->columnExistsCache[$cacheKey];
     }
 }
-

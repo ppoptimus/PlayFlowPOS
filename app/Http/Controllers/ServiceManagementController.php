@@ -22,8 +22,11 @@ class ServiceManagementController extends Controller
         $categoryId = $request->has('category_id') && $request->query('category_id') !== ''
             ? (int) $request->query('category_id')
             : null;
+        $branchId = $request->has('branch_id') && $request->query('branch_id') !== ''
+            ? (int) $request->query('branch_id')
+            : null;
 
-        $pageData = $this->serviceManagement->getPageData($search, $categoryId);
+        $pageData = $this->serviceManagement->getPageData($request->user(), $search, $categoryId, $branchId);
 
         return view('services.index', $pageData);
     }
@@ -37,7 +40,7 @@ class ServiceManagementController extends Controller
             'price' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $this->serviceManagement->createService($request->all());
+        $this->serviceManagement->createService($request->user(), $request->all());
 
         return redirect()
             ->route('services.index')
@@ -54,7 +57,7 @@ class ServiceManagementController extends Controller
             'is_active' => ['nullable'],
         ]);
 
-        $this->serviceManagement->updateService($serviceId, $request->all());
+        $this->serviceManagement->updateService($request->user(), $serviceId, $request->all());
 
         return redirect()
             ->route('services.index')
@@ -63,7 +66,7 @@ class ServiceManagementController extends Controller
 
     public function destroy(int $serviceId): RedirectResponse
     {
-        $this->serviceManagement->deleteService($serviceId);
+        $this->serviceManagement->deleteService($request->user(), $serviceId);
 
         return redirect()
             ->route('services.index')
@@ -76,7 +79,7 @@ class ServiceManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        $this->serviceManagement->createCategory($request->all());
+        $this->serviceManagement->createCategory($request->user(), $request->all());
 
         return redirect()
             ->route('services.index')
@@ -89,7 +92,7 @@ class ServiceManagementController extends Controller
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        $this->serviceManagement->updateCategory($categoryId, $request->all());
+        $this->serviceManagement->updateCategory($request->user(), $categoryId, $request->all());
 
         return redirect()
             ->route('services.index')
@@ -98,7 +101,7 @@ class ServiceManagementController extends Controller
 
     public function deleteCategory(int $categoryId): RedirectResponse
     {
-        $this->serviceManagement->deleteCategory($categoryId);
+        $this->serviceManagement->deleteCategory($request->user(), $categoryId);
 
         return redirect()
             ->route('services.index')

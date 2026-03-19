@@ -27,6 +27,7 @@ Route::middleware('auth')->group(function (): void {
     Route::post('/booking', 'BookingController@store')->name('booking.store');
     Route::put('/booking/{bookingId}', 'BookingController@update')->name('booking.update');
     Route::delete('/booking/{bookingId}', 'BookingController@destroy')->name('booking.destroy');
+    Route::get('/my-profile', 'StaffManagementController@profile')->name('profile.show');
     Route::get('/masseuse', 'MasseuseController@index')->name('masseuse');
     Route::post('/masseuse/attendance', 'MasseuseController@updateAttendance')->name('masseuse.attendance');
     Route::get('/customers', 'CustomerController@index')->name('customers');
@@ -80,6 +81,25 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/admin/commission', 'CommissionConfigController@index')->name('admin.commission.index');
         Route::post('/admin/commission', 'CommissionConfigController@store')->name('admin.commission.store');
         Route::delete('/admin/commission/{id}', 'CommissionConfigController@destroy')->name('admin.commission.destroy');
+
+        // สาขา (Branch Management)
+        Route::get('/branches', 'BranchController@index')->name('branches.index');
+        Route::post('/branches', 'BranchController@store')->name('branches.store');
+        Route::put('/branches/{branchId}', 'BranchController@update')->name('branches.update');
+        Route::delete('/branches/{branchId}', 'BranchController@destroy')->name('branches.destroy');
+
+        // พนักงาน (Staff Management)
+        Route::get('/staff', 'StaffManagementController@index')->name('staff.index');
+        Route::post('/staff', 'StaffManagementController@store')->name('staff.store');
+        Route::put('/staff/{staffId}', 'StaffManagementController@update')->name('staff.update');
+        Route::delete('/staff/{staffId}', 'StaffManagementController@destroy')->name('staff.destroy');
+
+        // ผู้ใช้งาน (User Accounts)
+        Route::get('/users', 'UserAccountController@index')->name('users.index');
+        Route::post('/users', 'UserAccountController@store')->name('users.store');
+        Route::put('/users/{userId}', 'UserAccountController@update')->name('users.update');
+        Route::post('/users/{userId}/reset-password', 'UserAccountController@resetPassword')->name('users.reset-password');
+        Route::delete('/users/{userId}', 'UserAccountController@destroy')->name('users.destroy');
     });
 
     // Reports
@@ -87,8 +107,7 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/reports/export-csv', 'ReportController@exportCsv')->name('reports.export-csv');
 
     $modules = [
-        'staff', 'promotions',
-        'financial', 'branches', 'users',
+        'promotions', 'financial',
     ];
 
     foreach ($modules as $module) {

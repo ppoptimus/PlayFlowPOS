@@ -202,34 +202,20 @@
         .navbar.sticky-top .link-dark,
         .navbar.sticky-top .dropdown-toggle,
         .navbar.sticky-top .pf-fa-icon { color: #ffffff !important; }
-        .navbar.sticky-top .dropdown-toggle {
+        .navbar.sticky-top .pf-navbar-actions {
+            gap: 0;
+        }
+        .navbar.sticky-top .pf-navbar-profile-link {
             background-color: rgba(255, 255, 255, 0.16) !important;
-            border: 1px solid rgba(255, 255, 255, 0.26);
+            border: 1px solid rgba(255, 255, 255, 0.26) !important;
+            color: #ffffff !important;
         }
-        .navbar.sticky-top .dropdown-toggle:hover { background-color: rgba(255, 255, 255, 0.24) !important; }
+        .navbar.sticky-top .pf-navbar-profile-link:hover,
+        .navbar.sticky-top .pf-navbar-profile-link:focus-visible {
+            background-color: rgba(255, 255, 255, 0.24) !important;
+            color: #ffffff !important;
+        }
         .navbar.sticky-top img.border-primary { border-color: rgba(255, 255, 255, 0.82) !important; }
-        .navbar.sticky-top .dropdown-menu {
-            background: #ffffff;
-            border: 1px solid rgba(31, 115, 224, 0.14) !important;
-        }
-        .navbar.sticky-top .dropdown-menu .dropdown-item,
-        .navbar.sticky-top .dropdown-menu .dropdown-item-text {
-            color: #1e3e5f !important;
-        }
-        .navbar.sticky-top .dropdown-menu .text-muted {
-            color: #6b7f93 !important;
-        }
-        .navbar.sticky-top .dropdown-menu .pf-fa-icon {
-            color: currentColor !important;
-        }
-        .navbar.sticky-top .dropdown-menu .dropdown-item.text-danger,
-        .navbar.sticky-top .dropdown-menu .dropdown-item.text-danger .pf-fa-icon {
-            color: #dc3545 !important;
-        }
-        .navbar.sticky-top .dropdown-menu .dropdown-item:hover,
-        .navbar.sticky-top .dropdown-menu .dropdown-item:focus {
-            background-color: #eef5ff;
-        }
         .navbar.sticky-top .mobile-menu-btn {
             position: relative;
             overflow: hidden;
@@ -369,6 +355,21 @@
             flex-shrink: 0;
         }
         .mobile-menu-link.active .mobile-menu-arrow { opacity: 1; }
+        .mobile-menu-link--logout {
+            border-color: rgba(220, 53, 69, 0.18);
+            background: linear-gradient(135deg, rgba(255, 243, 245, 0.98), rgba(255, 250, 250, 0.98));
+            color: #c2364d;
+            box-shadow: 0 10px 20px rgba(176, 53, 71, 0.08);
+        }
+        .mobile-menu-link--logout:hover {
+            border-color: rgba(220, 53, 69, 0.3);
+            background: linear-gradient(135deg, rgba(255, 232, 236, 0.98), rgba(255, 247, 248, 0.98));
+            color: #b52e45;
+        }
+        .mobile-menu-link--logout .mobile-menu-icon {
+            background: rgba(220, 53, 69, 0.1);
+            color: #c2364d;
+        }
         .form-control,
         .form-select,
         textarea.form-control {

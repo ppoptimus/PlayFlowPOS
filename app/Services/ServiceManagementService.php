@@ -2,19 +2,31 @@
 
 namespace App\Services;
 
+use App\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class ServiceManagementService
 {
-    // ─── Page Data ───────────────────────────────────────────────
+    private BranchContextService $branchContext;
 
-    public function getPageData(string $search = '', ?int $categoryId = null): array
+    public function __construct(BranchContextService $branchContext)
     {
+        $this->branchContext = $branchContext;
+    }
+
+    public function getPageData(User $user, string $search = '', ?int $categoryId = null, ?int $requestedBranchId = null): array
+    {
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user, $requestedBranchId);
         $normalizedSearch = trim($search);
 
-        $query = DB::table('services')->orderBy('id');
+        $query = DB::table('services')
+            ->orderBy('id');
+
+        if (Schema::hasColumn('services', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
 
         if ($normalizedSearch !== '') {
             $query->where('name', 'like', '%' . $normalizedSearch . '%');
@@ -38,20 +50,18 @@ class ServiceManagementService
             })
             ->all();
 
-        $categories = $this->getCategories();
-
         return [
             'search' => $normalizedSearch,
             'categoryFilter' => $categoryId,
             'services' => $services,
-            'categories' => $categories,
+            'categories' => $this->getCategories($branchId),
+            'activeBranchId' => $branchId,
         ];
     }
 
-    // ─── Service CRUD ────────────────────────────────────────────
-
-    public function createService(array $payload): void
+    public function createService(User $user, array $payload): void
     {
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
         $name = trim((string) ($payload['name'] ?? ''));
         if ($name === '') {
             throw ValidationException::withMessages([
@@ -60,29 +70,36 @@ class ServiceManagementService
         }
 
         $exists = DB::table('services')
-            ->where('name', $name)
-            ->exists();
+            ->where('name', $name);
+        if (Schema::hasColumn('services', 'branch_id')) {
+            $exists->where('branch_id', $branchId);
+        }
 
-        if ($exists) {
+        if ($exists->exists()) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อบริการนี้มีอยู่แล้ว'],
+                'name' => ['ชื่อบริการนี้มีอยู่แล้วในสาขานี้'],
             ]);
         }
 
-        DB::table('services')->insert([
+        $row = [
             'name' => $name,
             'category_id' => $this->normalizeNullableId($payload['category_id'] ?? null),
             'duration_minutes' => max(1, (int) ($payload['duration_minutes'] ?? 60)),
             'price' => $this->normalizeMoney($payload['price'] ?? 0),
             'is_active' => true,
-        ]);
+        ];
+
+        if (Schema::hasColumn('services', 'branch_id')) {
+            $row['branch_id'] = $branchId;
+        }
+
+        DB::table('services')->insert($row);
     }
 
-    public function updateService(int $serviceId, array $payload): void
+    public function updateService(User $user, int $serviceId, array $payload): void
     {
-        $existing = DB::table('services')
-            ->where('id', $serviceId)
-            ->first(['id']);
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
+        $existing = $this->findScopedService($serviceId, $branchId);
 
         if ($existing === null) {
             throw ValidationException::withMessages([
@@ -99,12 +116,14 @@ class ServiceManagementService
 
         $nameExists = DB::table('services')
             ->where('name', $name)
-            ->where('id', '!=', $serviceId)
-            ->exists();
+            ->where('id', '!=', $serviceId);
+        if (Schema::hasColumn('services', 'branch_id')) {
+            $nameExists->where('branch_id', $branchId);
+        }
 
-        if ($nameExists) {
+        if ($nameExists->exists()) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อบริการนี้มีอยู่แล้ว'],
+                'name' => ['ชื่อบริการนี้มีอยู่แล้วในสาขานี้'],
             ]);
         }
 
@@ -119,11 +138,10 @@ class ServiceManagementService
             ]);
     }
 
-    public function deleteService(int $serviceId): void
+    public function deleteService(User $user, int $serviceId): void
     {
-        $existing = DB::table('services')
-            ->where('id', $serviceId)
-            ->first(['id']);
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
+        $existing = $this->findScopedService($serviceId, $branchId);
 
         if ($existing === null) {
             throw ValidationException::withMessages([
@@ -131,7 +149,6 @@ class ServiceManagementService
             ]);
         }
 
-        // ถ้ามีออเดอร์อ้างอิง → soft-delete (is_active=0) แทนลบจริง
         $usedInOrders = Schema::hasTable('order_items')
             && DB::table('order_items')
                 ->where('item_type', 'service')
@@ -149,16 +166,20 @@ class ServiceManagementService
         }
     }
 
-    // ─── Category CRUD ───────────────────────────────────────────
-
-    public function getCategories(): array
+    public function getCategories(int $branchId): array
     {
         if (!Schema::hasTable('service_categories')) {
             return [];
         }
 
-        return DB::table('service_categories')
-            ->orderBy('id')
+        $query = DB::table('service_categories')
+            ->orderBy('id');
+
+        if (Schema::hasColumn('service_categories', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query
             ->get(['id', 'name'])
             ->map(static function ($row): array {
                 return [
@@ -169,8 +190,9 @@ class ServiceManagementService
             ->all();
     }
 
-    public function createCategory(array $payload): void
+    public function createCategory(User $user, array $payload): void
     {
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
         $name = trim((string) ($payload['name'] ?? ''));
         if ($name === '') {
             throw ValidationException::withMessages([
@@ -179,23 +201,29 @@ class ServiceManagementService
         }
 
         $exists = DB::table('service_categories')
-            ->where('name', $name)
-            ->exists();
+            ->where('name', $name);
+        if (Schema::hasColumn('service_categories', 'branch_id')) {
+            $exists->where('branch_id', $branchId);
+        }
 
-        if ($exists) {
+        if ($exists->exists()) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อหมวดหมู่นี้มีอยู่แล้ว'],
+                'name' => ['ชื่อหมวดหมู่นี้มีอยู่แล้วในสาขานี้'],
             ]);
         }
 
-        DB::table('service_categories')->insert(['name' => $name]);
+        $row = ['name' => $name];
+        if (Schema::hasColumn('service_categories', 'branch_id')) {
+            $row['branch_id'] = $branchId;
+        }
+
+        DB::table('service_categories')->insert($row);
     }
 
-    public function updateCategory(int $categoryId, array $payload): void
+    public function updateCategory(User $user, int $categoryId, array $payload): void
     {
-        $existing = DB::table('service_categories')
-            ->where('id', $categoryId)
-            ->first(['id']);
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
+        $existing = $this->findScopedCategory($categoryId, $branchId);
 
         if ($existing === null) {
             throw ValidationException::withMessages([
@@ -212,12 +240,14 @@ class ServiceManagementService
 
         $nameExists = DB::table('service_categories')
             ->where('name', $name)
-            ->where('id', '!=', $categoryId)
-            ->exists();
+            ->where('id', '!=', $categoryId);
+        if (Schema::hasColumn('service_categories', 'branch_id')) {
+            $nameExists->where('branch_id', $branchId);
+        }
 
-        if ($nameExists) {
+        if ($nameExists->exists()) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อหมวดหมู่นี้มีอยู่แล้ว'],
+                'name' => ['ชื่อหมวดหมู่นี้มีอยู่แล้วในสาขานี้'],
             ]);
         }
 
@@ -226,11 +256,10 @@ class ServiceManagementService
             ->update(['name' => $name]);
     }
 
-    public function deleteCategory(int $categoryId): void
+    public function deleteCategory(User $user, int $categoryId): void
     {
-        $existing = DB::table('service_categories')
-            ->where('id', $categoryId)
-            ->first(['id']);
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
+        $existing = $this->findScopedCategory($categoryId, $branchId);
 
         if ($existing === null) {
             throw ValidationException::withMessages([
@@ -238,17 +267,42 @@ class ServiceManagementService
             ]);
         }
 
-        // ปลด category ออกจาก services ก่อนลบ
-        DB::table('services')
-            ->where('category_id', $categoryId)
-            ->update(['category_id' => null]);
+        $servicesQuery = DB::table('services')
+            ->where('category_id', $categoryId);
+        if (Schema::hasColumn('services', 'branch_id')) {
+            $servicesQuery->where('branch_id', $branchId);
+        }
+
+        $servicesQuery->update(['category_id' => null]);
 
         DB::table('service_categories')
             ->where('id', $categoryId)
             ->delete();
     }
 
-    // ─── Internal Helpers ────────────────────────────────────────
+    private function findScopedService(int $serviceId, int $branchId): ?object
+    {
+        $query = DB::table('services')
+            ->where('id', $serviceId);
+
+        if (Schema::hasColumn('services', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query->first(['id']);
+    }
+
+    private function findScopedCategory(int $categoryId, int $branchId): ?object
+    {
+        $query = DB::table('service_categories')
+            ->where('id', $categoryId);
+
+        if (Schema::hasColumn('service_categories', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query->first(['id']);
+    }
 
     private function normalizeMoney($value): float
     {

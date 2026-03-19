@@ -19,7 +19,10 @@ class PackageController extends Controller
     public function index(Request $request): View
     {
         $search = (string) $request->query('search', '');
-        $pageData = $this->packageService->getPageData($search);
+        $branchId = $request->has('branch_id') && $request->query('branch_id') !== ''
+            ? (int) $request->query('branch_id')
+            : null;
+        $pageData = $this->packageService->getPageData($request->user(), $search, $branchId);
 
         return view('packages.index', $pageData);
     }
@@ -33,7 +36,7 @@ class PackageController extends Controller
             'valid_days' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $this->packageService->createPackage($payload);
+        $this->packageService->createPackage($request->user(), $payload);
 
         return redirect()
             ->route('packages')
@@ -49,7 +52,7 @@ class PackageController extends Controller
             'valid_days' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $this->packageService->updatePackage($packageId, $payload);
+        $this->packageService->updatePackage($request->user(), $packageId, $payload);
 
         return redirect()
             ->route('packages')

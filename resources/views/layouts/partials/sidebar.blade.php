@@ -1,17 +1,38 @@
 <style>
-    .pf-sidebar .nav-link.link-dark { color: #2e3f55 !important; }
+    .pf-sidebar .nav-link.link-dark {
+        color: #2e3f55 !important;
+    }
+
     .pf-sidebar .nav-link.link-dark:hover {
         color: #1f73e0 !important;
         background-color: rgba(31, 115, 224, 0.08) !important;
     }
-    .pf-sidebar .text-muted { color: #5c728a !important; }
+
+    .pf-sidebar .text-muted {
+        color: #5c728a !important;
+    }
+
+    .pf-sidebar .sidebar-logout-btn {
+        border-radius: 0.85rem;
+        border: 1px solid rgba(220, 53, 69, 0.16);
+        background: linear-gradient(135deg, rgba(255, 241, 243, 0.98), rgba(255, 250, 250, 0.98));
+        color: #bf3147 !important;
+        font-weight: 700;
+        box-shadow: 0 8px 18px rgba(176, 53, 71, 0.08);
+    }
+
+    .pf-sidebar .sidebar-logout-btn:hover {
+        color: #a82940 !important;
+        background: linear-gradient(135deg, rgba(255, 231, 235, 0.98), rgba(255, 247, 248, 0.98));
+    }
 </style>
 
 <div class="pf-sidebar">
 @php
     $sidebarRole = (string) (auth()->user()->role ?? '');
-    $canManageMembershipLevels = in_array($sidebarRole, ['admin', 'super_admin'], true);
+    $canManageMembershipLevels = in_array($sidebarRole, ['super_admin', 'branch_manager'], true);
 @endphp
+
 <div class="mb-4 px-2">
     <h4 class="fw-bold text-primary mb-0"><i class="bi bi-flower1"></i> PlayFlow</h4>
     <small class="text-muted text-uppercase fw-bold" style="font-size: 0.65rem; letter-spacing: 1px;">Spa Management System</small>
@@ -28,7 +49,7 @@
     <a href="{{ route('receipts') }}" class="nav-link {{ request()->routeIs('receipts*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-receipt-cutoff me-2"></i> ใบเสร็จ
     </a>
-    <a href="{{ route('booking') }}" class="nav-link {{ request()->routeIs('booking') ? 'active' : 'link-dark' }}">
+    <a href="{{ route('booking') }}" class="nav-link {{ request()->routeIs('booking*') ? 'active' : 'link-dark' }}">
         <i class="bi bi-calendar-event-fill me-2"></i> ตารางคิว/จอง
     </a>
 
@@ -58,13 +79,32 @@
     </a>
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บัญชี & รายงาน</small>
-    <a href="{{ route('reports') }}" class="nav-link {{ request()->routeIs('reports*') ? 'active' : 'link-dark' }}"><i class="bi bi-bar-chart-line-fill me-2"></i> รายงานวิเคราะห์</a>
-    <a href="{{ route('financial') }}" class="nav-link link-dark"><i class="bi bi-wallet2 me-2"></i> การเงิน/P&amp;L</a>
-    <a href="{{ route('admin.commission.index') }}" class="nav-link {{ request()->routeIs('admin.commission.*') ? 'active' : 'link-dark' }}"><i class="bi bi-cash-stack me-2"></i> ค่าคอมมิชชัน</a>
+    <a href="{{ route('reports') }}" class="nav-link {{ request()->routeIs('reports*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-bar-chart-line-fill me-2"></i> รายงานวิเคราะห์
+    </a>
+    <a href="{{ route('financial') }}" class="nav-link {{ request()->routeIs('financial*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-wallet2 me-2"></i> การเงิน/P&L
+    </a>
+    <a href="{{ route('admin.commission.index') }}" class="nav-link {{ request()->routeIs('admin.commission.*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-cash-stack me-2"></i> ค่าคอมมิชชัน
+    </a>
 
     <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">ตั้งค่าระบบ</small>
-    <a href="{{ route('branches') }}" class="nav-link link-dark"><i class="bi bi-building-fill me-2"></i> จัดการสาขา</a>
-    <a href="{{ route('users') }}" class="nav-link link-dark"><i class="bi bi-shield-lock-fill me-2"></i> จัดการผู้ใช้งาน</a>
-</div>
+    <a href="{{ route('branches.index') }}" class="nav-link {{ request()->routeIs('branches.*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-building-fill me-2"></i> จัดการสาขา
+    </a>
+    <a href="{{ route('staff.index') }}" class="nav-link {{ request()->routeIs('staff.*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-person-badge-fill me-2"></i> จัดการพนักงาน
+    </a>
+    <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : 'link-dark' }}">
+        <i class="bi bi-shield-lock-fill me-2"></i> จัดการผู้ใช้งาน
+    </a>
 
+    <form method="POST" action="{{ route('logout') }}" class="mt-1">
+        @csrf
+        <button type="submit" class="nav-link sidebar-logout-btn w-100 text-start">
+            <i class="bi bi-box-arrow-right me-2"></i> ออกจากระบบ
+        </button>
+    </form>
+</div>
 </div>

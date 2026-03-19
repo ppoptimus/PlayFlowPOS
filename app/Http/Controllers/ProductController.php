@@ -23,8 +23,11 @@ class ProductController extends Controller
         $categoryId = $request->has('category_id') && $request->query('category_id') !== ''
             ? (int) $request->query('category_id')
             : null;
+        $branchId = $request->has('branch_id') && $request->query('branch_id') !== ''
+            ? (int) $request->query('branch_id')
+            : null;
 
-        $pageData = $this->productService->getPageData($search, $typeFilter, $categoryId);
+        $pageData = $this->productService->getPageData($request->user(), $search, $typeFilter, $categoryId, $branchId);
 
         return view('products.index', $pageData);
     }
@@ -43,7 +46,7 @@ class ProductController extends Controller
             'min_stock' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        $this->productService->createProduct($payload);
+        $this->productService->createProduct($request->user(), $payload);
 
         return redirect()
             ->route('products')
@@ -65,7 +68,7 @@ class ProductController extends Controller
             'is_active' => ['nullable'],
         ]);
 
-        $this->productService->updateProduct($productId, $payload);
+        $this->productService->updateProduct($request->user(), $productId, $payload);
 
         return redirect()
             ->route('products')
@@ -74,7 +77,7 @@ class ProductController extends Controller
 
     public function destroy(Request $request, int $productId): RedirectResponse
     {
-        $this->productService->deleteProduct($productId);
+        $this->productService->deleteProduct($request->user(), $productId);
 
         return redirect()
             ->route('products')
@@ -122,7 +125,7 @@ class ProductController extends Controller
             'adjust_qty' => ['required', 'integer'],
         ]);
 
-        $this->productService->adjustStock($productId, (int) $payload['adjust_qty']);
+        $this->productService->adjustStock($request->user(), $productId, (int) $payload['adjust_qty']);
 
         return redirect()
             ->route('products')

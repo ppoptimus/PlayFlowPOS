@@ -2,18 +2,26 @@
 
 namespace App\Services;
 
+use App\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class PackageService
 {
+    private BranchContextService $branchContext;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    public function getPageData(string $search = ''): array
+    public function __construct(BranchContextService $branchContext)
+    {
+        $this->branchContext = $branchContext;
+    }
+
+    public function getPageData(User $user, string $search = '', ?int $requestedBranchId = null): array
     {
         $normalizedSearch = trim($search);
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user, $requestedBranchId);
 
         if (!$this->tableExists('packages') || !$this->tableExists('customer_packages')) {
             return [
@@ -22,10 +30,15 @@ class PackageService
                 'packages' => [],
                 'balances' => [],
                 'redemptions' => [],
+                'activeBranchId' => $branchId,
             ];
         }
 
-        $packageQuery = DB::table('packages')->orderBy('id');
+        $packageQuery = DB::table('packages')
+            ->orderBy('id');
+        if ($this->hasColumn('packages', 'branch_id')) {
+            $packageQuery->where('branch_id', $branchId);
+        }
         if ($normalizedSearch !== '' && $this->hasColumn('packages', 'name')) {
             $packageQuery->where('name', 'like', '%' . $normalizedSearch . '%');
         }
@@ -43,12 +56,19 @@ class PackageService
             })
             ->all();
 
-        $balances = DB::table('customer_packages as cp')
+        $balanceQuery = DB::table('customer_packages as cp')
             ->leftJoin('customers as c', 'c.id', '=', 'cp.customer_id')
             ->leftJoin('packages as p', 'p.id', '=', 'cp.package_id')
             ->where('cp.remaining_qty', '>', 0)
             ->orderByDesc('cp.id')
-            ->limit(80)
+            ->limit(80);
+        if ($this->hasColumn('customer_packages', 'branch_id')) {
+            $balanceQuery->where('cp.branch_id', $branchId);
+        } elseif ($this->hasColumn('packages', 'branch_id')) {
+            $balanceQuery->where('p.branch_id', $branchId);
+        }
+
+        $balances = $balanceQuery
             ->get([
                 'cp.id',
                 'cp.remaining_qty',
@@ -79,6 +99,10 @@ class PackageService
                 ->where('oi.unit_price', 0)
                 ->orderByDesc('o.created_at')
                 ->limit(80);
+
+            if ($this->hasColumn('orders', 'branch_id')) {
+                $redemptionQuery->where('o.branch_id', $branchId);
+            }
 
             if ($this->tableExists('users')) {
                 $redemptionQuery->leftJoin('users as u', 'u.id', '=', 'oi.masseuse_id');
@@ -112,12 +136,14 @@ class PackageService
             'packages' => $packages,
             'balances' => $balances,
             'redemptions' => $redemptions,
+            'activeBranchId' => $branchId,
         ];
     }
 
-    public function createPackage(array $payload): void
+    public function createPackage(User $user, array $payload): void
     {
         $this->assertModuleReady();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
 
         $name = trim((string) ($payload['name'] ?? ''));
         if ($name === '') {
@@ -127,12 +153,14 @@ class PackageService
         }
 
         $exists = DB::table('packages')
-            ->where('name', $name)
-            ->exists();
+            ->where('name', $name);
+        if ($this->hasColumn('packages', 'branch_id')) {
+            $exists->where('branch_id', $branchId);
+        }
 
-        if ($exists) {
+        if ($exists->exists()) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อแพ็กเกจนี้มีอยู่แล้ว'],
+                'name' => ['ชื่อแพ็กเกจนี้มีอยู่แล้วในสาขานี้'],
             ]);
         }
 
@@ -143,6 +171,9 @@ class PackageService
             'valid_days' => $this->normalizeValidDays($payload['valid_days'] ?? null),
         ];
 
+        if ($this->hasColumn('packages', 'branch_id')) {
+            $row['branch_id'] = $branchId;
+        }
         if ($this->hasColumn('packages', 'created_at')) {
             $row['created_at'] = now();
         }
@@ -153,14 +184,12 @@ class PackageService
         DB::table('packages')->insert($row);
     }
 
-    public function updatePackage(int $packageId, array $payload): void
+    public function updatePackage(User $user, int $packageId, array $payload): void
     {
         $this->assertModuleReady();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
 
-        $existing = DB::table('packages')
-            ->where('id', $packageId)
-            ->first(['id']);
-
+        $existing = $this->findScopedPackage($packageId, $branchId);
         if ($existing === null) {
             throw ValidationException::withMessages([
                 'package' => ['ไม่พบแพ็กเกจที่ต้องการแก้ไข'],
@@ -176,12 +205,14 @@ class PackageService
 
         $nameExists = DB::table('packages')
             ->where('name', $name)
-            ->where('id', '!=', $packageId)
-            ->exists();
+            ->where('id', '!=', $packageId);
+        if ($this->hasColumn('packages', 'branch_id')) {
+            $nameExists->where('branch_id', $branchId);
+        }
 
-        if ($nameExists) {
+        if ($nameExists->exists()) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อแพ็กเกจนี้มีอยู่แล้ว'],
+                'name' => ['ชื่อแพ็กเกจนี้มีอยู่แล้วในสาขานี้'],
             ]);
         }
 
@@ -201,14 +232,19 @@ class PackageService
             ->update($updates);
     }
 
-    public function getPackagesForPos(): array
+    public function getPackagesForPos(int $branchId): array
     {
         if (!$this->tableExists('packages')) {
             return [];
         }
 
-        return DB::table('packages')
-            ->orderBy('id')
+        $query = DB::table('packages')
+            ->orderBy('id');
+        if ($this->hasColumn('packages', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query
             ->get(['id', 'name', 'price'])
             ->map(static function ($row): array {
                 return [
@@ -223,23 +259,32 @@ class PackageService
             ->all();
     }
 
-    public function getCustomerPackageBalancesMap(): array
+    public function getCustomerPackageBalancesMap(?int $branchId = null): array
     {
         if (!$this->tableExists('customer_packages') || !$this->tableExists('packages')) {
             return [];
         }
 
-        $rows = DB::table('customer_packages as cp')
+        $query = DB::table('customer_packages as cp')
             ->join('packages as p', 'p.id', '=', 'cp.package_id')
             ->where('cp.remaining_qty', '>', 0)
             ->orderBy('cp.customer_id')
-            ->orderByDesc('cp.id')
-            ->get([
-                'cp.customer_id',
-                'cp.remaining_qty',
-                'cp.expired_at',
-                'p.name as package_name',
-            ]);
+            ->orderByDesc('cp.id');
+
+        if ($branchId !== null) {
+            if ($this->hasColumn('customer_packages', 'branch_id')) {
+                $query->where('cp.branch_id', $branchId);
+            } elseif ($this->hasColumn('packages', 'branch_id')) {
+                $query->where('p.branch_id', $branchId);
+            }
+        }
+
+        $rows = $query->get([
+            'cp.customer_id',
+            'cp.remaining_qty',
+            'cp.expired_at',
+            'p.name as package_name',
+        ]);
 
         $map = [];
         foreach ($rows as $row) {
@@ -260,6 +305,18 @@ class PackageService
         }
 
         return $map;
+    }
+
+    private function findScopedPackage(int $packageId, int $branchId): ?object
+    {
+        $query = DB::table('packages')
+            ->where('id', $packageId);
+
+        if ($this->hasColumn('packages', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query->first(['id']);
     }
 
     private function assertModuleReady(): void

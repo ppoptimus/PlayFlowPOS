@@ -35,7 +35,7 @@ class BookingService
             'activeBranchId' => $branchId,
             'selectedDate' => $selectedDate,
             'staff' => $this->getStaff($branchId, $selectedDate, true),
-            'serviceItems' => $this->getServiceItems(),
+            'serviceItems' => $this->getServiceItems($branchId),
             'customers' => $this->getCustomers(),
             'beds' => $this->getBeds($branchId),
             'statuses' => [
@@ -134,7 +134,7 @@ class BookingService
         }
 
         foreach ($serviceIds as $selectedServiceId) {
-            $this->ensureServiceExists((int) $selectedServiceId);
+            $this->ensureServiceExists((int) $selectedServiceId, $branchId);
         }
         $this->ensureCustomerExists($customerId);
         $this->ensureMasseuseInBranch($masseuseId, $branchId);
@@ -444,11 +444,18 @@ class BookingService
             ->first(['id']);
     }
 
-    private function getServiceItems(): array
+    private function getServiceItems(int $branchId): array
     {
-        return DB::table('services')
+        $query = DB::table('services')
             ->where('is_active', 1)
             ->orderBy('id')
+            ;
+
+        if ($this->tableExists('services') && Schema::hasColumn('services', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query
             ->get(['id', 'name', 'duration_minutes', 'price'])
             ->map(static function ($row): array {
                 return [
@@ -862,12 +869,17 @@ class BookingService
         }
     }
 
-    private function ensureServiceExists(int $serviceId): void
+    private function ensureServiceExists(int $serviceId, int $branchId): void
     {
-        $exists = DB::table('services')
+        $query = DB::table('services')
             ->where('id', $serviceId)
-            ->where('is_active', 1)
-            ->exists();
+            ->where('is_active', 1);
+
+        if ($this->tableExists('services') && Schema::hasColumn('services', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        $exists = $query->exists();
 
         if (!$exists) {
             throw ValidationException::withMessages([

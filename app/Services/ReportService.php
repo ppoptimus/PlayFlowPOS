@@ -2,11 +2,20 @@
 
 namespace App\Services;
 
+use App\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ReportService
 {
+    private BranchContextService $branchContext;
+
+    public function __construct(BranchContextService $branchContext)
+    {
+        $this->branchContext = $branchContext;
+    }
+
     // ─── Sales Report (Module 13) ─────────────────────────────────────
 
     public function getSalesReport(int $branchId, string $period = 'daily', ?string $dateFrom = null, ?string $dateTo = null): array
@@ -220,7 +229,7 @@ class ReportService
             'date_from' => $range['from']->toDateString(),
             'date_to' => $range['to']->toDateString(),
             'top_products' => $this->buildTopProducts($branchId, $range['from'], $range['to']),
-            'stock_value' => $this->buildStockValue(),
+            'stock_value' => $this->buildStockValue($branchId),
         ];
     }
 
@@ -250,11 +259,18 @@ class ReportService
             ])->all();
     }
 
-    private function buildStockValue(): array
+    private function buildStockValue(int $branchId): array
     {
-        return DB::table('products')
+        $query = DB::table('products')
             ->where('is_active', 1)
             ->orderByDesc(DB::raw('stock_qty * cost_price'))
+            ;
+
+        if (Schema::hasColumn('products', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query
             ->get(['id', 'name', 'sku', 'stock_qty', 'cost_price', 'sell_price'])
             ->map(fn($r) => [
                 'id' => (int) $r->id,
@@ -355,16 +371,8 @@ class ReportService
         });
     }
 
-    public function resolveBranchId(?int $branchId): int
+    public function resolveBranchId(User $user, ?int $branchId): int
     {
-        if ($branchId !== null && $branchId > 0) {
-            $branch = DB::table('branches')->where('id', $branchId)->where('is_active', 1)->first();
-            if ($branch) {
-                return (int) $branch->id;
-            }
-        }
-
-        $branch = DB::table('branches')->where('is_active', 1)->orderBy('id')->first();
-        return $branch ? (int) $branch->id : 1;
+        return $this->branchContext->resolveAuthorizedBranchId($user, $branchId);
     }
 }

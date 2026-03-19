@@ -10,11 +10,10 @@ class EnsureAdminOnly
     public function handle(Request $request, Closure $next)
     {
         $role = (string) ($request->user()->role ?? '');
-        if (!in_array($role, ['admin', 'super_admin'], true)) {
+        if (!in_array($role, ['super_admin', 'branch_manager'], true)) {
             abort(403, 'Admin only');
         }
 
         return $next($request);
     }
 }
-

@@ -1,12 +1,12 @@
 @php
     $mobileSidebarRole = (string) (auth()->user()->role ?? '');
-    $canManageMembershipLevels = in_array($mobileSidebarRole, ['admin', 'super_admin'], true);
+    $canManageMembershipLevels = in_array($mobileSidebarRole, ['super_admin', 'branch_manager'], true);
 
     $mobileBackofficeMenus = [
         [
-            'route' => 'branches',
+            'route' => 'branches.index',
             'icon' => 'bi-shop-window',
-            'title' => 'ข้อมูลร้าน',
+            'title' => 'ข้อมูลร้าน / สาขา',
             'subtitle' => 'ตั้งค่าข้อมูลสาขาและร้าน',
         ],
         [
@@ -30,10 +30,10 @@
         [
             'route' => 'admin.commission.index',
             'icon' => 'bi-percent',
-            'title' => 'ตั้งค่าคอมมิชชัน',
-            'subtitle' => 'จัดการตั้งค่าคอมมิชชัน',
+            'title' => 'ตั้งค่าคอมมิชชั่น',
+            'subtitle' => 'จัดการค่าคอมมิชชั่น',
         ],
-         [
+        [
             'route' => 'products',
             'icon' => 'bi-box-seam-fill',
             'title' => 'สินค้า & สต็อก',
@@ -58,10 +58,16 @@
             'subtitle' => 'ยอดขาย บริการ หมอนวด สินค้า',
         ],
         [
-            'route' => 'users',
+            'route' => 'staff.index',
+            'icon' => 'bi-person-badge',
+            'title' => 'พนักงาน',
+            'subtitle' => 'จัดการข้อมูลพนักงาน',
+        ],
+        [
+            'route' => 'users.index',
             'icon' => 'bi-shield-check',
-            'title' => 'สิทธิ์เข้าใช้',
-            'subtitle' => 'จัดการสิทธิ์ผู้ใช้งาน',
+            'title' => 'ผู้ใช้งานระบบ',
+            'subtitle' => 'จัดการบัญชีและสิทธิ์เข้าใช้',
         ],
     ];
 
@@ -74,14 +80,14 @@
         ], [
             'route' => 'packages',
             'icon' => 'bi-box2-heart',
-            'title' => 'แพ็กเกจ & โปรโมชั่น',
+            'title' => 'แพ็กเกจ',
             'subtitle' => 'จัดการแพ็กเกจและโปรโมชั่น',
         ]]);
     }
 @endphp
 
 <div class="mobile-menu-panel">
-    <p class="mobile-menu-heading mb-3">เมนูหลังบ้าน</p>
+    <p class="mobile-menu-heading mb-3">เมนูหลัก</p>
     <div class="d-flex flex-column gap-2">
         @foreach($mobileBackofficeMenus as $item)
         <a href="{{ route($item['route']) }}" class="mobile-menu-link {{ request()->routeIs($item['route'] . '*') ? 'active' : '' }}">
@@ -93,5 +99,16 @@
             <i class="bi bi-chevron-right mobile-menu-arrow"></i>
         </a>
         @endforeach
+
+        <form method="POST" action="{{ route('logout') }}" class="mt-2">
+            @csrf
+            <button type="submit" class="mobile-menu-link mobile-menu-link--logout w-100 text-start">
+                <span class="mobile-menu-icon"><i class="bi bi-box-arrow-right"></i></span>
+                <span class="mobile-menu-content">
+                    <span class="mobile-menu-title">ออกจากระบบ</span>
+                    <span class="mobile-menu-subtitle">ออกจากบัญชีผู้ใช้งานปัจจุบัน</span>
+                </span>
+            </button>
+        </form>
     </div>
 </div>

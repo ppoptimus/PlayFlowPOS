@@ -18,7 +18,7 @@ class DashboardController extends Controller
     {
         $branchId = request()->has('branch_id') ? (int) request()->query('branch_id') : null;
         $range = (string) request()->query('range', 'today');
-        $stats = $this->dashboardService->getDashboardStats($branchId, $range);
+        $stats = $this->dashboardService->getDashboardStats(request()->user(), $branchId, $range);
 
         return view('dashboard', [
             'stats' => $stats,
