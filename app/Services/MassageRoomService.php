@@ -69,6 +69,7 @@ class MassageRoomService
             ]);
 
             DB::table('beds')->insert([
+                'branch_id' => $branchId,
                 'room_id' => $roomId,
                 'name' => 'เตียง 1',
                 'status' => 'available',
@@ -141,6 +142,7 @@ class MassageRoomService
         }
 
         DB::table('beds')->insert([
+            'branch_id' => $branchId,
             'room_id' => $roomId,
             'name' => $this->normalizeRequiredString($payload['name'] ?? null, 'name', 'กรุณาระบุชื่อเตียง'),
             'status' => $this->normalizeBedStatus($payload['status'] ?? null),
@@ -172,6 +174,7 @@ class MassageRoomService
         DB::table('beds')
             ->where('id', $bedId)
             ->update([
+                'branch_id' => $branchId,
                 'room_id' => $roomId,
                 'name' => $this->normalizeRequiredString($payload['name'] ?? null, 'name', 'กรุณาระบุชื่อเตียง'),
                 'status' => $this->normalizeBedStatus($payload['status'] ?? null),

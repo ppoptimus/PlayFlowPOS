@@ -16,20 +16,27 @@ class CustomerService
         ['value' => 'firm', 'label' => 'หนัก (Firm)'],
     ];
 
+    private BranchContextService $branchContext;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
+    public function __construct(BranchContextService $branchContext)
+    {
+        $this->branchContext = $branchContext;
+    }
+
     public function getPageData(User $user, ?int $selectedCustomerId, string $search): array
     {
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
         $normalizedSearch = trim($search);
-        $customers = $this->getCustomers($normalizedSearch);
+        $customers = $this->getCustomers($branchId, $normalizedSearch);
         $selectedCustomer = null;
         $history = [];
 
         if ($selectedCustomerId !== null && $selectedCustomerId > 0) {
-            $selectedCustomer = $this->findCustomerById($selectedCustomerId);
+            $selectedCustomer = $this->findCustomerById($branchId, $selectedCustomerId);
             if ($selectedCustomer !== null) {
-                $history = $this->getCustomerOrderHistory((int) $selectedCustomer['id']);
+                $history = $this->getCustomerOrderHistory($branchId, (int) $selectedCustomer['id']);
             }
         }
 
@@ -38,42 +45,48 @@ class CustomerService
             'customers' => $customers,
             'selectedCustomer' => $selectedCustomer,
             'history' => $history,
-            'summary' => $this->buildSummary($customers),
+            'summary' => $this->buildSummary($branchId, $customers),
             'pressureLevels' => self::PRESSURE_LEVELS,
             'membershipTiers' => $this->getMembershipTiers(),
         ];
     }
 
-    public function getCustomerById(int $customerId): ?array
+    public function getCustomerById(User $user, int $customerId): ?array
     {
-        return $this->findCustomerById($customerId);
+        return $this->findCustomerById($this->branchContext->resolveAuthorizedBranchId($user), $customerId);
     }
 
-    public function getHistoryByCustomerId(int $customerId): array
+    public function getHistoryByCustomerId(User $user, int $customerId): array
     {
-        return $this->getCustomerOrderHistory($customerId);
+        return $this->getCustomerOrderHistory($this->branchContext->resolveAuthorizedBranchId($user), $customerId);
     }
 
-    public function createCustomer(array $payload): array
+    public function createCustomer(User $user, array $payload): array
     {
         $this->assertCustomersTableExists();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
         $data = $this->sanitizeCustomerData($payload);
+
         if (empty($data)) {
             throw ValidationException::withMessages([
                 'customer' => ['ไม่สามารถบันทึกข้อมูลลูกค้าได้ เพราะโครงสร้างตารางยังไม่พร้อม'],
             ]);
         }
-        $now = now();
+
+        if ($this->hasColumn('customers', 'branch_id')) {
+            $data['branch_id'] = $branchId;
+        }
 
         if ($this->hasColumn('customers', 'created_at')) {
-            $data['created_at'] = $now;
+            $data['created_at'] = now();
         }
+
         if ($this->hasColumn('customers', 'updated_at')) {
-            $data['updated_at'] = $now;
+            $data['updated_at'] = now();
         }
 
         $customerId = (int) DB::table('customers')->insertGetId($data);
-        $customer = $this->findCustomerById($customerId);
+        $customer = $this->findCustomerById($branchId, $customerId);
 
         if ($customer === null) {
             throw ValidationException::withMessages([
@@ -84,10 +97,11 @@ class CustomerService
         return $customer;
     }
 
-    public function updateCustomer(int $customerId, array $payload): array
+    public function updateCustomer(User $user, int $customerId, array $payload): array
     {
         $this->assertCustomersTableExists();
-        $existing = $this->findCustomerById($customerId);
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
+        $existing = $this->findCustomerById($branchId, $customerId);
 
         if ($existing === null) {
             throw ValidationException::withMessages([
@@ -104,32 +118,35 @@ class CustomerService
             return $existing;
         }
 
-        DB::table('customers')
-            ->where('id', $customerId)
-            ->update($data);
+        $query = DB::table('customers')->where('id', $customerId);
+        if ($this->hasColumn('customers', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
 
-        $updated = $this->findCustomerById($customerId);
+        $query->update($data);
+
+        $updated = $this->findCustomerById($branchId, $customerId);
         return $updated !== null ? $updated : $existing;
     }
 
-    public function deleteCustomer(int $customerId): void
+    public function deleteCustomer(User $user, int $customerId): void
     {
         $this->assertCustomersTableExists();
-        $existing = DB::table('customers')
-            ->where('id', $customerId)
-            ->exists();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
 
-        if (!$existing) {
+        if ($this->findCustomerRecord($branchId, $customerId) === null) {
             throw ValidationException::withMessages([
                 'customer' => ['ไม่พบข้อมูลลูกค้าที่ต้องการลบ'],
             ]);
         }
 
         if ($this->tableExists('orders')) {
-            $hasOrders = DB::table('orders')
-                ->where('customer_id', $customerId)
-                ->exists();
-            if ($hasOrders) {
+            $ordersQuery = DB::table('orders')->where('customer_id', $customerId);
+            if ($this->hasColumn('orders', 'branch_id')) {
+                $ordersQuery->where('branch_id', $branchId);
+            }
+
+            if ($ordersQuery->exists()) {
                 throw ValidationException::withMessages([
                     'customer' => ['ลูกค้ารายนี้มีประวัติการชำระเงินแล้ว จึงไม่สามารถลบได้'],
                 ]);
@@ -137,28 +154,33 @@ class CustomerService
         }
 
         if ($this->tableExists('bookings')) {
-            $hasBookings = DB::table('bookings')
-                ->where('customer_id', $customerId)
-                ->exists();
-            if ($hasBookings) {
+            $bookingsQuery = DB::table('bookings')->where('customer_id', $customerId);
+            if ($this->hasColumn('bookings', 'branch_id')) {
+                $bookingsQuery->where('branch_id', $branchId);
+            }
+
+            if ($bookingsQuery->exists()) {
                 throw ValidationException::withMessages([
                     'customer' => ['ลูกค้ารายนี้มีประวัติคิวจองแล้ว จึงไม่สามารถลบได้'],
                 ]);
             }
         }
 
-        DB::table('customers')
-            ->where('id', $customerId)
-            ->delete();
+        $query = DB::table('customers')->where('id', $customerId);
+        if ($this->hasColumn('customers', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        $query->delete();
     }
 
-    private function getCustomers(string $search): array
+    private function getCustomers(int $branchId, string $search): array
     {
         if (!$this->tableExists('customers')) {
             return [];
         }
 
-        $query = $this->buildCustomersBaseQuery()
+        $query = $this->buildCustomersBaseQuery($branchId)
             ->orderBy('name')
             ->orderBy('c.id');
 
@@ -200,13 +222,13 @@ class CustomerService
             ->all();
     }
 
-    private function findCustomerById(int $customerId): ?array
+    private function findCustomerById(int $branchId, int $customerId): ?array
     {
         if (!$this->tableExists('customers')) {
             return null;
         }
 
-        $row = $this->buildCustomersBaseQuery()
+        $row = $this->buildCustomersBaseQuery($branchId)
             ->where('c.id', $customerId)
             ->first();
 
@@ -217,7 +239,7 @@ class CustomerService
         return $this->appendNextTierInfo($this->mapCustomerRow($row), $this->getMembershipTiers());
     }
 
-    private function getCustomerOrderHistory(int $customerId): array
+    private function getCustomerOrderHistory(int $branchId, int $customerId): array
     {
         if (!$this->tableExists('orders')) {
             return [];
@@ -226,6 +248,9 @@ class CustomerService
         $hasOrderItems = $this->tableExists('order_items');
         $query = DB::table('orders as o')
             ->where('o.customer_id', $customerId)
+            ->when($this->hasColumn('orders', 'branch_id'), function ($builder) use ($branchId): void {
+                $builder->where('o.branch_id', $branchId);
+            })
             ->orderByDesc('o.created_at')
             ->limit(50);
 
@@ -292,15 +317,21 @@ class CustomerService
             ->all();
     }
 
-    private function buildSummary(array $customers): array
+    private function buildSummary(int $branchId, array $customers): array
     {
         $totalCustomers = count($customers);
         $activeCustomers30d = 0;
 
         if ($this->tableExists('orders')) {
-            $activeCustomers30d = (int) DB::table('orders')
+            $query = DB::table('orders')
                 ->where('created_at', '>=', now()->subDays(30)->toDateTimeString())
-                ->whereNotNull('customer_id')
+                ->whereNotNull('customer_id');
+
+            if ($this->hasColumn('orders', 'branch_id')) {
+                $query->where('branch_id', $branchId);
+            }
+
+            $activeCustomers30d = (int) $query
                 ->distinct('customer_id')
                 ->count('customer_id');
         }
@@ -311,10 +342,14 @@ class CustomerService
         ];
     }
 
-    private function buildCustomersBaseQuery()
+    private function buildCustomersBaseQuery(int $branchId)
     {
         $query = DB::table('customers as c')
             ->select('c.id');
+
+        if ($this->hasColumn('customers', 'branch_id')) {
+            $query->where('c.branch_id', $branchId);
+        }
 
         $this->addCustomerColumnSelect($query, 'name', "CONCAT('Customer #', c.id)");
         $this->addCustomerColumnSelect($query, 'phone', "''");
@@ -334,22 +369,36 @@ class CustomerService
         }
 
         if ($this->tableExists('orders')) {
-            $query->selectSub(function ($subQuery): void {
+            $hasOrdersBranchId = $this->hasColumn('orders', 'branch_id');
+
+            $query->selectSub(function ($subQuery) use ($branchId, $hasOrdersBranchId): void {
                 $subQuery->from('orders as o')
                     ->selectRaw('COUNT(*)')
                     ->whereColumn('o.customer_id', 'c.id');
+
+                if ($hasOrdersBranchId) {
+                    $subQuery->where('o.branch_id', $branchId);
+                }
             }, 'visit_count');
 
-            $query->selectSub(function ($subQuery): void {
+            $query->selectSub(function ($subQuery) use ($branchId, $hasOrdersBranchId): void {
                 $subQuery->from('orders as o')
                     ->selectRaw('COALESCE(SUM(CASE WHEN o.status = ? THEN o.grand_total ELSE 0 END), 0)', ['paid'])
                     ->whereColumn('o.customer_id', 'c.id');
+
+                if ($hasOrdersBranchId) {
+                    $subQuery->where('o.branch_id', $branchId);
+                }
             }, 'total_spent');
 
-            $query->selectSub(function ($subQuery): void {
+            $query->selectSub(function ($subQuery) use ($branchId, $hasOrdersBranchId): void {
                 $subQuery->from('orders as o')
                     ->selectRaw('MAX(o.created_at)')
                     ->whereColumn('o.customer_id', 'c.id');
+
+                if ($hasOrdersBranchId) {
+                    $subQuery->where('o.branch_id', $branchId);
+                }
             }, 'last_visit_at');
         } else {
             $query->selectRaw('0 as visit_count');
@@ -358,6 +407,20 @@ class CustomerService
         }
 
         return $query;
+    }
+
+    private function findCustomerRecord(int $branchId, int $customerId): ?object
+    {
+        if (!$this->tableExists('customers')) {
+            return null;
+        }
+
+        $query = DB::table('customers')->where('id', $customerId);
+        if ($this->hasColumn('customers', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query->first(['id']);
     }
 
     private function mapCustomerRow($row): array

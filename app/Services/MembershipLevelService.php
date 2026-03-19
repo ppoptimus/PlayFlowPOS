@@ -2,16 +2,23 @@
 
 namespace App\Services;
 
+use App\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 class MembershipLevelService
 {
+    private BranchContextService $branchContext;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    public function getPageData(string $search = ''): array
+    public function __construct(BranchContextService $branchContext)
+    {
+        $this->branchContext = $branchContext;
+    }
+
+    public function getPageData(User $user, string $search = ''): array
     {
         $normalizedSearch = trim($search);
 
@@ -23,9 +30,14 @@ class MembershipLevelService
             ];
         }
 
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
         $query = DB::table('membership_tiers')
             ->orderBy('min_spend')
             ->orderBy('id');
+
+        if ($this->hasColumn('membership_tiers', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
 
         if ($normalizedSearch !== '' && $this->hasColumn('membership_tiers', 'name')) {
             $query->where('name', 'like', '%' . $normalizedSearch . '%');
@@ -50,9 +62,10 @@ class MembershipLevelService
         ];
     }
 
-    public function createTier(array $payload): void
+    public function createTier(User $user, array $payload): void
     {
         $this->assertModuleReady();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
 
         $name = trim((string) ($payload['name'] ?? ''));
         if ($name === '') {
@@ -62,10 +75,13 @@ class MembershipLevelService
         }
 
         $exists = DB::table('membership_tiers')
-            ->where('name', $name)
-            ->exists();
+            ->where('name', $name);
 
-        if ($exists) {
+        if ($this->hasColumn('membership_tiers', 'branch_id')) {
+            $exists->where('branch_id', $branchId);
+        }
+
+        if ($exists->exists()) {
             throw ValidationException::withMessages([
                 'name' => ['ชื่อระดับสมาชิกนี้มีอยู่แล้ว'],
             ]);
@@ -77,6 +93,9 @@ class MembershipLevelService
             'min_spend' => $this->normalizeMoney($payload['min_spend'] ?? 0),
         ];
 
+        if ($this->hasColumn('membership_tiers', 'branch_id')) {
+            $row['branch_id'] = $branchId;
+        }
         if ($this->hasColumn('membership_tiers', 'created_at')) {
             $row['created_at'] = now();
         }
@@ -87,11 +106,17 @@ class MembershipLevelService
         DB::table('membership_tiers')->insert($row);
     }
 
-    public function updateTier(int $tierId, array $payload): void
+    public function updateTier(User $user, int $tierId, array $payload): void
     {
         $this->assertModuleReady();
+        $branchId = $this->branchContext->resolveAuthorizedBranchId($user);
 
-        $tier = DB::table('membership_tiers')->where('id', $tierId)->first(['id', 'name']);
+        $tierQuery = DB::table('membership_tiers')->where('id', $tierId);
+        if ($this->hasColumn('membership_tiers', 'branch_id')) {
+            $tierQuery->where('branch_id', $branchId);
+        }
+
+        $tier = $tierQuery->first(['id', 'name']);
         if ($tier === null) {
             throw ValidationException::withMessages([
                 'tier' => ['ไม่พบระดับสมาชิกที่ต้องการแก้ไข'],
@@ -107,10 +132,13 @@ class MembershipLevelService
 
         $nameExists = DB::table('membership_tiers')
             ->where('name', $name)
-            ->where('id', '!=', $tierId)
-            ->exists();
+            ->where('id', '!=', $tierId);
 
-        if ($nameExists) {
+        if ($this->hasColumn('membership_tiers', 'branch_id')) {
+            $nameExists->where('branch_id', $branchId);
+        }
+
+        if ($nameExists->exists()) {
             throw ValidationException::withMessages([
                 'name' => ['ชื่อระดับสมาชิกนี้มีอยู่แล้ว'],
             ]);
@@ -128,6 +156,9 @@ class MembershipLevelService
 
         DB::table('membership_tiers')
             ->where('id', $tierId)
+            ->when($this->hasColumn('membership_tiers', 'branch_id'), function ($query) use ($branchId) {
+                $query->where('branch_id', $branchId);
+            })
             ->update($updates);
     }
 
@@ -151,6 +182,7 @@ class MembershipLevelService
         if ($parsed > 100) {
             return 100.0;
         }
+
         return round($parsed, 2);
     }
 
@@ -160,6 +192,7 @@ class MembershipLevelService
         if ($parsed < 0) {
             return 0.0;
         }
+
         return round($parsed, 2);
     }
 

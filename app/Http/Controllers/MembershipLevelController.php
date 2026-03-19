@@ -19,7 +19,7 @@ class MembershipLevelController extends Controller
     public function index(Request $request): View
     {
         $search = (string) $request->query('search', '');
-        $pageData = $this->membershipLevelService->getPageData($search);
+        $pageData = $this->membershipLevelService->getPageData($request->user(), $search);
 
         return view('membership-levels.index', $pageData);
     }
@@ -32,7 +32,7 @@ class MembershipLevelController extends Controller
             'min_spend' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $this->membershipLevelService->createTier($payload);
+        $this->membershipLevelService->createTier($request->user(), $payload);
 
         return redirect()
             ->route('membership-levels')
@@ -47,7 +47,7 @@ class MembershipLevelController extends Controller
             'min_spend' => ['required', 'numeric', 'min:0'],
         ]);
 
-        $this->membershipLevelService->updateTier($tierId, $payload);
+        $this->membershipLevelService->updateTier($request->user(), $tierId, $payload);
 
         return redirect()
             ->route('membership-levels')

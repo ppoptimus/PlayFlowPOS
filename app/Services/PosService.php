@@ -10,14 +10,21 @@ use Illuminate\Validation\ValidationException;
 
 class PosService
 {
+    private BranchContextService $branchContext;
     private BookingService $bookingService;
     private PackageService $packageService;
     private CommissionService $commissionService;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    public function __construct(BookingService $bookingService, PackageService $packageService, CommissionService $commissionService)
+    public function __construct(
+        BranchContextService $branchContext,
+        BookingService $bookingService,
+        PackageService $packageService,
+        CommissionService $commissionService
+    )
     {
+        $this->branchContext = $branchContext;
         $this->bookingService = $bookingService;
         $this->packageService = $packageService;
         $this->commissionService = $commissionService;
@@ -33,7 +40,7 @@ class PosService
             'items' => $this->getPosItems($branchId),
             'serviceItems' => $this->getServiceItems($branchId),
             'staff' => $this->getStaff($branchId),
-            'customers' => $this->getCustomers(),
+            'customers' => $this->getCustomers($branchId),
             'customerPackageBalances' => $this->packageService->getCustomerPackageBalancesMap($branchId),
             'bookingContext' => $this->resolveBookingContext($user, $query, $branchId),
         ];
@@ -57,6 +64,8 @@ class PosService
                 'items' => ['à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸­à¸¢à¹ˆà¸²à¸‡à¸™à¹‰à¸­à¸¢ 1 à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹ˆà¸­à¸™à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™'],
             ]);
         }
+
+        $this->assertCustomerInBranch($customerId, $branchId);
 
         return DB::transaction(function () use (
             $user,
@@ -171,7 +180,7 @@ class PosService
                     'purchased' => $packagePurchaseSummary,
                     'redeemed' => $packageRedeemSummary,
                 ],
-                'membership' => $this->syncCustomerTierAfterPayment($customerId),
+                'membership' => $this->syncCustomerTierAfterPayment($customerId, $branchId),
             ];
         });
     }
@@ -253,10 +262,16 @@ class PosService
             ->all();
     }
 
-    private function getCustomers(): array
+    private function getCustomers(int $branchId): array
     {
-        return DB::table('customers')
-            ->orderBy('name')
+        $query = DB::table('customers')
+            ->orderBy('name');
+
+        if ($this->hasColumn('customers', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query
             ->get(['id', 'name', 'phone'])
             ->map(static function ($row): array {
                 return [
@@ -266,6 +281,26 @@ class PosService
                 ];
             })
             ->all();
+    }
+
+    private function assertCustomerInBranch(?int $customerId, int $branchId): void
+    {
+        if ($customerId === null || $customerId <= 0) {
+            return;
+        }
+
+        $query = DB::table('customers')->where('id', $customerId);
+        if ($this->hasColumn('customers', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        if ($query->exists()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'customer_id' => ['ไม่พบลูกค้าในสาขานี้'],
+        ]);
     }
 
 
@@ -776,26 +811,7 @@ class PosService
 
     private function resolveAuthorizedBranchId(User $user, ?int $requestedBranchId): int
     {
-        $role = (string) ($user->role ?? '');
-        $userBranchId = isset($user->branch_id) ? (int) $user->branch_id : 0;
-
-        if ($role === 'super_admin') {
-            if ($requestedBranchId !== null && $requestedBranchId > 0 && $this->branchExists($requestedBranchId)) {
-                return $requestedBranchId;
-            }
-
-            return $this->getDefaultBranchId();
-        }
-
-        if ($userBranchId > 0 && $this->branchExists($userBranchId)) {
-            return $userBranchId;
-        }
-
-        if ($requestedBranchId !== null && $requestedBranchId > 0 && $this->branchExists($requestedBranchId)) {
-            return $requestedBranchId;
-        }
-
-        return $this->getDefaultBranchId();
+        return $this->branchContext->resolveAuthorizedBranchId($user, $requestedBranchId);
     }
 
     private function branchExists(int $branchId): bool
@@ -827,7 +843,7 @@ class PosService
         return 1;
     }
 
-    private function syncCustomerTierAfterPayment(?int $customerId): ?array
+    private function syncCustomerTierAfterPayment(?int $customerId, int $branchId): ?array
     {
         if ($customerId === null || $customerId <= 0) {
             return null;
@@ -842,19 +858,29 @@ class PosService
             return null;
         }
 
-        $tiers = DB::table('membership_tiers')
+        $tiersQuery = DB::table('membership_tiers')
             ->orderBy('min_spend')
-            ->orderBy('id')
-            ->get(['id', 'name', 'min_spend']);
+            ->orderBy('id');
+
+        if ($this->hasColumn('membership_tiers', 'branch_id')) {
+            $tiersQuery->where('branch_id', $branchId);
+        }
+
+        $tiers = $tiersQuery->get(['id', 'name', 'min_spend']);
 
         if ($tiers->isEmpty()) {
             return null;
         }
 
-        $totalSpent = (float) DB::table('orders')
+        $totalSpentQuery = DB::table('orders')
             ->where('customer_id', $customerId)
-            ->where('status', 'paid')
-            ->sum('grand_total');
+            ->where('status', 'paid');
+
+        if ($this->hasColumn('orders', 'branch_id')) {
+            $totalSpentQuery->where('branch_id', $branchId);
+        }
+
+        $totalSpent = (float) $totalSpentQuery->sum('grand_total');
 
         $recommendedTier = null;
         foreach ($tiers as $tier) {
@@ -867,9 +893,14 @@ class PosService
             return null;
         }
 
-        $customer = DB::table('customers')
-            ->where('id', $customerId)
-            ->first(['id', 'tier_id']);
+        $customerQuery = DB::table('customers')
+            ->where('id', $customerId);
+
+        if ($this->hasColumn('customers', 'branch_id')) {
+            $customerQuery->where('branch_id', $branchId);
+        }
+
+        $customer = $customerQuery->first(['id', 'tier_id']);
 
         if ($customer === null) {
             return null;
@@ -894,6 +925,9 @@ class PosService
 
             DB::table('customers')
                 ->where('id', $customerId)
+                ->when($this->hasColumn('customers', 'branch_id'), function ($query) use ($branchId) {
+                    $query->where('branch_id', $branchId);
+                })
                 ->update($updates);
         }
 

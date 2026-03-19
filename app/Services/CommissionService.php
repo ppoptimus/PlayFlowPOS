@@ -2,8 +2,9 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class CommissionService
 {
@@ -33,10 +34,22 @@ class CommissionService
     private function calculateAndSave($item, ?int $branchId): void
     {
         // 1. ดึงการตั้งค่าคอมมิชชัน โดยใช้ item_type + item_id
-        $config = DB::table('commission_configs')
+        $configQuery = DB::table('commission_configs')
             ->where('item_type', $item->item_type)
-            ->where('item_id', $item->item_id)
-            ->first();
+            ->where('item_id', $item->item_id);
+
+        if (Schema::hasColumn('commission_configs', 'branch_id')) {
+            if ($branchId !== null) {
+                $configQuery->where(function ($query) use ($branchId): void {
+                    $query->where('branch_id', $branchId)
+                        ->orWhereNull('branch_id');
+                })->orderByRaw('CASE WHEN branch_id = ? THEN 0 ELSE 1 END', [$branchId]);
+            } else {
+                $configQuery->whereNull('branch_id');
+            }
+        }
+
+        $config = $configQuery->first();
 
         // ไม่พบ config = รายการนี้ไม่คิดค่าคอม → ข้ามไป
         if (!$config) return;

@@ -31,7 +31,7 @@ class CustomerController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $payload = $this->validateCustomerPayload($request);
-        $customer = $this->customerService->createCustomer($payload);
+        $customer = $this->customerService->createCustomer($request->user(), $payload);
 
         return redirect()
             ->route('customers', ['customer_id' => $customer['id']])
@@ -41,16 +41,16 @@ class CustomerController extends Controller
     public function update(Request $request, int $customerId): RedirectResponse
     {
         $payload = $this->validateCustomerPayload($request, $customerId);
-        $this->customerService->updateCustomer($customerId, $payload);
+        $this->customerService->updateCustomer($request->user(), $customerId, $payload);
 
         return redirect()
             ->route('customers', ['customer_id' => $customerId])
             ->with('success', 'อัปเดตข้อมูลลูกค้าเรียบร้อยแล้ว');
     }
 
-    public function destroy(int $customerId): RedirectResponse
+    public function destroy(Request $request, int $customerId): RedirectResponse
     {
-        $this->customerService->deleteCustomer($customerId);
+        $this->customerService->deleteCustomer($request->user(), $customerId);
 
         return redirect()
             ->route('customers')
@@ -66,12 +66,12 @@ class CustomerController extends Controller
                 'string',
                 'max:32',
                 'regex:/^[0-9\\-\\+\\s\\(\\)]+$/',
-                Rule::unique('customers', 'phone'),
+                $this->buildUniquePhoneRule($request),
             ],
             'line_id' => ['nullable', 'string', 'max:120'],
         ]);
 
-        $customer = $this->customerService->createCustomer($payload);
+        $customer = $this->customerService->createCustomer($request->user(), $payload);
 
         return response()->json([
             'message' => 'บันทึกข้อมูลลูกค้าเรียบร้อยแล้ว',
@@ -84,9 +84,9 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function history(int $customerId): JsonResponse
+    public function history(Request $request, int $customerId): JsonResponse
     {
-        $customer = $this->customerService->getCustomerById($customerId);
+        $customer = $this->customerService->getCustomerById($request->user(), $customerId);
         if ($customer === null) {
             return response()->json([
                 'message' => 'ไม่พบข้อมูลลูกค้า',
@@ -95,17 +95,12 @@ class CustomerController extends Controller
 
         return response()->json([
             'customer' => $customer,
-            'history' => $this->customerService->getHistoryByCustomerId($customerId),
+            'history' => $this->customerService->getHistoryByCustomerId($request->user(), $customerId),
         ]);
     }
 
     private function validateCustomerPayload(Request $request, ?int $customerId = null): array
     {
-        $uniquePhoneRule = Rule::unique('customers', 'phone');
-        if ($customerId !== null) {
-            $uniquePhoneRule = $uniquePhoneRule->ignore($customerId);
-        }
-
         $tierRules = ['nullable'];
         if (Schema::hasTable('membership_tiers')) {
             $tierRules = ['nullable', 'integer', 'exists:membership_tiers,id'];
@@ -113,12 +108,32 @@ class CustomerController extends Controller
 
         return $request->validate([
             'name' => ['required', 'string', 'max:150'],
-            'phone' => ['required', 'string', 'max:32', 'regex:/^[0-9\\-\\+\\s\\(\\)]+$/', $uniquePhoneRule],
+            'phone' => ['required', 'string', 'max:32', 'regex:/^[0-9\\-\\+\\s\\(\\)]+$/', $this->buildUniquePhoneRule($request, $customerId)],
             'line_id' => ['nullable', 'string', 'max:120'],
             'tier_id' => $tierRules,
             'preferred_pressure_level' => ['nullable', 'string', Rule::in(['light', 'medium', 'firm'])],
             'health_notes' => ['nullable', 'string', 'max:4000'],
             'contraindications' => ['nullable', 'string', 'max:4000'],
         ]);
+    }
+
+    private function buildUniquePhoneRule(Request $request, ?int $customerId = null)
+    {
+        $rule = Rule::unique('customers', 'phone');
+
+        if ($customerId !== null) {
+            $rule = $rule->ignore($customerId);
+        }
+
+        if (Schema::hasColumn('customers', 'branch_id')) {
+            $branchId = isset($request->user()->branch_id) ? (int) $request->user()->branch_id : 0;
+            if ($branchId > 0) {
+                $rule = $rule->where(static function ($query) use ($branchId): void {
+                    $query->where('branch_id', $branchId);
+                });
+            }
+        }
+
+        return $rule;
     }
 }

@@ -9,6 +9,13 @@ use Illuminate\Validation\ValidationException;
 
 class ReceiptService
 {
+    private BranchContextService $branchContext;
+
+    public function __construct(BranchContextService $branchContext)
+    {
+        $this->branchContext = $branchContext;
+    }
+
     public function getPageData(User $user, ?int $requestedBranchId, ?string $dateFrom, ?string $dateTo): array
     {
         $branchId = $this->resolveAuthorizedBranchId($user, $requestedBranchId);
@@ -179,26 +186,7 @@ class ReceiptService
 
     private function resolveAuthorizedBranchId(User $user, ?int $requestedBranchId): int
     {
-        $role = (string) ($user->role ?? '');
-        $userBranchId = isset($user->branch_id) ? (int) $user->branch_id : 0;
-
-        if ($role === 'super_admin') {
-            if ($requestedBranchId !== null && $requestedBranchId > 0 && $this->branchExists($requestedBranchId)) {
-                return $requestedBranchId;
-            }
-
-            return $this->getDefaultBranchId();
-        }
-
-        if ($userBranchId > 0 && $this->branchExists($userBranchId)) {
-            return $userBranchId;
-        }
-
-        if ($requestedBranchId !== null && $requestedBranchId > 0 && $this->branchExists($requestedBranchId)) {
-            return $requestedBranchId;
-        }
-
-        return $this->getDefaultBranchId();
+        return $this->branchContext->resolveAuthorizedBranchId($user, $requestedBranchId);
     }
 
     private function branchExists(int $branchId): bool

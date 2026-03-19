@@ -18,12 +18,14 @@ class BookingService
         'cancelled' => 'ยกเลิก',
     ];
 
+    private BranchContextService $branchContext;
     private StaffAttendanceService $staffAttendanceService;
     private array $tableExistsCache = [];
 
-    public function __construct(StaffAttendanceService $staffAttendanceService)
+    public function __construct(StaffAttendanceService $staffAttendanceService, BranchContextService $branchContext)
     {
         $this->staffAttendanceService = $staffAttendanceService;
+        $this->branchContext = $branchContext;
     }
 
     public function getPageData(User $user, ?int $requestedBranchId, string $date): array
@@ -36,7 +38,7 @@ class BookingService
             'selectedDate' => $selectedDate,
             'staff' => $this->getStaff($branchId, $selectedDate, true),
             'serviceItems' => $this->getServiceItems($branchId),
-            'customers' => $this->getCustomers(),
+            'customers' => $this->getCustomers($branchId),
             'beds' => $this->getBeds($branchId),
             'statuses' => [
                 'waiting' => self::STATUSES['waiting'],
@@ -136,7 +138,7 @@ class BookingService
         foreach ($serviceIds as $selectedServiceId) {
             $this->ensureServiceExists((int) $selectedServiceId, $branchId);
         }
-        $this->ensureCustomerExists($customerId);
+        $this->ensureCustomerExists($customerId, $branchId);
         $this->ensureMasseuseInBranch($masseuseId, $branchId);
         $this->ensureBedInBranch($bedId, $branchId);
         $this->ensureNoTimeConflict($branchId, $startAt, $endAt, $masseuseId, $bedId, $bookingId);
@@ -482,10 +484,16 @@ class BookingService
             ->all();
     }
 
-    private function getCustomers(): array
+    private function getCustomers(int $branchId): array
     {
-        return DB::table('customers')
-            ->orderBy('name')
+        $query = DB::table('customers')
+            ->orderBy('name');
+
+        if ($this->tableExists('customers') && Schema::hasColumn('customers', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        return $query
             ->get(['id', 'name', 'phone', 'line_id'])
             ->map(static function ($row): array {
                 return [
@@ -873,10 +881,15 @@ class BookingService
         }
     }
 
-    private function ensureCustomerExists(int $customerId): void
+    private function ensureCustomerExists(int $customerId, int $branchId): void
     {
-        $exists = DB::table('customers')->where('id', $customerId)->exists();
-        if (!$exists) {
+        $query = DB::table('customers')->where('id', $customerId);
+
+        if ($this->tableExists('customers') && Schema::hasColumn('customers', 'branch_id')) {
+            $query->where('branch_id', $branchId);
+        }
+
+        if (!$query->exists()) {
             throw ValidationException::withMessages([
                 'customer_id' => ['ไม่พบข้อมูลลูกค้า'],
             ]);
@@ -950,26 +963,7 @@ class BookingService
 
     private function resolveAuthorizedBranchId(User $user, ?int $requestedBranchId): int
     {
-        $role = (string) ($user->role ?? '');
-        $userBranchId = isset($user->branch_id) ? (int) $user->branch_id : 0;
-
-        if ($role === 'super_admin') {
-            if ($requestedBranchId !== null && $requestedBranchId > 0 && $this->branchExists($requestedBranchId)) {
-                return $requestedBranchId;
-            }
-
-            return $this->getDefaultBranchId();
-        }
-
-        if ($userBranchId > 0 && $this->branchExists($userBranchId)) {
-            return $userBranchId;
-        }
-
-        if ($requestedBranchId !== null && $requestedBranchId > 0 && $this->branchExists($requestedBranchId)) {
-            return $requestedBranchId;
-        }
-
-        return $this->getDefaultBranchId();
+        return $this->branchContext->resolveAuthorizedBranchId($user, $requestedBranchId);
     }
 
     private function branchExists(int $branchId): bool
