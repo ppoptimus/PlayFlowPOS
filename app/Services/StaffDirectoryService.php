@@ -280,7 +280,7 @@ class StaffDirectoryService
             return $imagePath;
         }
 
-        return '/' . ltrim($imagePath, '/');
+        return asset(ltrim($imagePath, '/'));
     }
 
     private function buildFallbackAvatar(string $seed): string

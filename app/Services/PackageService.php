@@ -104,8 +104,8 @@ class PackageService
                 $redemptionQuery->where('o.branch_id', $branchId);
             }
 
-            if ($this->tableExists('users')) {
-                $redemptionQuery->leftJoin('users as u', 'u.id', '=', 'oi.masseuse_id');
+            if ($this->tableExists('masseuses')) {
+                $redemptionQuery->leftJoin('masseuses as m', 'm.id', '=', 'oi.masseuse_id');
             }
 
             $redemptions = $redemptionQuery
@@ -115,7 +115,7 @@ class PackageService
                     'oi.qty',
                     'c.name as customer_name',
                     'p.name as package_name',
-                    DB::raw("COALESCE(u.name, '-') as redeemed_by"),
+                    DB::raw("COALESCE(NULLIF(m.nickname, ''), NULLIF(m.full_name, ''), '-') as redeemed_by"),
                 ])
                 ->map(static function ($row): array {
                     return [

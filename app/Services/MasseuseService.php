@@ -469,8 +469,9 @@ class MasseuseService
         }
 
         return DB::table('commission_configs')
-            ->get(['service_id', 'type', 'value', 'deduct_cost'])
-            ->keyBy('service_id')
+            ->where('item_type', 'service')
+            ->get(['item_id', 'type', 'value', 'deduct_cost'])
+            ->keyBy('item_id')
             ->map(static function ($row): array {
                 return [
                     'type' => (string) $row->type,

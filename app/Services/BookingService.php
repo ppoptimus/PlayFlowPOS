@@ -280,7 +280,7 @@ class BookingService
     {
         $staffRoster = $this->getStaff($branchId, $date, false);
         $queueByStaff = $this->getQueueByStaff($branchId, $date);
-        $commissionConfigs = $this->getCommissionConfigsByService();
+        $commissionConfigs = $this->getCommissionConfigsByService($branchId);
 
         return array_map(function (array $staff) use ($queueByStaff, $commissionConfigs, $date): array {
             $staffId = (string) ($staff['id'] ?? '');
@@ -354,11 +354,25 @@ class BookingService
         return $queueByStaff;
     }
 
-    private function getCommissionConfigsByService(): array
+    private function getCommissionConfigsByService(int $branchId): array
     {
-        return DB::table('commission_configs')
-            ->get(['service_id', 'type', 'value', 'deduct_cost'])
-            ->keyBy('service_id')
+        if (!$this->tableExists('commission_configs')) {
+            return [];
+        }
+
+        $query = DB::table('commission_configs')
+            ->where('item_type', 'service');
+
+        if (Schema::hasColumn('commission_configs', 'branch_id')) {
+            $query->where(function ($inner) use ($branchId): void {
+                $inner->whereNull('branch_id')
+                    ->orWhere('branch_id', $branchId);
+            });
+        }
+
+        return $query
+            ->get(['item_id', 'type', 'value', 'deduct_cost'])
+            ->keyBy('item_id')
             ->map(static function ($row): array {
                 return [
                     'type' => (string) $row->type,
