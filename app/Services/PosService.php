@@ -39,7 +39,7 @@ class PosService
             'activeBranchId' => $branchId,
             'items' => $this->getPosItems($branchId),
             'serviceItems' => $this->getServiceItems($branchId),
-            'staff' => $this->getStaff($branchId),
+            'staff' => $this->getStaff($user, $branchId),
             'customers' => $this->getCustomers($branchId),
             'customerPackageBalances' => $this->packageService->getCustomerPackageBalancesMap($branchId),
             'bookingContext' => $this->resolveBookingContext($user, $query, $branchId),
@@ -61,11 +61,12 @@ class PosService
 
         if (empty($items)) {
             throw ValidationException::withMessages([
-                'items' => ['à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¸£à¸²à¸¢à¸à¸²à¸£à¸­à¸¢à¹ˆà¸²à¸‡à¸™à¹‰à¸­à¸¢ 1 à¸£à¸²à¸¢à¸à¸²à¸£à¸à¹ˆà¸­à¸™à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™'],
+                'items' => ['กรุณาเลือกรายการอย่างน้อย 1 รายการก่อนชำระเงิน'],
             ]);
         }
 
         $this->assertCustomerInBranch($customerId, $branchId);
+        $this->assertStaffAvailableForPos($staffId, $branchId);
 
         return DB::transaction(function () use (
             $user,
@@ -134,7 +135,7 @@ class PosService
             if ($bookingContext !== null) {
                 if (!empty($bookingContext['is_paid'])) {
                     throw ValidationException::withMessages([
-                        'booking_context' => ['à¸„à¸´à¸§à¸™à¸µà¹‰à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™à¹à¸¥à¹‰à¸§ à¹„à¸¡à¹ˆà¸ªà¸²à¸¡à¸²à¸£à¸–à¸Šà¸³à¸£à¸°à¸‹à¹‰à¸³à¹„à¸”à¹‰'],
+                        'booking_context' => ['คิวนี้ชำระเงินแล้ว ไม่สามารถชำระซ้ำได้'],
                     ]);
                 }
 
@@ -142,7 +143,7 @@ class PosService
                 foreach ($requiredBookingFields as $field) {
                     if (!isset($bookingContext[$field]) || $bookingContext[$field] === null || $bookingContext[$field] === '') {
                         throw ValidationException::withMessages([
-                            'booking_context' => ['à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸ˆà¸­à¸‡à¹„à¸¡à¹ˆà¸„à¸£à¸šà¸–à¹‰à¸§à¸™à¸ªà¸³à¸«à¸£à¸±à¸šà¸à¸²à¸£à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™'],
+                            'booking_context' => ['ข้อมูลจองไม่ครบถ้วนสำหรับการชำระเงิน'],
                         ]);
                     }
                 }
@@ -169,7 +170,7 @@ class PosService
             }
 
             return [
-                'message' => 'à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™à¸ªà¸³à¹€à¸£à¹‡à¸ˆ',
+                'message' => 'ชำระเงินสำเร็จ',
                 'order_id' => $orderId,
                 'order_no' => $orderNo,
                 'booking' => $booking,
@@ -246,20 +247,14 @@ class PosService
             ->all();
     }
 
-    private function getStaff(int $branchId): array
+    private function getStaff(User $user, int $branchId): array
     {
-        return DB::table('masseuses as m')
-            ->where('m.branch_id', $branchId)
-            ->selectRaw("m.id, COALESCE(NULLIF(m.full_name, ''), NULLIF(m.nickname, ''), CONCAT('Masseuse #', m.id)) as name")
-            ->orderBy('m.id')
-            ->get()
-            ->map(static function ($row): array {
-                return [
-                    'id' => (string) $row->id,
-                    'name' => (string) $row->name,
-                ];
-            })
-            ->all();
+        return $this->bookingService->getStaffRoster(
+            $user,
+            $branchId,
+            Carbon::today()->toDateString(),
+            true
+        );
     }
 
     private function getCustomers(int $branchId): array
@@ -303,6 +298,42 @@ class PosService
         ]);
     }
 
+    private function assertStaffAvailableForPos(?int $staffId, int $branchId): void
+    {
+        if ($staffId === null || $staffId <= 0) {
+            return;
+        }
+
+        $masseuse = DB::table('masseuses')
+            ->where('id', $staffId)
+            ->where('branch_id', $branchId)
+            ->first(['id', 'status']);
+
+        if ($masseuse === null) {
+            throw ValidationException::withMessages([
+                'staff_id' => ['ไม่พบหมอนวดในสาขานี้'],
+            ]);
+        }
+
+        if ((string) ($masseuse->status ?? '') === 'day_off') {
+            throw ValidationException::withMessages([
+                'staff_id' => ['หมอนวดคนนี้หยุดงาน ไม่สามารถเลือกได้'],
+            ]);
+        }
+
+        if ($this->tableExists('staff_attendance')) {
+            $attendance = DB::table('staff_attendance')
+                ->where('masseuse_id', $staffId)
+                ->whereDate('attendance_date', Carbon::today()->toDateString())
+                ->value('is_working');
+
+            if ($attendance !== null && !(bool) $attendance) {
+                throw ValidationException::withMessages([
+                    'staff_id' => ['หมอนวดคนนี้ยังไม่เปิดรับงานวันนี้'],
+                ]);
+            }
+        }
+    }
 
     private function normalizeCartItems(int $branchId, array $items, ?int $staffId, ?int $customerId): array
     {

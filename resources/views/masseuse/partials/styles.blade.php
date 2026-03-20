@@ -165,6 +165,12 @@
         flex-wrap: wrap;
     }
 
+    .masseuse-page .attendance-toggle-form {
+        display: inline-flex;
+        align-items: center;
+        margin: 0;
+    }
+
     .masseuse-page .staff-period-switches {
         display: inline-flex;
         align-items: center;
@@ -411,6 +417,11 @@
         cursor: pointer;
     }
 
+    .masseuse-page .toggle.is-disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
     .masseuse-page .toggle input {
         position: absolute;
         opacity: 0;
@@ -446,6 +457,16 @@
 
     .masseuse-page .toggle input:checked + .toggle-track .toggle-thumb {
         transform: translateX(1.18rem);
+    }
+
+    .masseuse-page .toggle input:disabled + .toggle-track {
+        background: linear-gradient(135deg, #dce4eb, #e8eef3);
+        box-shadow: inset 0 1px 3px rgba(29, 61, 94, 0.08);
+    }
+
+    .masseuse-page .toggle input:disabled + .toggle-track .toggle-thumb {
+        background: #f8fbfd;
+        box-shadow: 0 2px 6px rgba(20, 55, 90, 0.1);
     }
 
     .masseuse-page .queue-load {

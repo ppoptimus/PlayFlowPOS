@@ -97,7 +97,7 @@ class MasseuseController extends Controller
             'nickname' => 'required|string|max:255',
             'full_name' => 'nullable|string|max:255',
             'skills_description' => 'nullable|string|max:5000',
-            'status' => 'required|in:available,busy,on_break,off_duty',
+            'status' => 'required|in:available,busy,on_break,off_duty,day_off',
             'profile_image' => 'nullable|image|max:2048',
         ]);
 
@@ -122,7 +122,7 @@ class MasseuseController extends Controller
             'nickname' => 'required|string|max:255',
             'full_name' => 'nullable|string|max:255',
             'skills_description' => 'nullable|string|max:5000',
-            'status' => 'required|in:available,busy,on_break,off_duty',
+            'status' => 'required|in:available,busy,on_break,off_duty,day_off',
             'profile_image' => 'nullable|image|max:2048',
             'remove_profile_image' => 'nullable|boolean',
         ]);

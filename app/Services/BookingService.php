@@ -79,12 +79,21 @@ class BookingService
         $branchId = $this->resolveAuthorizedBranchId($user, $requestedBranchId);
         $selectedDate = $this->normalizeDate($date);
         $staff = $this->findStaffById($branchId, $staffId);
-
         if ($staff === null) {
             throw ValidationException::withMessages([
-                'staff_id' => ['à¹„à¸¡à¹ˆà¸žà¸šà¸žà¸™à¸±à¸à¸‡à¸²à¸™à¹ƒà¸™à¸ªà¸²à¸‚à¸²à¸™à¸µà¹‰'],
+                'staff_id' => ['ไม่พบหมอนวดในสาขานี้'],
             ]);
         }
+
+        $currentStatus = (string) ($staff->status ?? '');
+        $nextStatus = $isWorking
+            ? ($currentStatus === 'day_off' || $currentStatus === '' ? 'available' : $currentStatus)
+            : 'day_off';
+
+        DB::table('masseuses')
+            ->where('branch_id', $branchId)
+            ->where('id', $staffId)
+            ->update(['status' => $nextStatus]);
 
         $this->staffAttendanceService->setAttendance($branchId, $selectedDate, (string) $staffId, $isWorking);
 
@@ -92,6 +101,7 @@ class BookingService
             'staff_id' => $staffId,
             'date' => $selectedDate,
             'isWorkingToday' => $isWorking,
+            'statusValue' => $nextStatus,
         ];
     }
 
@@ -257,11 +267,14 @@ class BookingService
             ->get()
             ->map(function ($row) use ($branchId, $date): array {
                 $staffId = (string) $row->id;
-                $isWorkingToday = $this->staffAttendanceService->isWorking($branchId, $date, $staffId);
+                $statusValue = (string) ($row->status ?? '');
+                $isWorkingToday = $statusValue !== 'day_off'
+                    && $this->staffAttendanceService->isWorking($branchId, $date, $staffId);
 
                 return [
                     'id' => $staffId,
                     'name' => (string) $row->name,
+                    'statusValue' => $statusValue,
                     'profileImage' => $row->profile_image !== null ? (string) $row->profile_image : '',
                     'isWorkingToday' => $isWorkingToday,
                     'attendanceLabel' => $isWorkingToday ? 'มาทำงานวันนี้' : 'ไม่มาทำงานวันนี้',
@@ -294,6 +307,7 @@ class BookingService
                 'id' => $staffId,
                 'display_id' => 'MS' . str_pad($staffId, 3, '0', STR_PAD_LEFT),
                 'name' => (string) ($staff['name'] ?? ''),
+                'statusValue' => (string) ($staff['statusValue'] ?? ''),
                 'status' => $this->resolveStaffPageStatus($staff, $queue, $date),
                 'isWorkingToday' => (bool) ($staff['isWorkingToday'] ?? true),
                 'income' => $bookedValue,
@@ -421,6 +435,10 @@ class BookingService
 
     private function resolveStaffPageStatus(array $staff, array $queue, string $date): string
     {
+        if (($staff['statusValue'] ?? '') === 'day_off') {
+            return 'หยุดงาน';
+        }
+
         $isWorkingToday = (bool) ($staff['isWorkingToday'] ?? true);
         if (!$isWorkingToday) {
             return 'ไม่มาทำงานวันนี้';
@@ -457,7 +475,7 @@ class BookingService
         return DB::table('masseuses')
             ->where('branch_id', $branchId)
             ->where('id', $staffId)
-            ->first(['id']);
+            ->first(['id', 'status']);
     }
 
     private function getServiceItems(int $branchId): array
@@ -784,40 +802,32 @@ class BookingService
             ->where('b.status', '!=', 'cancelled')
             ->where('b.start_time', '<', $endAt->format('Y-m-d H:i:s'))
             ->where('b.end_time', '>', $startAt->format('Y-m-d H:i:s'));
-
         if ($excludeBookingId !== null) {
             $baseQuery->where('b.id', '!=', $excludeBookingId);
         }
-
         $messages = [];
-
         if ($masseuseId !== null) {
             $staffConflict = (clone $baseQuery)
                 ->where('b.masseuse_id', $masseuseId)
                 ->exists();
-
             if ($staffConflict) {
                 $messages[] = 'หมอนวดคนนี้มีคิวซ้อนในช่วงเวลาเดียวกัน';
             }
         }
-
         if ($bedId !== null) {
             $bedConflict = (clone $baseQuery)
                 ->where('b.bed_id', $bedId)
                 ->exists();
-
             if ($bedConflict) {
                 $messages[] = 'ห้อง/เตียงนี้มีคิวซ้อนในช่วงเวลาเดียวกัน';
             }
         }
-
         if (!empty($messages)) {
             throw ValidationException::withMessages([
                 'start_time' => [implode(' และ ', $messages)],
             ]);
         }
     }
-
     private function normalizeServiceIdsFromPayload(array $payload): array
     {
         $rawIds = [];
@@ -929,19 +939,16 @@ class BookingService
         if ($masseuseId === null) {
             return;
         }
-
         $exists = DB::table('masseuses')
             ->where('id', $masseuseId)
             ->where('branch_id', $branchId)
             ->exists();
-
         if (!$exists) {
             throw ValidationException::withMessages([
                 'masseuse_id' => ['หมอนวดไม่อยู่ในสาขาที่เลือก'],
             ]);
         }
     }
-
     private function ensureBedInBranch(?int $bedId, int $branchId): void
     {
         if ($bedId === null) {

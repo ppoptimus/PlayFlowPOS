@@ -18,6 +18,7 @@ class MasseuseService
         'busy' => 'ติดคิว',
         'on_break' => 'พัก',
         'off_duty' => 'ไม่ประจำกะ',
+        'day_off' => 'หยุดงาน',
     ];
 
     private BookingService $bookingService;
@@ -46,6 +47,7 @@ class MasseuseService
             'staff' => $staffWithYesterday,
             'moduleReady' => $this->tableExists('masseuses'),
             'canManage' => $this->canManage($user),
+            'canManageAttendance' => $this->canManageAttendance($user),
             'statusOptions' => $this->getStatusOptions(),
             'staffRecords' => $this->tableExists('masseuses')
                 ? $this->getStaffRecords($activeBranchId, $staffWithYesterday)
@@ -644,6 +646,11 @@ class MasseuseService
     private function canManage(User $user): bool
     {
         return in_array((string) ($user->role ?? ''), ['super_admin', 'branch_manager'], true);
+    }
+
+    private function canManageAttendance(User $user): bool
+    {
+        return in_array((string) ($user->role ?? ''), ['super_admin', 'branch_manager', 'cashier'], true);
     }
 
     private function normalizeSelectedDate(string $date): string

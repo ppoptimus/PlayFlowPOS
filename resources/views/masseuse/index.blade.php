@@ -143,7 +143,29 @@
 
                 <div class="staff-actions">
                     <span class="status-pill {{ $statusClass }}">{{ $s['status'] }}</span>
-                    
+
+                    @if($canManageAttendance ?? false)
+                    <form method="POST" action="{{ route('masseuse.attendance') }}" class="attendance-toggle-form" title="เปิดหรือปิดการมาทำงานวันนี้">
+                        @csrf
+                        <input type="hidden" name="date" value="{{ $selectedDate }}">
+                        <input type="hidden" name="branch_id" value="{{ $activeBranchId }}">
+                        <input type="hidden" name="staff_id" value="{{ $s['id'] }}">
+                        <input type="hidden" name="is_working" value="0">
+                        <label class="toggle mb-0">
+                            <input
+                                type="checkbox"
+                                name="is_working"
+                                value="1"
+                                {{ $s['isWorkingToday'] ? 'checked' : '' }}
+                                onchange="this.form.submit()"
+                            >
+                            <span class="toggle-track">
+                                <span class="toggle-thumb"></span>
+                            </span>
+                        </label>
+                    </form>
+                    @endif
+
                     @if($canManage)
                     <a href="{{ $editUrl }}" class="btn btn-outline-primary staff-edit-btn" aria-label="แก้ไขข้อมูลหมอนวด" title="แก้ไขข้อมูลหมอนวด">
                         <i class="fa-solid fa-pen-to-square"></i>
@@ -223,7 +245,7 @@
     </div>
     @endforelse
 
-    @if($canManage)
+    @if(false)
     <div class="col-12 pt-2">
         <section class="attendance-card">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">

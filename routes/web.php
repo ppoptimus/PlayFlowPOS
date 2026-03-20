@@ -33,10 +33,10 @@ Route::middleware('auth')->group(function (): void {
         Route::put('/booking/{bookingId}', 'BookingController@update')->name('booking.update');
         Route::delete('/booking/{bookingId}', 'BookingController@destroy')->name('booking.destroy');
         Route::post('/customers/quick-create', 'CustomerController@quickCreate')->name('customers.quick-create');
+        Route::post('/masseuse/attendance', 'MasseuseController@updateAttendance')->name('masseuse.attendance');
     });
 
     Route::middleware('admin.only')->group(function (): void {
-        Route::post('/masseuse/attendance', 'MasseuseController@updateAttendance')->name('masseuse.attendance');
         Route::get('/receipts', 'ReceiptController@index')->name('receipts');
         Route::get('/receipts/{orderId}', 'ReceiptController@show')->name('receipts.show');
         Route::get('/customers', 'CustomerController@index')->name('customers');
