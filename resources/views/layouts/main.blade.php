@@ -42,8 +42,9 @@
             --pf-mobile-nav-offset: calc(var(--pf-mobile-nav-height) + env(safe-area-inset-bottom));
         }
         body { font-family: 'Prompt', sans-serif; background: radial-gradient(circle at top right, #d4edf9 0%, #e4f1f8 45%, #edf5fa 100%); color: #25405c; }
-        .sidebar-desktop { width: 280px; height: 100vh; position: sticky; top: 0; z-index: 1000; overflow-y: auto; }
-        .main-content { flex: 1; min-height: 100vh; background: transparent; }
+        .sidebar-desktop { width: 280px; height: 100vh; position: sticky; top: 0; z-index: 1000; overflow-y: auto; flex: 0 0 280px; }
+        .main-wrapper-d-flex { min-width: 0; }
+        .main-content { flex: 1 1 auto; min-width: 0; min-height: 100vh; background: transparent; }
         .card { border: none; border-radius: 1rem; box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
         .nav-link { border-radius: 0.5rem; margin-bottom: 0.2rem; transition: all 0.2s; }
         .nav-link:hover { background-color: rgba(31, 115, 224, 0.1); }

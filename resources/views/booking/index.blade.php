@@ -81,6 +81,11 @@
 
 @push('head')
 <style>
+    .booking-page,
+    .booking-shell,
+    .booking-card-body {
+        min-width: 0;
+    }
     .queue-board {
         --board-zoom: 1;
         --staff-col-base: 124px;
@@ -105,6 +110,7 @@
         min-width: calc(var(--staff-col-width) + (var(--slot-count) * var(--slot-width)));
     }
     .queue-board-wrap {
+        max-width: 100%;
         overscroll-behavior-x: contain;
         overscroll-behavior-y: auto;
         -webkit-overflow-scrolling: touch;
