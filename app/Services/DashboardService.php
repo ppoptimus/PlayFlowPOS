@@ -77,6 +77,35 @@ class DashboardService
         ];
     }
 
+    public function getCashierDashboardData(User $user, ?int $branchId = null): array
+    {
+        $branch = $this->resolveBranch($user, $branchId);
+        $resolvedBranchId = (int) $branch->id;
+        $today = Carbon::today();
+        $tomorrow = $today->copy()->addDay();
+        $yesterday = $today->copy()->subDay();
+
+        $todaySales = $this->sumSalesBetween($resolvedBranchId, $today, $tomorrow);
+        $yesterdaySales = $this->sumSalesBetween($resolvedBranchId, $yesterday, $today);
+        $todayOrders = $this->countOrdersBetween($resolvedBranchId, $today, $tomorrow);
+        $yesterdayOrders = $this->countOrdersBetween($resolvedBranchId, $yesterday, $today);
+
+        $todayMasseuses = $this->buildMasseuseSummaryRows($resolvedBranchId, $today, $tomorrow);
+        $yesterdayMasseuses = $this->buildMasseuseSummaryRows($resolvedBranchId, $yesterday, $today);
+        $masseuseComparisons = $this->mergeMasseuseComparisons($todayMasseuses, $yesterdayMasseuses);
+
+        return [
+            'branch_id' => $resolvedBranchId,
+            'branch_name' => (string) $branch->name,
+            'today_sales' => (int) round($todaySales),
+            'yesterday_sales' => (int) round($yesterdaySales),
+            'today_orders' => $todayOrders,
+            'yesterday_orders' => $yesterdayOrders,
+            'masseuses' => $masseuseComparisons,
+            'last_sync' => Carbon::now()->format('H:i'),
+        ];
+    }
+
     private function normalizeRange(string $range): string
     {
         if (in_array($range, ['today', 'yesterday', '7d'], true)) {
@@ -294,6 +323,94 @@ class DashboardService
                 'avatar' => 'https://i.pravatar.cc/150?u=ms' . $id,
             ];
         })->all();
+    }
+
+    private function buildMasseuseSummaryRows(int $branchId, Carbon $from, Carbon $to): array
+    {
+        $revenueQuery = DB::table('order_items as oi')
+            ->join('orders as o', 'o.id', '=', 'oi.order_id')
+            ->leftJoin('masseuses as m', 'm.id', '=', 'oi.masseuse_id')
+            ->where('o.branch_id', $branchId)
+            ->where('oi.item_type', 'service')
+            ->whereNotNull('oi.masseuse_id')
+            ->where('o.created_at', '>=', $from)
+            ->where('o.created_at', '<', $to)
+            ->selectRaw(
+                "oi.masseuse_id as id, " .
+                "COALESCE(NULLIF(m.nickname, ''), m.full_name, CONCAT('Masseuse #', oi.masseuse_id)) as name, " .
+                "SUM(oi.qty * oi.unit_price) as income, " .
+                "COUNT(DISTINCT o.id) as queue_count"
+            )
+            ->groupBy('oi.masseuse_id', 'm.nickname', 'm.full_name');
+
+        $revenues = $this->applyPaidScope($revenueQuery, 'o')
+            ->get()
+            ->keyBy('id');
+
+        $commissionQuery = DB::table('commissions as c')
+            ->join('order_items as oi', 'oi.id', '=', 'c.order_item_id')
+            ->join('orders as o', 'o.id', '=', 'oi.order_id')
+            ->where('o.branch_id', $branchId)
+            ->where('o.created_at', '>=', $from)
+            ->where('o.created_at', '<', $to)
+            ->selectRaw('c.masseuse_id as id, SUM(c.amount) as commission')
+            ->groupBy('c.masseuse_id');
+
+        $commissions = $this->applyPaidScope($commissionQuery, 'o')
+            ->get()
+            ->keyBy('id');
+
+        $allIds = array_values(array_unique(array_merge(
+            array_map('intval', array_keys($revenues->all())),
+            array_map('intval', array_keys($commissions->all()))
+        )));
+
+        $rows = [];
+        foreach ($allIds as $id) {
+            $revenue = $revenues->get($id);
+            $commission = $commissions->get($id);
+
+            $rows[$id] = [
+                'id' => (int) $id,
+                'name' => (string) ($revenue->name ?? ('Masseuse #' . $id)),
+                'income' => (float) ($revenue->income ?? 0),
+                'commission' => (float) ($commission->commission ?? 0),
+                'queue_count' => (int) ($revenue->queue_count ?? 0),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function mergeMasseuseComparisons(array $todayRows, array $yesterdayRows): array
+    {
+        $allIds = array_values(array_unique(array_merge(array_keys($todayRows), array_keys($yesterdayRows))));
+        $merged = [];
+
+        foreach ($allIds as $id) {
+            $today = $todayRows[$id] ?? null;
+            $yesterday = $yesterdayRows[$id] ?? null;
+
+            $merged[] = [
+                'id' => (int) $id,
+                'name' => (string) ($today['name'] ?? $yesterday['name'] ?? ('Masseuse #' . $id)),
+                'today_income' => (float) ($today['income'] ?? 0),
+                'today_commission' => (float) ($today['commission'] ?? 0),
+                'today_queue_count' => (int) ($today['queue_count'] ?? 0),
+                'yesterday_income' => (float) ($yesterday['income'] ?? 0),
+                'yesterday_commission' => (float) ($yesterday['commission'] ?? 0),
+                'yesterday_queue_count' => (int) ($yesterday['queue_count'] ?? 0),
+            ];
+        }
+
+        usort($merged, static function (array $left, array $right): int {
+            $leftScore = ((float) $left['today_income']) + ((float) $left['yesterday_income']);
+            $rightScore = ((float) $right['today_income']) + ((float) $right['yesterday_income']);
+
+            return $rightScore <=> $leftScore;
+        });
+
+        return $merged;
     }
 
     private function sumCommissions(int $branchId, Carbon $from, ?Carbon $to = null): float

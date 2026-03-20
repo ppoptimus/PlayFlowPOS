@@ -18,6 +18,13 @@ class MasseuseController extends Controller
 
     public function index(Request $request): View
     {
+        if ((string) ($request->user()->role ?? '') === 'masseuse') {
+            return view('masseuse.self', $this->masseuseService->getSelfDashboardData(
+                $request->user(),
+                (string) $request->query('date', now()->toDateString())
+            ));
+        }
+
         $requestedBranchId = $request->has('branch_id') ? (int) $request->query('branch_id') : null;
         $selectedDate = (string) $request->query('date', now()->toDateString());
 
@@ -25,6 +32,14 @@ class MasseuseController extends Controller
             $request->user(),
             $requestedBranchId,
             $selectedDate
+        ));
+    }
+
+    public function selfDashboard(Request $request): View
+    {
+        return view('masseuse.self', $this->masseuseService->getSelfDashboardData(
+            $request->user(),
+            (string) $request->query('date', now()->toDateString())
         ));
     }
 

@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Services\DashboardService;
-use Illuminate\Contracts\View\View;
-
 class DashboardController extends Controller
 {
     private DashboardService $dashboardService;
@@ -14,14 +12,25 @@ class DashboardController extends Controller
         $this->dashboardService = $dashboardService;
     }
 
-    public function index(): View
+    public function index()
     {
+        $user = request()->user();
+        $role = (string) ($user->role ?? '');
         $branchId = request()->has('branch_id') ? (int) request()->query('branch_id') : null;
+        if ($role === 'masseuse') {
+            return redirect()->route('masseuse.self');
+        }
+
+        if ($role === 'cashier') {
+            return view('dashboard.cashier', [
+                'stats' => $this->dashboardService->getCashierDashboardData($user, $branchId),
+            ]);
+        }
+
         $range = (string) request()->query('range', 'today');
-        $stats = $this->dashboardService->getDashboardStats(request()->user(), $branchId, $range);
 
         return view('dashboard', [
-            'stats' => $stats,
+            'stats' => $this->dashboardService->getDashboardStats($user, $branchId, $range),
         ]);
     }
 }

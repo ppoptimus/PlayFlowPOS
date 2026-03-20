@@ -21,12 +21,14 @@ class MasseuseService
     ];
 
     private BookingService $bookingService;
+    private StaffDirectoryService $staffDirectory;
 
     private array $tableExistsCache = [];
 
-    public function __construct(BookingService $bookingService)
+    public function __construct(BookingService $bookingService, StaffDirectoryService $staffDirectory)
     {
         $this->bookingService = $bookingService;
+        $this->staffDirectory = $staffDirectory;
     }
 
     public function getPageData(User $user, ?int $requestedBranchId, string $date): array
@@ -49,6 +51,34 @@ class MasseuseService
                 ? $this->getStaffRecords($activeBranchId, $staffWithYesterday)
                 : [],
         ]);
+    }
+
+    public function getSelfDashboardData(User $user, string $date): array
+    {
+        $selectedDate = $this->normalizeSelectedDate($date);
+        $activeBranchId = $this->bookingService->resolveBranchIdForUser($user, null);
+        $profile = $this->staffDirectory->resolveUserProfile($user);
+        $selfMasseuseId = $this->resolveSelfMasseuseId($user, $activeBranchId);
+
+        $record = null;
+        if ($selfMasseuseId !== null) {
+            $pageData = $this->getPageData($user, null, $selectedDate);
+            foreach (($pageData['staff'] ?? []) as $staffRow) {
+                if ((int) ($staffRow['id'] ?? 0) === $selfMasseuseId) {
+                    $record = $staffRow;
+                    break;
+                }
+            }
+        }
+
+        return [
+            'moduleReady' => $this->tableExists('masseuses'),
+            'selectedDate' => $selectedDate,
+            'activeBranchId' => $activeBranchId,
+            'profile' => $profile,
+            'record' => $record,
+            'isLinked' => $record !== null,
+        ];
     }
 
     public function getEmptyFormRecord(): array
@@ -616,6 +646,92 @@ class MasseuseService
         return in_array((string) ($user->role ?? ''), ['super_admin', 'branch_manager'], true);
     }
 
+    private function normalizeSelectedDate(string $date): string
+    {
+        try {
+            return Carbon::createFromFormat('Y-m-d', $date)->toDateString();
+        } catch (\Throwable $e) {
+            return Carbon::today()->toDateString();
+        }
+    }
+
+    private function resolveSelfMasseuseId(User $user, int $branchId): ?int
+    {
+        if (!$this->tableExists('masseuses')) {
+            return null;
+        }
+
+        if ($this->hasColumn('masseuses', 'user_id')) {
+            $linkedId = DB::table('masseuses')
+                ->where('user_id', (int) $user->id)
+                ->when($this->hasColumn('masseuses', 'branch_id'), function ($query) use ($branchId) {
+                    $query->where('branch_id', $branchId);
+                })
+                ->value('id');
+
+            if ($linkedId !== null) {
+                return (int) $linkedId;
+            }
+        }
+
+        $staffId = isset($user->staff_id) ? (int) $user->staff_id : 0;
+        if ($staffId <= 0 || !$this->tableExists('staff')) {
+            return null;
+        }
+
+        $staff = DB::table('staff')
+            ->where('id', $staffId)
+            ->first(['name', 'nickname', 'branch_id']);
+
+        if ($staff === null) {
+            return null;
+        }
+
+        $names = array_values(array_unique(array_filter([
+            trim((string) ($staff->name ?? '')),
+            trim((string) ($staff->nickname ?? '')),
+        ], static function (string $value): bool {
+            return $value !== '';
+        })));
+
+        if (empty($names)) {
+            return null;
+        }
+
+        $candidates = DB::table('masseuses')
+            ->when($this->hasColumn('masseuses', 'branch_id'), function ($query) use ($branchId) {
+                $query->where('branch_id', $branchId);
+            })
+            ->where(function ($query) use ($names): void {
+                foreach ($names as $index => $name) {
+                    if ($index === 0) {
+                        $query->where('nickname', $name)
+                            ->orWhere('full_name', $name);
+                        continue;
+                    }
+
+                    $query->orWhere('nickname', $name)
+                        ->orWhere('full_name', $name);
+                }
+            })
+            ->get(['id']);
+
+        if ($candidates->count() !== 1) {
+            return null;
+        }
+
+        $resolvedId = (int) $candidates->first()->id;
+
+        if ($resolvedId > 0 && $this->hasColumn('masseuses', 'user_id')) {
+            DB::table('masseuses')
+                ->where('id', $resolvedId)
+                ->whereNull('user_id')
+                ->update(['user_id' => (int) $user->id]);
+        }
+
+        return $resolvedId > 0 ? $resolvedId : null;
+    }
+
     private function tableExists(string $table): bool
     {
         if (!array_key_exists($table, $this->tableExistsCache)) {
@@ -623,5 +739,10 @@ class MasseuseService
         }
 
         return (bool) $this->tableExistsCache[$table];
+    }
+
+    private function hasColumn(string $table, string $column): bool
+    {
+        return $this->tableExists($table) && Schema::hasColumn($table, $column);
     }
 }

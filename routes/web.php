@@ -13,30 +13,37 @@ Route::post('/logout', 'Auth\LoginController@logout')
 
 Route::middleware('auth')->group(function (): void {
     Route::get('/', 'DashboardController@index')->name('dashboard');
+    Route::get('/my-commission', 'MasseuseController@selfDashboard')
+        ->name('masseuse.self')
+        ->middleware('roles:masseuse');
 
     Route::get('/home', function () {
         return redirect()->route('dashboard');
     })->name('home');
 
-    Route::get('/pos', 'PosController@index')->name('pos');
-    Route::post('/pos/checkout', 'PosController@checkout')->name('pos.checkout');
-    Route::get('/receipts', 'ReceiptController@index')->name('receipts');
-    Route::get('/receipts/{orderId}', 'ReceiptController@show')->name('receipts.show');
-    Route::get('/booking', 'BookingController@index')->name('booking');
-    Route::get('/booking/data', 'BookingController@data')->name('booking.data');
-    Route::post('/booking', 'BookingController@store')->name('booking.store');
-    Route::put('/booking/{bookingId}', 'BookingController@update')->name('booking.update');
-    Route::delete('/booking/{bookingId}', 'BookingController@destroy')->name('booking.destroy');
     Route::get('/my-profile', 'StaffManagementController@profile')->name('profile.show');
     Route::get('/masseuse', 'MasseuseController@index')->name('masseuse');
-    Route::post('/masseuse/attendance', 'MasseuseController@updateAttendance')->name('masseuse.attendance');
-    Route::get('/customers', 'CustomerController@index')->name('customers');
-    Route::post('/customers', 'CustomerController@store')->name('customers.store');
-    Route::post('/customers/quick-create', 'CustomerController@quickCreate')->name('customers.quick-create');
-    Route::get('/customers/{customerId}/history', 'CustomerController@history')->name('customers.history');
-    Route::put('/customers/{customerId}', 'CustomerController@update')->name('customers.update');
-    Route::delete('/customers/{customerId}', 'CustomerController@destroy')->name('customers.destroy');
+
+    Route::middleware('roles:super_admin,branch_manager,cashier')->group(function (): void {
+        Route::get('/pos', 'PosController@index')->name('pos');
+        Route::post('/pos/checkout', 'PosController@checkout')->name('pos.checkout');
+        Route::get('/booking', 'BookingController@index')->name('booking');
+        Route::get('/booking/data', 'BookingController@data')->name('booking.data');
+        Route::post('/booking', 'BookingController@store')->name('booking.store');
+        Route::put('/booking/{bookingId}', 'BookingController@update')->name('booking.update');
+        Route::delete('/booking/{bookingId}', 'BookingController@destroy')->name('booking.destroy');
+        Route::post('/customers/quick-create', 'CustomerController@quickCreate')->name('customers.quick-create');
+    });
+
     Route::middleware('admin.only')->group(function (): void {
+        Route::post('/masseuse/attendance', 'MasseuseController@updateAttendance')->name('masseuse.attendance');
+        Route::get('/receipts', 'ReceiptController@index')->name('receipts');
+        Route::get('/receipts/{orderId}', 'ReceiptController@show')->name('receipts.show');
+        Route::get('/customers', 'CustomerController@index')->name('customers');
+        Route::post('/customers', 'CustomerController@store')->name('customers.store');
+        Route::get('/customers/{customerId}/history', 'CustomerController@history')->name('customers.history');
+        Route::put('/customers/{customerId}', 'CustomerController@update')->name('customers.update');
+        Route::delete('/customers/{customerId}', 'CustomerController@destroy')->name('customers.destroy');
         Route::get('/membership-levels', 'MembershipLevelController@index')->name('membership-levels');
         Route::post('/membership-levels', 'MembershipLevelController@store')->name('membership-levels.store');
         Route::put('/membership-levels/{tierId}', 'MembershipLevelController@update')->name('membership-levels.update');
@@ -103,14 +110,16 @@ Route::middleware('auth')->group(function (): void {
     });
 
     // Reports
-    Route::get('/reports', 'ReportController@index')->name('reports');
-    Route::get('/reports/export-csv', 'ReportController@exportCsv')->name('reports.export-csv');
+    Route::middleware('roles:super_admin,branch_manager')->group(function (): void {
+        Route::get('/reports', 'ReportController@index')->name('reports');
+        Route::get('/reports/export-csv', 'ReportController@exportCsv')->name('reports.export-csv');
 
-    $modules = [
-        'promotions', 'financial',
-    ];
+        $modules = [
+            'promotions', 'financial',
+        ];
 
-    foreach ($modules as $module) {
-        Route::get('/' . $module, 'ModuleController@comingSoon')->name($module);
-    }
+        foreach ($modules as $module) {
+            Route::get('/' . $module, 'ModuleController@comingSoon')->name($module);
+        }
+    });
 });

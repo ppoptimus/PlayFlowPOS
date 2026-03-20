@@ -223,6 +223,7 @@
     </div>
     @endforelse
 
+    @if($canManage)
     <div class="col-12 pt-2">
         <section class="attendance-card">
             <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
@@ -286,6 +287,7 @@
             </div>
         </section>
     </div>
+    @endif
     @endif
 </div>
 @endsection

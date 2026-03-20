@@ -42,6 +42,13 @@ class StaffManagementService
             ->leftJoin('branches as b', 's.branch_id', '=', 'b.id')
             ->orderBy('s.id');
 
+        if ($this->hasColumn('staff', 'position')) {
+            $query->where(function ($q): void {
+                $q->whereNull('s.position')
+                    ->orWhere('s.position', '!=', 'หมอนวด');
+            });
+        }
+
         if ($normalizedSearch !== '') {
             $query->where(function ($q) use ($normalizedSearch): void {
                 $q->where('s.name', 'like', '%' . $normalizedSearch . '%');

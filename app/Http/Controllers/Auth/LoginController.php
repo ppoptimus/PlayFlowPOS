@@ -44,9 +44,15 @@ class LoginController extends Controller
         return 'username';
     }
 
-    protected function authenticated(Request $request, $user): void
+    protected function authenticated(Request $request, $user)
     {
         $user->last_login = now();
         $user->save();
+
+        if ((string) ($user->role ?? '') === 'masseuse') {
+            return redirect()->route('masseuse.self');
+        }
+
+        return redirect()->route('dashboard');
     }
 }

@@ -136,6 +136,22 @@ class StaffDirectoryService
         );
     }
 
+    public function getMasseuseAvatar(?int $masseuseId, ?string $seed = null): string
+    {
+        if ($masseuseId === null || $masseuseId <= 0 || !$this->tableExists('masseuses')) {
+            return $this->buildFallbackAvatar($seed ?? 'masseuse');
+        }
+
+        $profileImage = DB::table('masseuses')
+            ->where('id', $masseuseId)
+            ->value('profile_image');
+
+        return $this->resolveAvatarPath(
+            is_string($profileImage) ? $profileImage : '',
+            $seed ?? ('masseuse-' . $masseuseId)
+        );
+    }
+
     public function saveStaffProfileImage(int $staffId, UploadedFile $profileImage): string
     {
         $metadata = $this->getMetadata();
