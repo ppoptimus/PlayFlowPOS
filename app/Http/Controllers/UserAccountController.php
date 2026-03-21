@@ -29,7 +29,7 @@ class UserAccountController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $payload = $request->validate([
-            'staff_id' => ['required'],
+            'staff_id' => ['nullable'],
             'source_type' => ['nullable', 'string'],
             'source_id' => ['nullable'],
             'username' => ['required', 'string', 'max:100'],

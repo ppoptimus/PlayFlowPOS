@@ -216,6 +216,7 @@ class StaffDirectoryService
     {
         $map = [
             'super_admin' => 'Super Admin',
+            'shop_owner' => 'เจ้าของร้าน',
             'branch_manager' => 'ผู้จัดการสาขา',
             'cashier' => 'แคชเชียร์',
             'masseuse' => 'หมอนวด',

@@ -17,6 +17,13 @@ Route::middleware('auth')->group(function (): void {
         ->name('masseuse.self')
         ->middleware('roles:masseuse');
 
+    Route::middleware('roles:super_admin')->prefix('system')->group(function (): void {
+        Route::get('/shops', 'ShopPortalController@index')->name('system.shops.index');
+        Route::get('/shops/{shopId}/enter', 'ShopPortalController@enter')->name('system.shops.enter');
+        Route::post('/shops', 'ShopPortalController@store')->name('system.shops.store');
+        Route::put('/shops/{shopId}', 'ShopPortalController@update')->name('system.shops.update');
+    });
+
     Route::get('/home', function () {
         return redirect()->route('dashboard');
     })->name('home');
@@ -33,6 +40,9 @@ Route::middleware('auth')->group(function (): void {
         Route::put('/booking/{bookingId}', 'BookingController@update')->name('booking.update');
         Route::delete('/booking/{bookingId}', 'BookingController@destroy')->name('booking.destroy');
         Route::post('/customers/quick-create', 'CustomerController@quickCreate')->name('customers.quick-create');
+    });
+
+    Route::middleware('roles:super_admin,shop_owner,branch_manager,cashier')->group(function (): void {
         Route::post('/masseuse/attendance', 'MasseuseController@updateAttendance')->name('masseuse.attendance');
     });
 
@@ -94,12 +104,27 @@ Route::middleware('auth')->group(function (): void {
         Route::post('/branches', 'BranchController@store')->name('branches.store');
         Route::put('/branches/{branchId}', 'BranchController@update')->name('branches.update');
         Route::delete('/branches/{branchId}', 'BranchController@destroy')->name('branches.destroy');
+    });
+
+    Route::middleware('roles:super_admin,shop_owner,branch_manager')->group(function (): void {
+        // สาขา (Branch Management)
+        Route::get('/branches', 'BranchController@index')->name('branches.index');
+        Route::post('/branches', 'BranchController@store')->name('branches.store');
+        Route::put('/branches/{branchId}', 'BranchController@update')->name('branches.update');
+        Route::delete('/branches/{branchId}', 'BranchController@destroy')->name('branches.destroy');
 
         // พนักงาน (Staff Management)
         Route::get('/staff', 'StaffManagementController@index')->name('staff.index');
         Route::post('/staff', 'StaffManagementController@store')->name('staff.store');
         Route::put('/staff/{staffId}', 'StaffManagementController@update')->name('staff.update');
         Route::delete('/staff/{staffId}', 'StaffManagementController@destroy')->name('staff.destroy');
+
+        // หมอนวด (Masseuse Management)
+        Route::get('/masseuse/create', 'MasseuseController@create')->name('masseuse.create');
+        Route::get('/masseuse/{staffId}/edit', 'MasseuseController@edit')->name('masseuse.edit');
+        Route::post('/masseuse', 'MasseuseController@store')->name('masseuse.store');
+        Route::put('/masseuse/{staffId}', 'MasseuseController@update')->name('masseuse.update');
+        Route::delete('/masseuse/{staffId}', 'MasseuseController@destroy')->name('masseuse.destroy');
 
         // ผู้ใช้งาน (User Accounts)
         Route::get('/users', 'UserAccountController@index')->name('users.index');

@@ -29,6 +29,8 @@
 
 @php
     $sidebarRole = (string) (auth()->user()->role ?? '');
+    $isSuperAdminSidebar = $sidebarRole === 'super_admin';
+    $isShopOwnerSidebar = $sidebarRole === 'shop_owner';
     $isAdminSidebar = in_array($sidebarRole, ['super_admin', 'branch_manager'], true);
     $isCashierSidebar = $sidebarRole === 'cashier';
     $isMasseuseSidebar = $sidebarRole === 'masseuse';
@@ -46,6 +48,34 @@
             <a href="{{ route('masseuse.self') }}" class="nav-link {{ request()->routeIs('masseuse.self') || request()->routeIs('masseuse') ? 'active' : 'link-dark' }}">
                 <i class="bi bi-wallet2 me-2"></i> ค่ามือของฉัน
             </a>
+        @elseif($isSuperAdminSidebar)
+            <small class="text-muted fw-bold mb-2 px-2" style="font-size: 0.75rem;">พอร์ทัลเจ้าของระบบ</small>
+            <a href="{{ route('system.shops.index') }}" class="nav-link {{ request()->routeIs('system.shops.*') ? 'active' : 'link-dark' }}">
+                <i class="bi bi-grid-fill me-2"></i> พอร์ทัลร้าน
+            </a>
+            <a href="{{ route('branches.index') }}" class="nav-link {{ request()->routeIs('branches.*') ? 'active' : 'link-dark' }}">
+                <i class="bi bi-building-fill me-2"></i> สาขา
+            </a>
+            <a href="{{ route('staff.index') }}" class="nav-link {{ request()->routeIs('staff.*') ? 'active' : 'link-dark' }}">
+                <i class="bi bi-person-badge-fill me-2"></i> พนักงาน
+            </a>
+            <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : 'link-dark' }}">
+                <i class="bi bi-shield-lock-fill me-2"></i> ผู้ใช้งานระบบ
+            </a>
+        @elseif($isShopOwnerSidebar)
+            <small class="text-muted fw-bold mb-2 px-2" style="font-size: 0.75rem;">เจ้าของร้าน</small>
+            <a href="{{ route('branches.index') }}" class="nav-link {{ request()->routeIs('branches.*') ? 'active' : 'link-dark' }}">
+                <i class="bi bi-building-fill me-2"></i> สาขา
+            </a>
+            <a href="{{ route('staff.index') }}" class="nav-link {{ request()->routeIs('staff.*') ? 'active' : 'link-dark' }}">
+                <i class="bi bi-person-badge-fill me-2"></i> พนักงาน
+            </a>
+            <a href="{{ route('masseuse') }}" class="nav-link {{ request()->routeIs('masseuse*') ? 'active' : 'link-dark' }}">
+                <i class="bi bi-people-fill me-2"></i> หมอนวด
+            </a>
+            <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : 'link-dark' }}">
+                <i class="bi bi-shield-lock-fill me-2"></i> ผู้ใช้งานระบบ
+            </a>
         @else
             <small class="text-muted fw-bold mb-2 px-2" style="font-size: 0.75rem;">งานหลัก</small>
             <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : 'link-dark' }}">
@@ -62,11 +92,10 @@
             </a>
 
             @if($isAdminSidebar)
+                <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">งานขายและบริการ</small>
                 <a href="{{ route('receipts') }}" class="nav-link {{ request()->routeIs('receipts*') ? 'active' : 'link-dark' }}">
                     <i class="bi bi-receipt-cutoff me-2"></i> ใบเสร็จ
                 </a>
-
-                <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บริหารจัดการ</small>
                 <a href="{{ route('customers') }}" class="nav-link {{ request()->routeIs('customers*') ? 'active' : 'link-dark' }}">
                     <i class="bi bi-people-fill me-2"></i> ลูกค้า
                 </a>
@@ -76,17 +105,17 @@
                 <a href="{{ route('packages') }}" class="nav-link {{ request()->routeIs('packages*') ? 'active' : 'link-dark' }}">
                     <i class="bi bi-box2-heart me-2"></i> แพ็กเกจ
                 </a>
-                <a href="{{ route('massage-rooms') }}" class="nav-link {{ request()->routeIs('massage-rooms*') ? 'active' : 'link-dark' }}">
-                    <i class="bi bi-door-open me-2"></i> ห้องนวด
-                </a>
                 <a href="{{ route('services.index') }}" class="nav-link {{ request()->routeIs('services.*') ? 'active' : 'link-dark' }}">
                     <i class="bi bi-list-stars me-2"></i> บริการ
                 </a>
                 <a href="{{ route('products') }}" class="nav-link {{ request()->routeIs('products*') ? 'active' : 'link-dark' }}">
                     <i class="bi bi-box-seam-fill me-2"></i> สินค้าและสต็อก
                 </a>
+                <a href="{{ route('massage-rooms') }}" class="nav-link {{ request()->routeIs('massage-rooms*') ? 'active' : 'link-dark' }}">
+                    <i class="bi bi-door-open me-2"></i> ห้องนวด
+                </a>
 
-                <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">บัญชีและรายงาน</small>
+                <small class="text-muted fw-bold mt-4 mb-2 px-2" style="font-size: 0.75rem;">วิเคราะห์และการเงิน</small>
                 <a href="{{ route('reports') }}" class="nav-link {{ request()->routeIs('reports*') ? 'active' : 'link-dark' }}">
                     <i class="bi bi-bar-chart-line-fill me-2"></i> รายงานวิเคราะห์
                 </a>

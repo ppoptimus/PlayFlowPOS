@@ -20,15 +20,14 @@ class BranchController extends Controller
     {
         $search = (string) $request->query('search', '');
 
-        $pageData = $this->branchService->getPageData($request->user(), $search);
-
-        return view('branches.index', $pageData);
+        return view('branches.index', $this->branchService->getPageData($request->user(), $search));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $payload = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'shop_id' => ['nullable', 'integer'],
             'address' => ['nullable', 'string', 'max:1000'],
             'phone' => ['nullable', 'string', 'max:50'],
         ]);
@@ -44,6 +43,7 @@ class BranchController extends Controller
     {
         $payload = $request->validate([
             'name' => ['required', 'string', 'max:255'],
+            'shop_id' => ['nullable', 'integer'],
             'address' => ['nullable', 'string', 'max:1000'],
             'phone' => ['nullable', 'string', 'max:50'],
             'is_active' => ['nullable'],

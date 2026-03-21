@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\DashboardService;
+
 class DashboardController extends Controller
 {
     private DashboardService $dashboardService;
@@ -17,6 +18,15 @@ class DashboardController extends Controller
         $user = request()->user();
         $role = (string) ($user->role ?? '');
         $branchId = request()->has('branch_id') ? (int) request()->query('branch_id') : null;
+
+        if ($role === 'super_admin') {
+            return redirect()->route('system.shops.index');
+        }
+
+        if ($role === 'shop_owner') {
+            return redirect()->route('branches.index');
+        }
+
         if ($role === 'masseuse') {
             return redirect()->route('masseuse.self');
         }

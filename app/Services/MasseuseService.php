@@ -645,12 +645,12 @@ class MasseuseService
 
     private function canManage(User $user): bool
     {
-        return in_array((string) ($user->role ?? ''), ['super_admin', 'branch_manager'], true);
+        return in_array((string) ($user->role ?? ''), ['super_admin', 'shop_owner', 'branch_manager'], true);
     }
 
     private function canManageAttendance(User $user): bool
     {
-        return in_array((string) ($user->role ?? ''), ['super_admin', 'branch_manager', 'cashier'], true);
+        return in_array((string) ($user->role ?? ''), ['super_admin', 'shop_owner', 'branch_manager', 'cashier'], true);
     }
 
     private function normalizeSelectedDate(string $date): string

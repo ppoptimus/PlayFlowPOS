@@ -32,17 +32,6 @@
             box-shadow: 0 18px 36px rgba(20, 73, 124, 0.14);
         }
 
-        .brand-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            border-radius: 999px;
-            padding: 0.35rem 0.75rem;
-            background: rgba(31, 115, 224, 0.1);
-            color: #1f73e0;
-            font-weight: 700;
-        }
-
         .brand-logo {
             display: flex;
             justify-content: center;
@@ -85,9 +74,15 @@
 
             <div class="mb-3">
                 <label class="form-label fw-semibold" for="username">ชื่อผู้ใช้งาน</label>
-                <input style="border-radius:1.20rem;" id="username" type="text" name="username"
+                <input id="username"
+                    type="text"
+                    name="username"
                     class="form-control form-control-lg @error('username') is-invalid @enderror"
-                    value="{{ old('username') }}" required autofocus autocomplete="username">
+                    style="border-radius: 1.2rem;"
+                    value="{{ old('username') }}"
+                    required
+                    autofocus
+                    autocomplete="username">
                 @error('username')
                     <div class="invalid-feedback">{{ $message }}</div>
                 @enderror
@@ -95,8 +90,12 @@
 
             <div class="mb-4">
                 <label class="form-label fw-semibold" for="password">รหัสผ่าน</label>
-                <input style="border-radius:1.20rem" id="password" type="password" name="password"
-                    class="form-control form-control-lg @error('password') is-invalid @enderror" required
+                <input id="password"
+                    type="password"
+                    name="password"
+                    class="form-control form-control-lg @error('password') is-invalid @enderror"
+                    style="border-radius: 1.2rem;"
+                    required
                     autocomplete="current-password">
                 @error('password')
                     <div class="invalid-feedback">{{ $message }}</div>
@@ -104,10 +103,13 @@
             </div>
 
             <button type="submit"
-                style="border-radius:1.25rem; padding: 1rem;  align-items: center; justify-content: center; gap: 0.75rem; transition: all 0.3s ease; font-size: 1.5rem; font-weight: 700; box-shadow: 0 10px 20px rgba(7, 90, 135, 0.25);"
-                class="btn btn-primary w-100">เข้าสู่ระบบ <i class="bi bi-chevron-right fs-5"></i></button>
+                class="btn btn-primary w-100"
+                style="border-radius: 1.25rem; padding: 1rem; align-items: center; justify-content: center; gap: 0.75rem; transition: all 0.3s ease; font-size: 1.5rem; font-weight: 700; box-shadow: 0 10px 20px rgba(7, 90, 135, 0.25);">
+                เข้าสู่ระบบ <i class="bi bi-chevron-right fs-5"></i>
+            </button>
         </form>
     </div>
+
     <script src="{{ asset('js/icon-bridge.js') }}?v={{ $iconBridgeJsVersion }}"></script>
 </body>
 

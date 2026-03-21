@@ -8,14 +8,21 @@ use Illuminate\Support\Facades\DB;
 
 class BranchContextService
 {
+    private ShopContextService $shopContext;
+
+    public function __construct(ShopContextService $shopContext)
+    {
+        $this->shopContext = $shopContext;
+    }
+
     public function canAccessAdmin(?User $user): bool
     {
-        return in_array((string) ($user->role ?? ''), ['super_admin', 'branch_manager'], true);
+        return in_array((string) ($user->role ?? ''), ['super_admin', 'shop_owner', 'branch_manager'], true);
     }
 
     public function canManageAllBranches(?User $user): bool
     {
-        return (string) ($user->role ?? '') === 'super_admin';
+        return in_array((string) ($user->role ?? ''), ['super_admin', 'shop_owner'], true);
     }
 
     public function getUserBranchId(?User $user): ?int
@@ -28,11 +35,21 @@ class BranchContextService
     public function resolveAuthorizedBranchId(User $user, ?int $requestedBranchId = null): int
     {
         if ($this->canManageAllBranches($user)) {
-            if ($requestedBranchId !== null && $requestedBranchId > 0 && $this->branchExists($requestedBranchId)) {
-                return $requestedBranchId;
+            $accessibleBranches = $this->getAccessibleBranches($user, false);
+
+            if ($requestedBranchId !== null && $requestedBranchId > 0) {
+                foreach ($accessibleBranches as $branch) {
+                    if ((int) $branch['id'] === $requestedBranchId) {
+                        return $requestedBranchId;
+                    }
+                }
             }
 
-            return $this->getDefaultBranchId();
+            if (!empty($accessibleBranches)) {
+                return (int) $accessibleBranches[0]['id'];
+            }
+
+            throw new AuthorizationException('กรุณาเลือกร้านก่อนเข้าเมนูที่อ้างอิงสาขา');
         }
 
         $userBranchId = $this->getUserBranchId($user);
@@ -52,7 +69,16 @@ class BranchContextService
             $query->where('is_active', 1);
         }
 
-        if (!$this->canManageAllBranches($user)) {
+        if ($this->canManageAllBranches($user)) {
+            $activeShopId = $this->shopContext->getActiveShopId($user);
+            if ($activeShopId === null) {
+                return [];
+            }
+
+            if ($this->shopContext->hasColumn('branches', 'shop_id')) {
+                $query->where('shop_id', $activeShopId);
+            }
+        } else {
             $userBranchId = $this->getUserBranchId($user);
             if ($userBranchId !== null) {
                 $query->where('id', $userBranchId);
@@ -80,9 +106,18 @@ class BranchContextService
             ->exists();
     }
 
-    public function getDefaultBranchId(): int
+    public function getDefaultBranchId(?User $user = null): int
     {
-        $activeBranch = DB::table('branches')
+        $query = DB::table('branches');
+
+        if ($user !== null && $this->canManageAllBranches($user) && $this->shopContext->hasColumn('branches', 'shop_id')) {
+            $activeShopId = $this->shopContext->getActiveShopId($user);
+            if ($activeShopId !== null) {
+                $query->where('shop_id', $activeShopId);
+            }
+        }
+
+        $activeBranch = (clone $query)
             ->where('is_active', 1)
             ->orderBy('id')
             ->value('id');
@@ -91,7 +126,7 @@ class BranchContextService
             return (int) $activeBranch;
         }
 
-        $firstBranch = DB::table('branches')
+        $firstBranch = (clone $query)
             ->orderBy('id')
             ->value('id');
 

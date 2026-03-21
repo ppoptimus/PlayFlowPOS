@@ -1,5 +1,7 @@
 @php
     $mobileSidebarRole = (string) (auth()->user()->role ?? '');
+    $isSuperAdminMobileSidebar = $mobileSidebarRole === 'super_admin';
+    $isShopOwnerMobileSidebar = $mobileSidebarRole === 'shop_owner';
     $isAdminMobileSidebar = in_array($mobileSidebarRole, ['super_admin', 'branch_manager'], true);
     $isMasseuseMobileSidebar = $mobileSidebarRole === 'masseuse';
 
@@ -11,6 +13,68 @@
                 'icon' => 'bi-wallet2',
                 'title' => 'ค่ามือของฉัน',
                 'subtitle' => 'ดูรายได้ ค่ามือ และคิวของตัวเอง',
+            ],
+        ];
+    } elseif ($isSuperAdminMobileSidebar) {
+        $mobileMenus = [
+            [
+                'route' => 'system.shops.index',
+                'active' => ['system.shops.*'],
+                'icon' => 'bi-grid-fill',
+                'title' => 'พอร์ทัลร้าน',
+                'subtitle' => 'เลือกร้านและเข้าไปจัดการข้อมูลของร้านนั้น',
+            ],
+            [
+                'route' => 'branches.index',
+                'active' => ['branches.*'],
+                'icon' => 'bi-building-fill',
+                'title' => 'สาขา',
+                'subtitle' => 'จัดการสาขาของร้านที่เลือก',
+            ],
+            [
+                'route' => 'staff.index',
+                'active' => ['staff.*'],
+                'icon' => 'bi-person-badge',
+                'title' => 'พนักงาน',
+                'subtitle' => 'จัดการข้อมูลพนักงานของร้านที่เลือก',
+            ],
+            [
+                'route' => 'users.index',
+                'active' => ['users.*'],
+                'icon' => 'bi-shield-check',
+                'title' => 'ผู้ใช้งานระบบ',
+                'subtitle' => 'จัดการบัญชีผู้ใช้ของร้านที่เลือก',
+            ],
+        ];
+    } elseif ($isShopOwnerMobileSidebar) {
+        $mobileMenus = [
+            [
+                'route' => 'branches.index',
+                'active' => ['branches.*'],
+                'icon' => 'bi-building-fill',
+                'title' => 'สาขา',
+                'subtitle' => 'จัดการสาขาภายในร้านของตัวเอง',
+            ],
+            [
+                'route' => 'staff.index',
+                'active' => ['staff.*'],
+                'icon' => 'bi-person-badge',
+                'title' => 'พนักงาน',
+                'subtitle' => 'จัดการข้อมูลพนักงานของร้าน',
+            ],
+            [
+                'route' => 'masseuse',
+                'active' => ['masseuse', 'masseuse.*'],
+                'icon' => 'bi-people-fill',
+                'title' => 'หมอนวด',
+                'subtitle' => 'จัดการข้อมูลหมอนวดของร้าน',
+            ],
+            [
+                'route' => 'users.index',
+                'active' => ['users.*'],
+                'icon' => 'bi-shield-check',
+                'title' => 'ผู้ใช้งานระบบ',
+                'subtitle' => 'สร้างผู้จัดการสาขาและบัญชีผู้ใช้ในร้าน',
             ],
         ];
     } else {
@@ -48,18 +112,11 @@
         if ($isAdminMobileSidebar) {
             $adminMenus = [
                 [
-                    'route' => 'branches.index',
-                    'active' => ['branches.*'],
-                    'icon' => 'bi-shop-window',
-                    'title' => 'สาขา',
-                    'subtitle' => 'จัดการข้อมูลสาขาและร้าน',
-                ],
-                [
-                    'route' => 'products',
-                    'active' => ['products*'],
-                    'icon' => 'bi-box-seam-fill',
-                    'title' => 'สินค้าและสต็อก',
-                    'subtitle' => 'จัดการสินค้าและสต็อก',
+                    'route' => 'receipts',
+                    'active' => ['receipts*'],
+                    'icon' => 'bi-receipt-cutoff',
+                    'title' => 'ใบเสร็จ',
+                    'subtitle' => 'ตรวจสอบย้อนหลังและพิมพ์บิล',
                 ],
                 [
                     'route' => 'customers',
@@ -80,14 +137,7 @@
                     'active' => ['packages*'],
                     'icon' => 'bi-box2-heart',
                     'title' => 'แพ็กเกจ',
-                    'subtitle' => 'จัดการแพ็กเกจและโปรโมชัน',
-                ],
-                [
-                    'route' => 'receipts',
-                    'active' => ['receipts*'],
-                    'icon' => 'bi-receipt-cutoff',
-                    'title' => 'ใบเสร็จ',
-                    'subtitle' => 'ตรวจสอบย้อนหลังและพิมพ์บิล',
+                    'subtitle' => 'จัดการแพ็กเกจและโปรโมชั่น',
                 ],
                 [
                     'route' => 'services.index',
@@ -97,6 +147,13 @@
                     'subtitle' => 'จัดการบริการและราคา',
                 ],
                 [
+                    'route' => 'products',
+                    'active' => ['products*'],
+                    'icon' => 'bi-box-seam-fill',
+                    'title' => 'สินค้าและสต็อก',
+                    'subtitle' => 'จัดการสินค้าและสต็อก',
+                ],
+                [
                     'route' => 'massage-rooms',
                     'active' => ['massage-rooms*'],
                     'icon' => 'bi-door-open',
@@ -104,18 +161,32 @@
                     'subtitle' => 'จัดการเตียงและห้องนวด',
                 ],
                 [
-                    'route' => 'admin.commission.index',
-                    'active' => ['admin.commission.*'],
-                    'icon' => 'bi-percent',
-                    'title' => 'ตั้งค่าคอมมิชชั่น',
-                    'subtitle' => 'จัดการค่าคอมมิชชั่น',
-                ],
-                [
                     'route' => 'reports',
                     'active' => ['reports*'],
                     'icon' => 'bi-bar-chart-line-fill',
                     'title' => 'รายงานวิเคราะห์',
                     'subtitle' => 'ยอดขาย บริการ หมอนวด สินค้า',
+                ],
+                [
+                    'route' => 'financial',
+                    'active' => ['financial*'],
+                    'icon' => 'bi-wallet2',
+                    'title' => 'การเงินและ P&L',
+                    'subtitle' => 'ดูภาพรวมรายได้และกำไรขาดทุน',
+                ],
+                [
+                    'route' => 'admin.commission.index',
+                    'active' => ['admin.commission.*'],
+                    'icon' => 'bi-percent',
+                    'title' => 'ค่าคอมมิชชั่น',
+                    'subtitle' => 'กำหนดค่าคอมมิชชั่น',
+                ],
+                [
+                    'route' => 'branches.index',
+                    'active' => ['branches.*'],
+                    'icon' => 'bi-building-fill',
+                    'title' => 'สาขา',
+                    'subtitle' => 'จัดการข้อมูลสาขา',
                 ],
                 [
                     'route' => 'staff.index',
@@ -169,7 +240,7 @@
                 <span class="mobile-menu-icon"><i class="bi bi-box-arrow-right"></i></span>
                 <span class="mobile-menu-content">
                     <span class="mobile-menu-title">ออกจากระบบ</span>
-                    <span class="mobile-menu-subtitle">ออกจากบัญชีผู้ใช้งานปัจจุบัน</span>
+                    <span class="mobile-menu-subtitle">ออกจากบัญชีผู้ใช้ปัจจุบัน</span>
                 </span>
             </button>
         </form>

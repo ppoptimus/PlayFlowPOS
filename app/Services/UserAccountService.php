@@ -10,36 +10,74 @@ use Illuminate\Validation\ValidationException;
 
 class UserAccountService
 {
+    private const STANDALONE_ROLES = ['super_admin', 'shop_owner'];
+
     private BranchContextService $branchContext;
+    private ShopContextService $shopContext;
     private StaffDirectoryService $staffDirectory;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    public function __construct(BranchContextService $branchContext, StaffDirectoryService $staffDirectory)
-    {
+    public function __construct(
+        BranchContextService $branchContext,
+        ShopContextService $shopContext,
+        StaffDirectoryService $staffDirectory
+    ) {
         $this->branchContext = $branchContext;
+        $this->shopContext = $shopContext;
         $this->staffDirectory = $staffDirectory;
     }
 
     public function getPageData(User $actor, string $search = '', ?int $branchFilter = null): array
     {
+        $normalizedSearch = trim($search);
+        $activeShop = $this->shopContext->getActiveShop($actor);
+        $branches = $this->branchContext->getAccessibleBranches($actor, true);
+        $accessibleBranchIds = array_column($branches, 'id');
         $resolvedBranchFilter = $this->resolveBranchFilter($actor, $branchFilter);
+        $activeShopOwnerUserId = (string) ($actor->role ?? '') === 'super_admin'
+            ? $this->getActiveShopOwnerUserId($actor)
+            : null;
 
         if (!$this->tableExists('users')) {
             return [
                 'moduleReady' => false,
-                'search' => trim($search),
+                'search' => $normalizedSearch,
                 'branchFilter' => $resolvedBranchFilter,
                 'users' => [],
-                'branches' => $this->branchContext->getAccessibleBranches($actor, true),
+                'branches' => $branches,
                 'roles' => $this->getAvailableRoles($actor),
                 'staffOptions' => [],
+                'standaloneRoles' => self::STANDALONE_ROLES,
                 'supportsActiveToggle' => false,
+                'activeShop' => $activeShop,
+                'shopSelected' => !$this->branchContext->canManageAllBranches($actor) || $activeShop !== null,
                 'canManageAllBranches' => $this->branchContext->canManageAllBranches($actor),
+                'activeShopOwnerUserId' => $activeShopOwnerUserId,
             ];
         }
 
-        $normalizedSearch = trim($search);
+        if (
+            (string) ($actor->role ?? '') === 'super_admin'
+            && $this->branchContext->canManageAllBranches($actor)
+            && $activeShop === null
+        ) {
+            return [
+                'moduleReady' => true,
+                'search' => $normalizedSearch,
+                'branchFilter' => null,
+                'users' => [],
+                'branches' => [],
+                'roles' => $this->getAvailableRoles($actor),
+                'staffOptions' => [],
+                'standaloneRoles' => self::STANDALONE_ROLES,
+                'supportsActiveToggle' => $this->hasColumn('users', 'is_active'),
+                'activeShop' => null,
+                'shopSelected' => false,
+                'canManageAllBranches' => true,
+                'activeShopOwnerUserId' => null,
+            ];
+        }
 
         $query = DB::table('users as u')
             ->leftJoin('staff as s', 'u.staff_id', '=', 's.id')
@@ -47,13 +85,13 @@ class UserAccountService
             ->orderBy('u.id');
 
         if ($normalizedSearch !== '') {
-            $query->where(function ($q) use ($normalizedSearch): void {
-                $q->where('u.username', 'like', '%' . $normalizedSearch . '%')
+            $query->where(function ($builder) use ($normalizedSearch): void {
+                $builder->where('u.username', 'like', '%' . $normalizedSearch . '%')
                     ->orWhere('s.name', 'like', '%' . $normalizedSearch . '%')
                     ->orWhere('s.nickname', 'like', '%' . $normalizedSearch . '%');
 
                 if ($this->tableExists('masseuses') && $this->hasColumn('masseuses', 'user_id')) {
-                    $q->orWhereExists(function ($sub) use ($normalizedSearch): void {
+                    $builder->orWhereExists(function ($sub) use ($normalizedSearch): void {
                         $sub->select(DB::raw(1))
                             ->from('masseuses as m')
                             ->whereColumn('m.user_id', 'u.id')
@@ -68,10 +106,40 @@ class UserAccountService
 
         if ($resolvedBranchFilter !== null && $this->hasColumn('users', 'branch_id')) {
             $query->where('u.branch_id', $resolvedBranchFilter);
+        } elseif ($this->branchContext->canManageAllBranches($actor)) {
+            $actorRole = (string) ($actor->role ?? '');
+
+            $query->where(function ($builder) use ($accessibleBranchIds, $activeShopOwnerUserId, $actorRole): void {
+                if (!empty($accessibleBranchIds)) {
+                    $builder->whereIn('u.branch_id', $accessibleBranchIds);
+                }
+
+                if ($activeShopOwnerUserId !== null) {
+                    if (!empty($accessibleBranchIds)) {
+                        $builder->orWhere('u.id', $activeShopOwnerUserId);
+                    } else {
+                        $builder->where('u.id', $activeShopOwnerUserId);
+                    }
+                }
+
+                if ($actorRole === 'super_admin') {
+                    if (!empty($accessibleBranchIds) || $activeShopOwnerUserId !== null) {
+                        $builder->orWhere('u.role', 'super_admin');
+                    } else {
+                        $builder->where('u.role', 'super_admin');
+                    }
+                }
+            });
+        } elseif ($this->hasColumn('users', 'branch_id')) {
+            $query->where('u.branch_id', $this->branchContext->resolveAuthorizedBranchId($actor));
         }
 
-        if (!$this->branchContext->canManageAllBranches($actor)) {
+        if ((string) ($actor->role ?? '') !== 'super_admin') {
             $query->where('u.role', '!=', 'super_admin');
+        }
+
+        if (!in_array((string) ($actor->role ?? ''), ['super_admin', 'shop_owner'], true)) {
+            $query->where('u.role', '!=', 'shop_owner');
         }
 
         $selectCols = [
@@ -91,58 +159,68 @@ class UserAccountService
             $selectCols[] = 'u.is_active';
         }
 
-        $users = $query
-            ->get($selectCols)
-            ->map(function ($row): array {
-                $staffId = isset($row->staff_id) && $row->staff_id !== null ? (int) $row->staff_id : null;
-                $linkedUser = new User();
-                $linkedUser->id = (int) $row->id;
-                $linkedUser->username = (string) ($row->username ?? '');
-                $linkedUser->role = (string) ($row->role ?? '');
-                $linkedUser->branch_id = isset($row->branch_id) && $row->branch_id !== null ? (int) $row->branch_id : null;
-                $linkedUser->staff_id = $staffId;
+        $users = $query->get($selectCols)->map(function ($row): array {
+            $staffId = isset($row->staff_id) && $row->staff_id !== null ? (int) $row->staff_id : null;
 
-                $profile = $this->staffDirectory->resolveUserProfile($linkedUser);
-                $displayName = (string) ($profile['display_name'] ?? '');
-                $displayMeta = (string) ($profile['position'] ?? '');
-                $displaySubmeta = (string) ($profile['nickname'] ?? '');
+            $linkedUser = new User();
+            $linkedUser->id = (int) $row->id;
+            $linkedUser->username = (string) ($row->username ?? '');
+            $linkedUser->role = (string) ($row->role ?? '');
+            $linkedUser->branch_id = isset($row->branch_id) && $row->branch_id !== null ? (int) $row->branch_id : null;
+            $linkedUser->staff_id = $staffId;
 
-                return [
-                    'id' => (int) $row->id,
-                    'username' => (string) ($row->username ?? ''),
-                    'role' => (string) ($row->role ?? ''),
-                    'branch_id' => isset($row->branch_id) && $row->branch_id !== null ? (int) $row->branch_id : null,
-                    'branch_name' => (string) ($row->branch_name ?? '-'),
-                    'is_active' => (bool) ($row->is_active ?? true),
-                    'last_login' => $row->last_login ?? null,
-                    'staff_id' => $staffId,
-                    'staff_name' => (string) ($row->staff_name ?? ''),
-                    'staff_nickname' => (string) ($row->staff_nickname ?? ''),
-                    'staff_position' => (string) ($row->staff_position ?? ''),
-                    'staff_avatar' => (string) ($profile['avatar'] ?? $this->staffDirectory->getStaffAvatar($staffId, 'user-' . (string) $row->id)),
-                    'is_staff_linked' => $staffId !== null && $staffId > 0,
-                    'display_name' => $displayName !== '' ? $displayName : ((string) ($row->staff_name ?? $row->username ?? '-')),
-                    'display_meta' => $displayMeta !== '' && $displayMeta !== '-'
-                        ? $displayMeta
-                        : ((string) ($row->staff_position ?? '')),
-                    'display_submeta' => $displaySubmeta !== '' && $displaySubmeta !== '-'
-                        ? $displaySubmeta
-                        : ((string) ($row->staff_nickname ?? '')),
-                    'profile_kind' => (string) ($profile['kind'] ?? 'user'),
-                ];
-            })
-            ->all();
+            $profile = $this->staffDirectory->resolveUserProfile($linkedUser);
+            $displayName = trim((string) ($profile['display_name'] ?? ''));
+            $displayMeta = trim((string) ($profile['position'] ?? ''));
+            $displaySubmeta = trim((string) ($profile['nickname'] ?? ''));
+
+            if ($displayName === '') {
+                $displayName = (string) ($row->staff_name ?? $row->username ?? '-');
+            }
+
+            if ($displayMeta === '' || $displayMeta === '-') {
+                $displayMeta = $this->getRoleLabel((string) ($row->role ?? ''));
+            }
+
+            if ($displaySubmeta === '' || $displaySubmeta === '-') {
+                $displaySubmeta = (string) ($row->branch_name ?? '');
+            }
+
+            return [
+                'id' => (int) $row->id,
+                'username' => (string) ($row->username ?? ''),
+                'role' => (string) ($row->role ?? ''),
+                'branch_id' => isset($row->branch_id) && $row->branch_id !== null ? (int) $row->branch_id : null,
+                'branch_name' => (string) ($row->branch_name ?? '-'),
+                'is_active' => (bool) ($row->is_active ?? true),
+                'last_login' => $row->last_login ?? null,
+                'staff_id' => $staffId,
+                'staff_name' => (string) ($row->staff_name ?? ''),
+                'staff_nickname' => (string) ($row->staff_nickname ?? ''),
+                'staff_position' => (string) ($row->staff_position ?? ''),
+                'staff_avatar' => (string) ($profile['avatar'] ?? $this->staffDirectory->getStaffAvatar($staffId, 'user-' . (string) $row->id)),
+                'is_staff_linked' => $staffId !== null && $staffId > 0,
+                'display_name' => $displayName,
+                'display_meta' => $displayMeta,
+                'display_submeta' => $displaySubmeta,
+                'profile_kind' => (string) ($profile['kind'] ?? 'user'),
+            ];
+        })->all();
 
         return [
             'moduleReady' => true,
             'search' => $normalizedSearch,
             'branchFilter' => $resolvedBranchFilter,
             'users' => $users,
-            'branches' => $this->branchContext->getAccessibleBranches($actor, true),
+            'branches' => $branches,
             'roles' => $this->getAvailableRoles($actor),
             'staffOptions' => $this->getAvailableAccountOptions($actor),
+            'standaloneRoles' => self::STANDALONE_ROLES,
             'supportsActiveToggle' => $this->hasColumn('users', 'is_active'),
+            'activeShop' => $activeShop,
+            'shopSelected' => !$this->branchContext->canManageAllBranches($actor) || $activeShop !== null,
             'canManageAllBranches' => $this->branchContext->canManageAllBranches($actor),
+            'activeShopOwnerUserId' => $activeShopOwnerUserId,
         ];
     }
 
@@ -150,46 +228,74 @@ class UserAccountService
     {
         $this->assertModuleReady();
 
-        [$sourceType, $sourceId] = $this->parseAccountSourcePayload($payload);
-        if ($sourceId <= 0 || !in_array($sourceType, ['staff', 'masseuse'], true)) {
-            throw ValidationException::withMessages([
-                'staff_id' => ['กรุณาเลือกพนักงานหรือหมอนวด'],
-            ]);
-        }
-
-        $source = $this->findSelectableAccountSource($actor, $sourceType, $sourceId);
-        if ($source === null) {
-            throw ValidationException::withMessages([
-                'staff_id' => ['ไม่พบบุคลากรที่เลือก หรือไม่มีสิทธิ์ใช้งานสาขานี้'],
-            ]);
-        }
-
         $username = trim((string) ($payload['username'] ?? ''));
         if ($username === '') {
             throw ValidationException::withMessages([
-                'username' => ['กรุณาระบุ Username'],
+                'username' => ['????????? Username'],
             ]);
         }
 
         $password = (string) ($payload['password'] ?? '');
         if (strlen($password) < 4) {
             throw ValidationException::withMessages([
-                'password' => ['รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร'],
+                'password' => ['??????????????????????? 4 ????????'],
             ]);
         }
 
         if (DB::table('users')->where('username', $username)->exists()) {
             throw ValidationException::withMessages([
-                'username' => ['Username นี้มีอยู่แล้ว'],
+                'username' => ['Username ????????????????'],
             ]);
         }
 
         $role = $this->normalizeAssignableRole($actor, (string) ($payload['role'] ?? 'cashier'));
-        $requestedBranchId = $this->normalizeNullableId($payload['branch_id'] ?? null);
-        $defaultBranchId = isset($source['branch_id']) && (int) $source['branch_id'] > 0 ? (int) $source['branch_id'] : null;
-        $branchId = $this->resolveAssignableBranchId($actor, $requestedBranchId ?? $defaultBranchId, $role);
 
-        DB::transaction(function () use ($source, $username, $password, $role, $branchId): void {
+        DB::transaction(function () use ($actor, $payload, $username, $password, $role): void {
+            if ($this->isStandaloneRole($role)) {
+                $row = [
+                    'username' => $username,
+                    'password' => Hash::make($password),
+                    'role' => $role,
+                    'branch_id' => null,
+                    'staff_id' => null,
+                ];
+
+                if ($this->hasColumn('users', 'is_active')) {
+                    $row['is_active'] = true;
+                }
+                if ($this->hasColumn('users', 'created_at')) {
+                    $row['created_at'] = now();
+                }
+                if ($this->hasColumn('users', 'updated_at')) {
+                    $row['updated_at'] = now();
+                }
+
+                $userId = (int) DB::table('users')->insertGetId($row);
+
+                if ($role === 'shop_owner') {
+                    $this->assignOwnerToCurrentShop($actor, $userId);
+                }
+
+                return;
+            }
+
+            [$sourceType, $sourceId] = $this->parseAccountSourcePayload($payload);
+            if ($sourceId <= 0 || !in_array($sourceType, ['staff', 'masseuse'], true)) {
+                throw ValidationException::withMessages([
+                    'staff_id' => ['???????????????????????????'],
+                ]);
+            }
+
+            $source = $this->findSelectableAccountSource($actor, $sourceType, $sourceId);
+            if ($source === null) {
+                throw ValidationException::withMessages([
+                    'staff_id' => ['???????????????????? ????????????????????????????'],
+                ]);
+            }
+
+            $requestedBranchId = $this->normalizeNullableId($payload['branch_id'] ?? null);
+            $defaultBranchId = isset($source['branch_id']) && (int) $source['branch_id'] > 0 ? (int) $source['branch_id'] : null;
+            $branchId = $this->resolveAssignableBranchId($actor, $requestedBranchId ?? $defaultBranchId, $role);
             $staffId = $this->resolveOrCreateStaffIdForSource($source);
 
             if ($this->hasColumn('users', 'staff_id')) {
@@ -199,7 +305,7 @@ class UserAccountService
 
                 if ($exists) {
                     throw ValidationException::withMessages([
-                        'staff_id' => ['บุคลากรคนนี้มีบัญชีผู้ใช้งานแล้ว'],
+                        'staff_id' => ['????????????????????????????????'],
                     ]);
                 }
             }
@@ -241,19 +347,20 @@ class UserAccountService
         $existing = $this->findScopedUser($actor, $userId);
         if ($existing === null) {
             throw ValidationException::withMessages([
-                'user' => ['ไม่พบผู้ใช้ที่ต้องการแก้ไข'],
+                'user' => ['??????????????????????????'],
             ]);
         }
 
         $role = $this->normalizeAssignableRole($actor, (string) ($payload['role'] ?? 'cashier'));
-        $requestedBranchId = $this->normalizeNullableId($payload['branch_id'] ?? null);
-        $defaultBranchId = isset($existing->staff_branch_id) && (int) $existing->staff_branch_id > 0 ? (int) $existing->staff_branch_id : null;
-        $branchId = $this->resolveAssignableBranchId($actor, $requestedBranchId ?? $defaultBranchId, $role);
+        $updates = ['role' => $role];
 
-        $updates = [
-            'role' => $role,
-            'branch_id' => $branchId,
-        ];
+        if ($this->isStandaloneRole($role)) {
+            $updates['branch_id'] = null;
+        } else {
+            $requestedBranchId = $this->normalizeNullableId($payload['branch_id'] ?? null);
+            $defaultBranchId = isset($existing->staff_branch_id) && (int) $existing->staff_branch_id > 0 ? (int) $existing->staff_branch_id : null;
+            $updates['branch_id'] = $this->resolveAssignableBranchId($actor, $requestedBranchId ?? $defaultBranchId, $role);
+        }
 
         if ($this->hasColumn('users', 'is_active')) {
             $updates['is_active'] = !empty($payload['is_active']);
@@ -262,9 +369,19 @@ class UserAccountService
             $updates['updated_at'] = now();
         }
 
-        DB::table('users')
-            ->where('id', $userId)
-            ->update($updates);
+        DB::transaction(function () use ($actor, $userId, $existing, $role, $updates): void {
+            DB::table('users')
+                ->where('id', $userId)
+                ->update($updates);
+
+            if ((string) ($existing->role ?? '') === 'shop_owner' && $role !== 'shop_owner') {
+                $this->clearShopOwnerIfMatches($userId);
+            }
+
+            if ($role === 'shop_owner') {
+                $this->assignOwnerToCurrentShop($actor, $userId);
+            }
+        });
     }
 
     public function resetPassword(User $actor, int $userId, string $newPassword): void
@@ -273,21 +390,18 @@ class UserAccountService
 
         if (strlen($newPassword) < 4) {
             throw ValidationException::withMessages([
-                'new_password' => ['รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร'],
+                'new_password' => ['??????????????????????? 4 ????????'],
             ]);
         }
 
         $existing = $this->findScopedUser($actor, $userId);
         if ($existing === null) {
             throw ValidationException::withMessages([
-                'user' => ['ไม่พบผู้ใช้ที่ต้องการรีเซ็ตรหัสผ่าน'],
+                'user' => ['???????????????????????????????????'],
             ]);
         }
 
-        $updates = [
-            'password' => Hash::make($newPassword),
-        ];
-
+        $updates = ['password' => Hash::make($newPassword)];
         if ($this->hasColumn('users', 'updated_at')) {
             $updates['updated_at'] = now();
         }
@@ -303,14 +417,14 @@ class UserAccountService
 
         if ($currentUserId !== null && $userId === $currentUserId) {
             throw ValidationException::withMessages([
-                'user' => ['ไม่สามารถลบบัญชีของตัวเองได้'],
+                'user' => ['????????????????????????????'],
             ]);
         }
 
         $existing = $this->findScopedUser($actor, $userId);
         if ($existing === null) {
             throw ValidationException::withMessages([
-                'user' => ['ไม่พบผู้ใช้ที่ต้องการลบ'],
+                'user' => ['???????????????????????'],
             ]);
         }
 
@@ -321,6 +435,8 @@ class UserAccountService
                     ->update(['user_id' => null]);
             }
 
+            $this->clearShopOwnerIfMatches($userId);
+
             DB::table('users')
                 ->where('id', $userId)
                 ->delete();
@@ -329,18 +445,29 @@ class UserAccountService
 
     public function getAvailableRoles(?User $actor = null): array
     {
-        if ($this->branchContext->canManageAllBranches($actor)) {
+        $actorRole = (string) ($actor->role ?? '');
+
+        if ($actorRole === 'super_admin') {
             return [
                 ['value' => 'super_admin', 'label' => 'Super Admin'],
-                ['value' => 'branch_manager', 'label' => 'ผู้จัดการสาขา'],
-                ['value' => 'cashier', 'label' => 'แคชเชียร์'],
-                ['value' => 'masseuse', 'label' => 'หมอนวด'],
+                ['value' => 'shop_owner', 'label' => '???????????'],
+                ['value' => 'branch_manager', 'label' => '?????????????'],
+                ['value' => 'cashier', 'label' => '?????????'],
+                ['value' => 'masseuse', 'label' => '??????'],
+            ];
+        }
+
+        if ($actorRole === 'shop_owner') {
+            return [
+                ['value' => 'branch_manager', 'label' => '?????????????'],
+                ['value' => 'cashier', 'label' => '?????????'],
+                ['value' => 'masseuse', 'label' => '??????'],
             ];
         }
 
         return [
-            ['value' => 'cashier', 'label' => 'แคชเชียร์'],
-            ['value' => 'masseuse', 'label' => 'หมอนวด'],
+            ['value' => 'cashier', 'label' => '?????????'],
+            ['value' => 'masseuse', 'label' => '??????'],
         ];
     }
 
@@ -370,7 +497,14 @@ class UserAccountService
             ->whereNull('u.id')
             ->orderBy('s.name');
 
-        if (!$this->branchContext->canManageAllBranches($actor)) {
+        if ($this->branchContext->canManageAllBranches($actor)) {
+            $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($actor, false), 'id');
+            if (empty($accessibleBranchIds)) {
+                return [];
+            }
+
+            $query->whereIn('s.branch_id', $accessibleBranchIds);
+        } else {
             $query->where('s.branch_id', $this->branchContext->resolveAuthorizedBranchId($actor));
         }
 
@@ -393,7 +527,7 @@ class UserAccountService
                 return [
                     'id' => 'staff:' . $staffId,
                     'source_type' => 'staff',
-                    'type_label' => 'พนักงาน',
+                    'type_label' => '???????',
                     'name' => (string) ($row->name ?? ''),
                     'nickname' => (string) ($row->nickname ?? ''),
                     'position' => (string) ($row->position ?? ''),
@@ -415,7 +549,14 @@ class UserAccountService
             ->leftJoin('branches as b', 'm.branch_id', '=', 'b.id')
             ->orderByRaw("COALESCE(NULLIF(m.full_name, ''), m.nickname)");
 
-        if (!$this->branchContext->canManageAllBranches($actor)) {
+        if ($this->branchContext->canManageAllBranches($actor)) {
+            $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($actor, false), 'id');
+            if (empty($accessibleBranchIds)) {
+                return [];
+            }
+
+            $query->whereIn('m.branch_id', $accessibleBranchIds);
+        } else {
             $query->where('m.branch_id', $this->branchContext->resolveAuthorizedBranchId($actor));
         }
 
@@ -435,14 +576,15 @@ class UserAccountService
                 $masseuseId = (int) $row->id;
                 $fullName = trim((string) ($row->full_name ?? ''));
                 $nickname = trim((string) ($row->nickname ?? ''));
+                $displayName = $fullName !== '' ? $fullName : ($nickname !== '' ? $nickname : ('?????? #' . $masseuseId));
 
                 return [
                     'id' => 'masseuse:' . $masseuseId,
                     'source_type' => 'masseuse',
-                    'type_label' => 'หมอนวด',
-                    'name' => $fullName !== '' ? '[หมอนวด] ' . $fullName : ($nickname !== '' ? '[หมอนวด] ' . $nickname : ('หมอนวด #' . $masseuseId)),
+                    'type_label' => '??????',
+                    'name' => '[??????] ' . $displayName,
                     'nickname' => $nickname,
-                    'position' => 'หมอนวด',
+                    'position' => '??????',
                     'branch_id' => $row->branch_id !== null ? (int) $row->branch_id : null,
                     'branch_name' => (string) ($row->branch_name ?? '-'),
                     'avatar' => $this->staffDirectory->getMasseuseAvatar($masseuseId, 'masseuse-option-' . $masseuseId),
@@ -480,7 +622,7 @@ class UserAccountService
             'type' => 'masseuse',
             'id' => (int) $masseuse->id,
             'branch_id' => isset($masseuse->branch_id) && $masseuse->branch_id !== null ? (int) $masseuse->branch_id : null,
-            'name' => $fullName !== '' ? $fullName : ($nickname !== '' ? $nickname : ('หมอนวด #' . (int) $masseuse->id)),
+            'name' => $fullName !== '' ? $fullName : ($nickname !== '' ? $nickname : ('?????? #' . (int) $masseuse->id)),
             'nickname' => $nickname,
         ];
     }
@@ -491,10 +633,16 @@ class UserAccountService
             return null;
         }
 
-        $query = DB::table('staff')
-            ->where('id', $staffId);
+        $query = DB::table('staff')->where('id', $staffId);
 
-        if (!$this->branchContext->canManageAllBranches($actor)) {
+        if ($this->branchContext->canManageAllBranches($actor)) {
+            $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($actor, false), 'id');
+            if (empty($accessibleBranchIds)) {
+                return null;
+            }
+
+            $query->whereIn('branch_id', $accessibleBranchIds);
+        } else {
             $query->where('branch_id', $this->branchContext->resolveAuthorizedBranchId($actor));
         }
 
@@ -518,10 +666,16 @@ class UserAccountService
             return null;
         }
 
-        $query = DB::table('masseuses')
-            ->where('id', $masseuseId);
+        $query = DB::table('masseuses')->where('id', $masseuseId);
 
-        if (!$this->branchContext->canManageAllBranches($actor)) {
+        if ($this->branchContext->canManageAllBranches($actor)) {
+            $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($actor, false), 'id');
+            if (empty($accessibleBranchIds)) {
+                return null;
+            }
+
+            $query->whereIn('branch_id', $accessibleBranchIds);
+        } else {
             $query->where('branch_id', $this->branchContext->resolveAuthorizedBranchId($actor));
         }
 
@@ -554,10 +708,10 @@ class UserAccountService
 
         $row = [
             'branch_id' => $branchId,
-            'name' => $name !== '' ? $name : ($nickname !== '' ? $nickname : 'หมอนวด'),
+            'name' => $name !== '' ? $name : ($nickname !== '' ? $nickname : '??????'),
             'nickname' => $nickname,
             'phone' => '',
-            'position' => 'หมอนวด',
+            'position' => '??????',
             'is_active' => true,
         ];
 
@@ -589,15 +743,15 @@ class UserAccountService
         }
 
         $query = DB::table('staff')
-            ->where(function ($q) use ($candidates): void {
+            ->where(function ($builder) use ($candidates): void {
                 foreach ($candidates as $index => $candidate) {
                     if ($index === 0) {
-                        $q->where('name', $candidate)
+                        $builder->where('name', $candidate)
                             ->orWhere('nickname', $candidate);
                         continue;
                     }
 
-                    $q->orWhere('name', $candidate)
+                    $builder->orWhere('name', $candidate)
                         ->orWhere('nickname', $candidate);
                 }
             });
@@ -620,9 +774,44 @@ class UserAccountService
             ->leftJoin('staff as s', 'u.staff_id', '=', 's.id')
             ->where('u.id', $userId);
 
-        if (!$this->branchContext->canManageAllBranches($actor)) {
-            $query->where('u.branch_id', $this->branchContext->resolveAuthorizedBranchId($actor))
-                ->where('u.role', '!=', 'super_admin');
+        if ($this->branchContext->canManageAllBranches($actor)) {
+            $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($actor, false), 'id');
+            $activeShopOwnerUserId = (string) ($actor->role ?? '') === 'super_admin'
+                ? $this->getActiveShopOwnerUserId($actor)
+                : null;
+            $actorRole = (string) ($actor->role ?? '');
+
+            $query->where(function ($builder) use ($accessibleBranchIds, $activeShopOwnerUserId, $actorRole): void {
+                if (!empty($accessibleBranchIds)) {
+                    $builder->whereIn('u.branch_id', $accessibleBranchIds);
+                }
+
+                if ($activeShopOwnerUserId !== null) {
+                    if (!empty($accessibleBranchIds)) {
+                        $builder->orWhere('u.id', $activeShopOwnerUserId);
+                    } else {
+                        $builder->where('u.id', $activeShopOwnerUserId);
+                    }
+                }
+
+                if ($actorRole === 'super_admin') {
+                    if (!empty($accessibleBranchIds) || $activeShopOwnerUserId !== null) {
+                        $builder->orWhere('u.role', 'super_admin');
+                    } else {
+                        $builder->where('u.role', 'super_admin');
+                    }
+                }
+            });
+        } else {
+            $query->where('u.branch_id', $this->branchContext->resolveAuthorizedBranchId($actor));
+        }
+
+        if ((string) ($actor->role ?? '') !== 'super_admin') {
+            $query->where('u.role', '!=', 'super_admin');
+        }
+
+        if (!in_array((string) ($actor->role ?? ''), ['super_admin', 'shop_owner'], true)) {
+            $query->where('u.role', '!=', 'shop_owner');
         }
 
         return $query->first([
@@ -646,16 +835,18 @@ class UserAccountService
 
     private function resolveAssignableBranchId(User $actor, ?int $branchId, string $role): ?int
     {
-        if ($role === 'super_admin' && $this->branchContext->canManageAllBranches($actor)) {
-            return $branchId;
+        if ($this->isStandaloneRole($role)) {
+            return null;
         }
 
         if ($this->branchContext->canManageAllBranches($actor)) {
-            if ($branchId !== null && $this->branchContext->branchExists($branchId)) {
+            $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($actor, false), 'id');
+
+            if ($branchId !== null && in_array($branchId, $accessibleBranchIds, true)) {
                 return $branchId;
             }
 
-            return $this->branchContext->getDefaultBranchId();
+            return !empty($accessibleBranchIds) ? (int) $accessibleBranchIds[0] : null;
         }
 
         return $this->branchContext->resolveAuthorizedBranchId($actor);
@@ -664,7 +855,12 @@ class UserAccountService
     private function resolveBranchFilter(User $actor, ?int $branchFilter): ?int
     {
         if ($this->branchContext->canManageAllBranches($actor)) {
-            return $branchFilter;
+            if ($branchFilter === null) {
+                return null;
+            }
+
+            $accessibleIds = array_column($this->branchContext->getAccessibleBranches($actor, false), 'id');
+            return in_array($branchFilter, $accessibleIds, true) ? $branchFilter : null;
         }
 
         return $this->branchContext->resolveAuthorizedBranchId($actor);
@@ -706,6 +902,96 @@ class UserAccountService
         ];
     }
 
+    private function getRoleLabel(string $role): string
+    {
+        $labels = [
+            'super_admin' => 'Super Admin',
+            'shop_owner' => '???????????',
+            'branch_manager' => '?????????????',
+            'cashier' => '?????????',
+            'masseuse' => '??????',
+        ];
+
+        return $labels[$role] ?? $role;
+    }
+
+    private function isStandaloneRole(string $role): bool
+    {
+        return in_array($role, self::STANDALONE_ROLES, true);
+    }
+
+    private function getActiveShopOwnerUserId(User $actor): ?int
+    {
+        if (!$this->tableExists('shops') || !$this->hasColumn('shops', 'owner_user_id')) {
+            return null;
+        }
+
+        $shopId = $this->shopContext->getActiveShopId($actor);
+        if ($shopId === null) {
+            return null;
+        }
+
+        $ownerUserId = DB::table('shops')
+            ->where('id', $shopId)
+            ->value('owner_user_id');
+
+        return $ownerUserId !== null ? (int) $ownerUserId : null;
+    }
+
+    private function assignOwnerToCurrentShop(User $actor, int $userId): void
+    {
+        if ((string) ($actor->role ?? '') !== 'super_admin') {
+            throw ValidationException::withMessages([
+                'role' => ['????? Super Admin ??????????????????????????????'],
+            ]);
+        }
+
+        if (!$this->tableExists('shops') || !$this->hasColumn('shops', 'owner_user_id')) {
+            throw ValidationException::withMessages([
+                'shop_owner' => ['???????????????????????????????? ???????? SQL setup ?????????????'],
+            ]);
+        }
+
+        $shopId = $this->shopContext->getActiveShopId($actor);
+        if ($shopId === null) {
+            throw ValidationException::withMessages([
+                'shop_owner' => ['????????????????????????????????????????????'],
+            ]);
+        }
+
+        $existingOwnerUserId = $this->getActiveShopOwnerUserId($actor);
+        if ($existingOwnerUserId !== null && $existingOwnerUserId !== $userId) {
+            throw ValidationException::withMessages([
+                'shop_owner' => ['???????????????????????????? ??????????????????????'],
+            ]);
+        }
+
+        $updates = ['owner_user_id' => $userId];
+        if ($this->hasColumn('shops', 'updated_at')) {
+            $updates['updated_at'] = now();
+        }
+
+        DB::table('shops')
+            ->where('id', $shopId)
+            ->update($updates);
+    }
+
+    private function clearShopOwnerIfMatches(int $userId): void
+    {
+        if (!$this->tableExists('shops') || !$this->hasColumn('shops', 'owner_user_id')) {
+            return;
+        }
+
+        $updates = ['owner_user_id' => null];
+        if ($this->hasColumn('shops', 'updated_at')) {
+            $updates['updated_at'] = now();
+        }
+
+        DB::table('shops')
+            ->where('owner_user_id', $userId)
+            ->update($updates);
+    }
+
     private function assertModuleReady(): void
     {
         if ($this->tableExists('users')) {
@@ -713,7 +999,7 @@ class UserAccountService
         }
 
         throw ValidationException::withMessages([
-            'users' => ['ยังไม่พบตาราง users ในฐานข้อมูล'],
+            'users' => ['????????????? users ???????????'],
         ]);
     }
 

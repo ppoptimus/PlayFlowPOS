@@ -11,19 +11,28 @@ use Illuminate\Validation\ValidationException;
 class StaffManagementService
 {
     private BranchContextService $branchContext;
+    private ShopContextService $shopContext;
     private StaffDirectoryService $staffDirectory;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    public function __construct(BranchContextService $branchContext, StaffDirectoryService $staffDirectory)
+    public function __construct(
+        BranchContextService $branchContext,
+        ShopContextService $shopContext,
+        StaffDirectoryService $staffDirectory
+    )
     {
         $this->branchContext = $branchContext;
+        $this->shopContext = $shopContext;
         $this->staffDirectory = $staffDirectory;
     }
 
     public function getPageData(User $user, string $search = '', ?int $branchFilter = null): array
     {
         $resolvedBranchFilter = $this->resolveBranchFilter($user, $branchFilter);
+        $activeShop = $this->shopContext->getActiveShop($user);
+        $branches = $this->branchContext->getAccessibleBranches($user, true);
+        $accessibleBranchIds = array_column($branches, 'id');
 
         if (!$this->tableExists('staff')) {
             return [
@@ -31,8 +40,23 @@ class StaffManagementService
                 'search' => trim($search),
                 'branchFilter' => $resolvedBranchFilter,
                 'staffList' => [],
-                'branches' => $this->branchContext->getAccessibleBranches($user, true),
+                'branches' => $branches,
+                'activeShop' => $activeShop,
+                'shopSelected' => !$this->branchContext->canManageAllBranches($user) || $activeShop !== null,
                 'canManageAllBranches' => $this->branchContext->canManageAllBranches($user),
+            ];
+        }
+
+        if ($this->branchContext->canManageAllBranches($user) && empty($accessibleBranchIds)) {
+            return [
+                'moduleReady' => true,
+                'search' => trim($search),
+                'branchFilter' => null,
+                'staffList' => [],
+                'branches' => [],
+                'activeShop' => $activeShop,
+                'shopSelected' => false,
+                'canManageAllBranches' => true,
             ];
         }
 
@@ -66,6 +90,8 @@ class StaffManagementService
 
         if ($resolvedBranchFilter !== null && $resolvedBranchFilter > 0) {
             $query->where('s.branch_id', $resolvedBranchFilter);
+        } elseif ($this->branchContext->canManageAllBranches($user)) {
+            $query->whereIn('s.branch_id', $accessibleBranchIds);
         }
 
         $staffList = $query
@@ -106,7 +132,9 @@ class StaffManagementService
             'search' => $normalizedSearch,
             'branchFilter' => $resolvedBranchFilter,
             'staffList' => $staffList,
-            'branches' => $this->branchContext->getAccessibleBranches($user, true),
+            'branches' => $branches,
+            'activeShop' => $activeShop,
+            'shopSelected' => !$this->branchContext->canManageAllBranches($user) || $activeShop !== null,
             'canManageAllBranches' => $this->branchContext->canManageAllBranches($user),
         ];
     }
@@ -234,7 +262,14 @@ class StaffManagementService
         $query = DB::table('staff')
             ->where('id', $staffId);
 
-        if (!$this->branchContext->canManageAllBranches($user)) {
+        if ($this->branchContext->canManageAllBranches($user)) {
+            $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($user, false), 'id');
+            if (empty($accessibleBranchIds)) {
+                return null;
+            }
+
+            $query->whereIn('branch_id', $accessibleBranchIds);
+        } else {
             $query->where('branch_id', $this->branchContext->resolveAuthorizedBranchId($user));
         }
 
@@ -244,7 +279,12 @@ class StaffManagementService
     private function resolveBranchFilter(User $user, ?int $branchFilter): ?int
     {
         if ($this->branchContext->canManageAllBranches($user)) {
-            return $branchFilter;
+            if ($branchFilter === null) {
+                return null;
+            }
+
+            $accessibleIds = array_column($this->branchContext->getAccessibleBranches($user, false), 'id');
+            return in_array($branchFilter, $accessibleIds, true) ? $branchFilter : null;
         }
 
         return $this->branchContext->resolveAuthorizedBranchId($user);

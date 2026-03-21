@@ -10,15 +10,15 @@ use Illuminate\Validation\ValidationException;
 class BranchService
 {
     private BranchContextService $branchContext;
+    private ShopContextService $shopContext;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    public function __construct(BranchContextService $branchContext)
+    public function __construct(BranchContextService $branchContext, ShopContextService $shopContext)
     {
         $this->branchContext = $branchContext;
+        $this->shopContext = $shopContext;
     }
-
-    // ─── Page Data ───────────────────────────────────────────────
 
     public function getPageData(User $user, string $search = ''): array
     {
@@ -27,51 +27,75 @@ class BranchService
                 'moduleReady' => false,
                 'search' => trim($search),
                 'branches' => [],
+                'activeShop' => $this->shopContext->getActiveShop($user),
+                'shopSelected' => $this->shopContext->getActiveShopId($user) !== null,
                 'canManageAllBranches' => $this->branchContext->canManageAllBranches($user),
             ];
         }
 
         $normalizedSearch = trim($search);
+        $canManageAllBranches = $this->branchContext->canManageAllBranches($user);
+        $activeShop = $this->shopContext->getActiveShop($user);
+        $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($user, false), 'id');
 
-        $query = DB::table('branches')->orderBy('id');
-        if (!$this->branchContext->canManageAllBranches($user)) {
-            $query->where('id', $this->branchContext->resolveAuthorizedBranchId($user));
+        if ($canManageAllBranches && empty($accessibleBranchIds)) {
+            return [
+                'moduleReady' => true,
+                'search' => $normalizedSearch,
+                'branches' => [],
+                'activeShop' => $activeShop,
+                'shopSelected' => false,
+                'canManageAllBranches' => true,
+            ];
+        }
+
+        $query = DB::table('branches as b')
+            ->leftJoin('shops as s', 's.id', '=', 'b.shop_id')
+            ->orderBy('b.id');
+
+        if ($canManageAllBranches) {
+            $query->whereIn('b.id', $accessibleBranchIds);
+        } else {
+            $query->where('b.id', $this->branchContext->resolveAuthorizedBranchId($user));
         }
 
         if ($normalizedSearch !== '') {
-            $query->where(function ($q) use ($normalizedSearch): void {
-                $q->where('name', 'like', '%' . $normalizedSearch . '%');
+            $query->where(function ($builder) use ($normalizedSearch): void {
+                $builder->where('b.name', 'like', '%' . $normalizedSearch . '%');
                 if ($this->hasColumn('branches', 'address')) {
-                    $q->orWhere('address', 'like', '%' . $normalizedSearch . '%');
+                    $builder->orWhere('b.address', 'like', '%' . $normalizedSearch . '%');
                 }
                 if ($this->hasColumn('branches', 'phone')) {
-                    $q->orWhere('phone', 'like', '%' . $normalizedSearch . '%');
+                    $builder->orWhere('b.phone', 'like', '%' . $normalizedSearch . '%');
+                }
+                if ($this->shopContext->hasColumn('branches', 'shop_id')) {
+                    $builder->orWhere('s.name', 'like', '%' . $normalizedSearch . '%');
                 }
             });
         }
 
-        $columns = ['id', 'name'];
-        foreach (['address', 'phone', 'is_active', 'created_at'] as $col) {
-            if ($this->hasColumn('branches', $col)) {
-                $columns[] = $col;
-            }
-        }
+        $branches = $query->get([
+            'b.id',
+            'b.name',
+            'b.address',
+            'b.phone',
+            'b.is_active',
+            'b.created_at',
+            'b.shop_id',
+            's.name as shop_name',
+        ])->map(static function ($row): array {
+            return [
+                'id' => (int) $row->id,
+                'name' => (string) ($row->name ?? ''),
+                'address' => (string) ($row->address ?? ''),
+                'phone' => (string) ($row->phone ?? ''),
+                'is_active' => (bool) ($row->is_active ?? true),
+                'created_at' => $row->created_at ?? null,
+                'shop_id' => isset($row->shop_id) ? (int) $row->shop_id : null,
+                'shop_name' => (string) ($row->shop_name ?? ''),
+            ];
+        })->all();
 
-        $branches = $query
-            ->get($columns)
-            ->map(static function ($row): array {
-                return [
-                    'id' => (int) $row->id,
-                    'name' => (string) ($row->name ?? ''),
-                    'address' => (string) ($row->address ?? ''),
-                    'phone' => (string) ($row->phone ?? ''),
-                    'is_active' => (bool) ($row->is_active ?? true),
-                    'created_at' => $row->created_at ?? null,
-                ];
-            })
-            ->all();
-
-        // สถิติจำนวนพนักงาน + users ต่อสาขา
         $staffCounts = [];
         $userCounts = [];
 
@@ -101,16 +125,23 @@ class BranchService
             'moduleReady' => true,
             'search' => $normalizedSearch,
             'branches' => $branches,
-            'canManageAllBranches' => $this->branchContext->canManageAllBranches($user),
+            'activeShop' => $activeShop,
+            'shopSelected' => !$canManageAllBranches || $activeShop !== null,
+            'canManageAllBranches' => $canManageAllBranches,
         ];
     }
-
-    // ─── Branch CRUD ─────────────────────────────────────────────
 
     public function createBranch(User $user, array $payload): void
     {
         $this->assertModuleReady();
         $this->assertCanManageAllBranches($user);
+
+        $activeShopId = $this->shopContext->getActiveShopId($user);
+        if ($activeShopId === null) {
+            throw ValidationException::withMessages([
+                'shop' => ['กรุณาเลือกร้านจากพอร์ทัลก่อนเพิ่มสาขา'],
+            ]);
+        }
 
         $name = trim((string) ($payload['name'] ?? ''));
         if ($name === '') {
@@ -120,16 +151,18 @@ class BranchService
         }
 
         $exists = DB::table('branches')
+            ->where('shop_id', $activeShopId)
             ->where('name', $name)
             ->exists();
 
         if ($exists) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อสาขานี้มีอยู่แล้ว'],
+                'name' => ['ชื่อสาขานี้มีอยู่แล้วในร้านนี้'],
             ]);
         }
 
         $row = [
+            'shop_id' => $activeShopId,
             'name' => $name,
             'address' => trim((string) ($payload['address'] ?? '')),
             'phone' => trim((string) ($payload['phone'] ?? '')),
@@ -153,7 +186,7 @@ class BranchService
 
         $existing = DB::table('branches')
             ->where('id', $branchId)
-            ->first(['id']);
+            ->first(['id', 'shop_id']);
 
         if ($existing === null) {
             throw ValidationException::withMessages([
@@ -169,13 +202,14 @@ class BranchService
         }
 
         $nameExists = DB::table('branches')
+            ->where('shop_id', (int) $existing->shop_id)
             ->where('name', $name)
             ->where('id', '!=', $branchId)
             ->exists();
 
         if ($nameExists) {
             throw ValidationException::withMessages([
-                'name' => ['ชื่อสาขานี้มีอยู่แล้ว'],
+                'name' => ['ชื่อสาขานี้มีอยู่แล้วในร้านนี้'],
             ]);
         }
 
@@ -199,6 +233,7 @@ class BranchService
     {
         $this->assertModuleReady();
         $this->assertCanManageAllBranches($user);
+        $this->assertCanManageBranch($user, $branchId);
 
         $existing = DB::table('branches')
             ->where('id', $branchId)
@@ -238,40 +273,21 @@ class BranchService
         }
 
         if ($hasRelatedData) {
-            // Soft-deactivate แทนลบ
             $updates = ['is_active' => false];
             if ($this->hasColumn('branches', 'updated_at')) {
                 $updates['updated_at'] = now();
             }
+
             DB::table('branches')
                 ->where('id', $branchId)
                 ->update($updates);
-        } else {
-            DB::table('branches')
-                ->where('id', $branchId)
-                ->delete();
-        }
-    }
 
-    // ─── Helpers ─────────────────────────────────────────────────
-
-    public function getAllBranches(): array
-    {
-        if (!$this->tableExists('branches')) {
-            return [];
+            return;
         }
 
-        return DB::table('branches')
-            ->orderBy('name')
-            ->get(['id', 'name', 'is_active'])
-            ->map(static function ($row): array {
-                return [
-                    'id' => (int) $row->id,
-                    'name' => (string) ($row->name ?? ''),
-                    'is_active' => (bool) ($row->is_active ?? true),
-                ];
-            })
-            ->all();
+        DB::table('branches')
+            ->where('id', $branchId)
+            ->delete();
     }
 
     private function assertCanManageAllBranches(User $user): void
@@ -281,18 +297,14 @@ class BranchService
         }
 
         throw ValidationException::withMessages([
-            'branch' => ['เฉพาะ Super Admin เท่านั้นที่สามารถจัดการหลายสาขาได้'],
+            'branch' => ['เฉพาะ Super Admin เท่านั้นที่จัดการหลายสาขาได้'],
         ]);
     }
 
     private function assertCanManageBranch(User $user, int $branchId): void
     {
-        if ($this->branchContext->canManageAllBranches($user)) {
-            return;
-        }
-
-        $userBranchId = $this->branchContext->resolveAuthorizedBranchId($user);
-        if ($userBranchId === $branchId) {
+        $accessibleIds = array_column($this->branchContext->getAccessibleBranches($user, false), 'id');
+        if (in_array($branchId, $accessibleIds, true)) {
             return;
         }
 

@@ -298,6 +298,16 @@
             <div>โปรดตรวจสอบฐานข้อมูลจริงของระบบก่อนใช้งานโมดูลนี้</div>
         </div>
     </div>
+    @elseif(($canManageAllBranches ?? false) && !($shopSelected ?? true))
+    <div class="col-12">
+        <div class="alert alert-info border-0 shadow-sm rounded-4 mb-0 d-flex flex-column gap-2">
+            <div class="fw-bold">กรุณาเลือกร้านจากพอร์ทัลก่อน</div>
+            <div>เมนูพนักงานจะอ้างอิงตามร้านที่คุณเลือกอยู่ในพอร์ทัลร้าน</div>
+            <div>
+                <a href="{{ route('system.shops.index') }}" class="btn gradient-btn rounded-pill px-4">ไปพอร์ทัลร้าน</a>
+            </div>
+        </div>
+    </div>
     @else
 
     <div class="col-12">
