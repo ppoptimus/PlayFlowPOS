@@ -231,20 +231,20 @@ class UserAccountService
         $username = trim((string) ($payload['username'] ?? ''));
         if ($username === '') {
             throw ValidationException::withMessages([
-                'username' => ['????????? Username'],
+                'username' => ['กรุณาระบุ Username'],
             ]);
         }
 
         $password = (string) ($payload['password'] ?? '');
         if (strlen($password) < 4) {
             throw ValidationException::withMessages([
-                'password' => ['??????????????????????? 4 ????????'],
+                'password' => ['รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร'],
             ]);
         }
 
         if (DB::table('users')->where('username', $username)->exists()) {
             throw ValidationException::withMessages([
-                'username' => ['Username ????????????????'],
+                'username' => ['Username นี้ถูกใช้งานแล้ว'],
             ]);
         }
 
@@ -282,14 +282,14 @@ class UserAccountService
             [$sourceType, $sourceId] = $this->parseAccountSourcePayload($payload);
             if ($sourceId <= 0 || !in_array($sourceType, ['staff', 'masseuse'], true)) {
                 throw ValidationException::withMessages([
-                    'staff_id' => ['???????????????????????????'],
+                    'staff_id' => ['กรุณาเลือกพนักงานหรือหมอนวด'],
                 ]);
             }
 
             $source = $this->findSelectableAccountSource($actor, $sourceType, $sourceId);
             if ($source === null) {
                 throw ValidationException::withMessages([
-                    'staff_id' => ['???????????????????? ????????????????????????????'],
+                    'staff_id' => ['ไม่พบพนักงานหรือหมอนวดที่เลือก กรุณาเลือกใหม่อีกครั้ง'],
                 ]);
             }
 
@@ -305,7 +305,7 @@ class UserAccountService
 
                 if ($exists) {
                     throw ValidationException::withMessages([
-                        'staff_id' => ['????????????????????????????????'],
+                        'staff_id' => ['พนักงานหรือหมอนวดคนนี้มีบัญชีผู้ใช้แล้ว'],
                     ]);
                 }
             }
@@ -347,7 +347,7 @@ class UserAccountService
         $existing = $this->findScopedUser($actor, $userId);
         if ($existing === null) {
             throw ValidationException::withMessages([
-                'user' => ['??????????????????????????'],
+                'user' => ['ไม่พบบัญชีผู้ใช้งานที่ต้องการแก้ไข'],
             ]);
         }
 
@@ -390,14 +390,14 @@ class UserAccountService
 
         if (strlen($newPassword) < 4) {
             throw ValidationException::withMessages([
-                'new_password' => ['??????????????????????? 4 ????????'],
+                'new_password' => ['รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร'],
             ]);
         }
 
         $existing = $this->findScopedUser($actor, $userId);
         if ($existing === null) {
             throw ValidationException::withMessages([
-                'user' => ['???????????????????????????????????'],
+                'user' => ['ไม่พบบัญชีผู้ใช้งานที่ต้องการรีเซ็ตรหัสผ่าน'],
             ]);
         }
 
@@ -417,14 +417,14 @@ class UserAccountService
 
         if ($currentUserId !== null && $userId === $currentUserId) {
             throw ValidationException::withMessages([
-                'user' => ['????????????????????????????'],
+                'user' => ['ไม่สามารถลบบัญชีที่กำลังใช้งานอยู่ได้'],
             ]);
         }
 
         $existing = $this->findScopedUser($actor, $userId);
         if ($existing === null) {
             throw ValidationException::withMessages([
-                'user' => ['???????????????????????'],
+                'user' => ['ไม่พบบัญชีผู้ใช้งานที่ต้องการลบ'],
             ]);
         }
 
@@ -450,24 +450,24 @@ class UserAccountService
         if ($actorRole === 'super_admin') {
             return [
                 ['value' => 'super_admin', 'label' => 'Super Admin'],
-                ['value' => 'shop_owner', 'label' => '???????????'],
-                ['value' => 'branch_manager', 'label' => '?????????????'],
-                ['value' => 'cashier', 'label' => '?????????'],
-                ['value' => 'masseuse', 'label' => '??????'],
+                ['value' => 'shop_owner', 'label' => 'เจ้าของร้าน'],
+                ['value' => 'branch_manager', 'label' => 'ผู้จัดการสาขา'],
+                ['value' => 'cashier', 'label' => 'แคชเชียร์'],
+                ['value' => 'masseuse', 'label' => 'หมอนวด'],
             ];
         }
 
         if ($actorRole === 'shop_owner') {
             return [
-                ['value' => 'branch_manager', 'label' => '?????????????'],
-                ['value' => 'cashier', 'label' => '?????????'],
-                ['value' => 'masseuse', 'label' => '??????'],
+                ['value' => 'branch_manager', 'label' => 'ผู้จัดการสาขา'],
+                ['value' => 'cashier', 'label' => 'แคชเชียร์'],
+                ['value' => 'masseuse', 'label' => 'หมอนวด'],
             ];
         }
 
         return [
-            ['value' => 'cashier', 'label' => '?????????'],
-            ['value' => 'masseuse', 'label' => '??????'],
+            ['value' => 'cashier', 'label' => 'แคชเชียร์'],
+            ['value' => 'masseuse', 'label' => 'หมอนวด'],
         ];
     }
 
@@ -527,7 +527,7 @@ class UserAccountService
                 return [
                     'id' => 'staff:' . $staffId,
                     'source_type' => 'staff',
-                    'type_label' => '???????',
+                    'type_label' => 'พนักงาน',
                     'name' => (string) ($row->name ?? ''),
                     'nickname' => (string) ($row->nickname ?? ''),
                     'position' => (string) ($row->position ?? ''),
@@ -576,15 +576,15 @@ class UserAccountService
                 $masseuseId = (int) $row->id;
                 $fullName = trim((string) ($row->full_name ?? ''));
                 $nickname = trim((string) ($row->nickname ?? ''));
-                $displayName = $fullName !== '' ? $fullName : ($nickname !== '' ? $nickname : ('?????? #' . $masseuseId));
+                $displayName = $fullName !== '' ? $fullName : ($nickname !== '' ? $nickname : ('หมอนวด #' . $masseuseId));
 
                 return [
                     'id' => 'masseuse:' . $masseuseId,
                     'source_type' => 'masseuse',
-                    'type_label' => '??????',
-                    'name' => '[??????] ' . $displayName,
+                    'type_label' => 'หมอนวด',
+                    'name' => '[หมอนวด] ' . $displayName,
                     'nickname' => $nickname,
-                    'position' => '??????',
+                    'position' => 'หมอนวด',
                     'branch_id' => $row->branch_id !== null ? (int) $row->branch_id : null,
                     'branch_name' => (string) ($row->branch_name ?? '-'),
                     'avatar' => $this->staffDirectory->getMasseuseAvatar($masseuseId, 'masseuse-option-' . $masseuseId),
@@ -622,7 +622,7 @@ class UserAccountService
             'type' => 'masseuse',
             'id' => (int) $masseuse->id,
             'branch_id' => isset($masseuse->branch_id) && $masseuse->branch_id !== null ? (int) $masseuse->branch_id : null,
-            'name' => $fullName !== '' ? $fullName : ($nickname !== '' ? $nickname : ('?????? #' . (int) $masseuse->id)),
+            'name' => $fullName !== '' ? $fullName : ($nickname !== '' ? $nickname : ('หมอนวด #' . (int) $masseuse->id)),
             'nickname' => $nickname,
         ];
     }
@@ -708,10 +708,10 @@ class UserAccountService
 
         $row = [
             'branch_id' => $branchId,
-            'name' => $name !== '' ? $name : ($nickname !== '' ? $nickname : '??????'),
+            'name' => $name !== '' ? $name : ($nickname !== '' ? $nickname : 'หมอนวด'),
             'nickname' => $nickname,
             'phone' => '',
-            'position' => '??????',
+            'position' => 'หมอนวด',
             'is_active' => true,
         ];
 
@@ -906,10 +906,10 @@ class UserAccountService
     {
         $labels = [
             'super_admin' => 'Super Admin',
-            'shop_owner' => '???????????',
-            'branch_manager' => '?????????????',
-            'cashier' => '?????????',
-            'masseuse' => '??????',
+            'shop_owner' => 'เจ้าของร้าน',
+            'branch_manager' => 'ผู้จัดการสาขา',
+            'cashier' => 'แคชเชียร์',
+            'masseuse' => 'หมอนวด',
         ];
 
         return $labels[$role] ?? $role;
@@ -942,27 +942,27 @@ class UserAccountService
     {
         if ((string) ($actor->role ?? '') !== 'super_admin') {
             throw ValidationException::withMessages([
-                'role' => ['????? Super Admin ??????????????????????????????'],
+                'role' => ['เฉพาะ Super Admin เท่านั้นที่กำหนดเจ้าของร้านได้'],
             ]);
         }
 
         if (!$this->tableExists('shops') || !$this->hasColumn('shops', 'owner_user_id')) {
             throw ValidationException::withMessages([
-                'shop_owner' => ['???????????????????????????????? ???????? SQL setup ?????????????'],
+                'shop_owner' => ['ฐานข้อมูลยังไม่รองรับการผูกเจ้าของร้าน กรุณารัน SQL setup เพิ่มเติมก่อน'],
             ]);
         }
 
         $shopId = $this->shopContext->getActiveShopId($actor);
         if ($shopId === null) {
             throw ValidationException::withMessages([
-                'shop_owner' => ['????????????????????????????????????????????'],
+                'shop_owner' => ['กรุณาเลือกร้านที่ต้องการจัดการก่อน'],
             ]);
         }
 
         $existingOwnerUserId = $this->getActiveShopOwnerUserId($actor);
         if ($existingOwnerUserId !== null && $existingOwnerUserId !== $userId) {
             throw ValidationException::withMessages([
-                'shop_owner' => ['???????????????????????????? ??????????????????????'],
+                'shop_owner' => ['ร้านนี้มีเจ้าของร้านอยู่แล้ว กรุณาเปลี่ยนบัญชีเดิมก่อน'],
             ]);
         }
 
@@ -999,7 +999,7 @@ class UserAccountService
         }
 
         throw ValidationException::withMessages([
-            'users' => ['????????????? users ???????????'],
+            'users' => ['ไม่พบตาราง users ในฐานข้อมูล'],
         ]);
     }
 

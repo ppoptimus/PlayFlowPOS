@@ -87,8 +87,8 @@ class ShopService
                 'is_lifetime' => $expiresOn === null,
                 'is_expired' => $expired,
                 'status_label' => !$this->shopContext->isShopActive($row)
-                    ? '???????'
-                    : ($expired ? '???????' : '???????????'),
+                    ? 'ปิดร้าน'
+                    : ($expired ? 'หมดอายุ' : 'ใช้งานอยู่'),
                 'created_at' => $row->created_at ?? null,
                 'owner_user_id' => isset($row->owner_user_id) && $row->owner_user_id !== null ? (int) $row->owner_user_id : null,
                 'owner_username' => (string) ($row->owner_username ?? ''),
@@ -154,27 +154,27 @@ class ShopService
         $name = trim((string) ($payload['name'] ?? ''));
         if ($name === '') {
             throw ValidationException::withMessages([
-                'name' => ['?????????????????'],
+                'name' => ['กรุณาระบุชื่อร้าน'],
             ]);
         }
 
         $ownerUsername = trim((string) ($payload['owner_username'] ?? ''));
         if ($ownerUsername === '') {
             throw ValidationException::withMessages([
-                'owner_username' => ['????????? Username ??????????????'],
+                'owner_username' => ['กรุณาระบุ Username เจ้าของร้าน'],
             ]);
         }
 
         $ownerPassword = (string) ($payload['owner_password'] ?? '');
         if (strlen($ownerPassword) < 4) {
             throw ValidationException::withMessages([
-                'owner_password' => ['?????????????????????????????????? 4 ????????'],
+                'owner_password' => ['รหัสผ่านเจ้าของร้านต้องมีอย่างน้อย 4 ตัวอักษร'],
             ]);
         }
 
         if (DB::table('users')->where('username', $ownerUsername)->exists()) {
             throw ValidationException::withMessages([
-                'owner_username' => ['Username ????????????????'],
+                'owner_username' => ['Username นี้ถูกใช้งานแล้ว'],
             ]);
         }
 
@@ -243,7 +243,7 @@ class ShopService
 
         if ($name === '') {
             throw ValidationException::withMessages([
-                'name' => ['?????????????????'],
+                'name' => ['กรุณาระบุชื่อร้าน'],
             ]);
         }
 
@@ -327,14 +327,14 @@ class ShopService
         $shopId = $this->shopContext->getActiveShopId($user);
         if ($shopId === null) {
             throw ValidationException::withMessages([
-                'shop_owner' => ['????????????????????????????????????????????'],
+                'shop_owner' => ['กรุณาเลือกร้านที่ต้องการจัดการก่อน'],
             ]);
         }
 
         $existingOwnerUserId = $this->getActiveShopOwnerUserId($user);
         if ($existingOwnerUserId !== null && $existingOwnerUserId !== $ownerUserId) {
             throw ValidationException::withMessages([
-                'shop_owner' => ['???????????????????????????? ??????????????????????'],
+                'shop_owner' => ['ร้านนี้มีเจ้าของร้านอยู่แล้ว กรุณาเปลี่ยนบัญชีเดิมก่อน'],
             ]);
         }
 
@@ -380,7 +380,7 @@ class ShopService
         }
 
         throw ValidationException::withMessages([
-            'shop_id' => ['?????????????????'],
+            'shop_id' => ['ไม่พบร้านที่เลือก'],
         ]);
     }
 
@@ -429,7 +429,7 @@ class ShopService
         }
 
         throw ValidationException::withMessages([
-            'shop' => ['????? Super Admin ????????????????????????'],
+            'shop' => ['เฉพาะ Super Admin เท่านั้นที่จัดการพอร์ทัลร้านได้'],
         ]);
     }
 
@@ -440,7 +440,7 @@ class ShopService
         }
 
         throw ValidationException::withMessages([
-            'shop' => ['????????????????????????? ???????? SQL setup ????'],
+            'shop' => ['ระบบร้านยังไม่พร้อมใช้งาน กรุณารัน SQL setup ก่อน'],
         ]);
     }
 
@@ -451,7 +451,7 @@ class ShopService
         }
 
         throw ValidationException::withMessages([
-            'shop_owner' => ['???????????????????????????????? ???????? SQL setup ?????????????'],
+            'shop_owner' => ['ฐานข้อมูลยังไม่รองรับการผูกเจ้าของร้าน กรุณารัน SQL setup เพิ่มเติมก่อน'],
         ]);
     }
 
