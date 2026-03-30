@@ -143,7 +143,7 @@ class ShopContextService
         if (!$this->isShopActive($shop)) {
             return [
                 'allowed' => false,
-                'message' => 'ร้านนี้ถูกปิดการใช้งานอยู่ กรุณาติดต่อผู้ดูแลระบบ',
+                'message' => 'ร้านไม่สามารถใช้งานได้ชั่วคราว กรุณาติดต่อเจ้าของระบบ',
                 'shop' => $shop,
             ];
         }

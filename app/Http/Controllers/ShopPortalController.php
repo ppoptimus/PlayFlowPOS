@@ -74,4 +74,22 @@ class ShopPortalController extends Controller
             ->route('system.shops.index')
             ->with('success', 'อัปเดตร้านเรียบร้อยแล้ว');
     }
+
+    public function toggle(Request $request, int $shopId): RedirectResponse
+    {
+        $message = $this->shopService->toggleShopActive($request->user(), $shopId);
+
+        return redirect()
+            ->route('system.shops.index')
+            ->with('success', $message);
+    }
+
+    public function destroy(Request $request, int $shopId): RedirectResponse
+    {
+        $this->shopService->deleteShop($request->user(), $shopId);
+
+        return redirect()
+            ->route('system.shops.index')
+            ->with('success', 'ลบร้านและข้อมูลที่เกี่ยวข้องเรียบร้อยแล้ว');
+    }
 }

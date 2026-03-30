@@ -269,6 +269,64 @@ class ShopService
             ->update($updates);
     }
 
+    public function toggleShopActive(User $user, int $shopId): string
+    {
+        $this->assertSuperAdmin($user);
+        $this->assertModuleReady();
+
+        $existing = $this->findShopOrFail($shopId);
+        $newState = !((bool) ($existing->is_active ?? true));
+        $updates = ['is_active' => $newState];
+
+        if ($this->hasColumn('shops', 'updated_at')) {
+            $updates['updated_at'] = now();
+        }
+
+        DB::table('shops')
+            ->where('id', (int) $existing->id)
+            ->update($updates);
+
+        return $newState
+            ? 'เปิดใช้งานร้านเรียบร้อยแล้ว'
+            : 'ปิดการใช้งานร้านเรียบร้อยแล้ว';
+    }
+
+    public function deleteShop(User $user, int $shopId): void
+    {
+        $this->assertSuperAdmin($user);
+        $this->assertModuleReady();
+
+        $existing = $this->findShopOrFail($shopId);
+        $ownerUserId = $this->hasColumn('shops', 'owner_user_id')
+            ? $this->normalizeNullableId($existing->owner_user_id ?? null)
+            : null;
+        $branchIds = $this->getShopBranchIds((int) $existing->id);
+
+        DB::transaction(function () use ($existing, $ownerUserId, $branchIds): void {
+            $this->deleteShopBranchData($branchIds);
+
+            if (!empty($branchIds) && $this->tableExists('branches')) {
+                DB::table('branches')
+                    ->whereIn('id', $branchIds)
+                    ->delete();
+            }
+
+            DB::table('shops')
+                ->where('id', (int) $existing->id)
+                ->delete();
+
+            if ($ownerUserId !== null && $this->tableExists('users')) {
+                DB::table('users')
+                    ->where('id', $ownerUserId)
+                    ->delete();
+            }
+        });
+
+        if ($this->shopContext->getActiveShopId($user) === (int) $existing->id) {
+            $this->shopContext->clearActiveShop();
+        }
+    }
+
     public function getShopOptions(bool $activeOnly = false): array
     {
         if (!$this->shopContext->isReady()) {
@@ -373,7 +431,7 @@ class ShopService
     {
         $shop = DB::table('shops')
             ->where('id', $shopId)
-            ->first(['id', 'name']);
+            ->first(['id', 'name', 'is_active', 'owner_user_id']);
 
         if ($shop !== null) {
             return $shop;
@@ -420,6 +478,136 @@ class ShopService
         }
 
         return $query->exists();
+    }
+
+    private function deleteShopBranchData(array $branchIds): void
+    {
+        if (empty($branchIds)) {
+            return;
+        }
+
+        $customerIds = $this->pluckIdsByBranch('customers', $branchIds);
+        $packageIds = $this->pluckIdsByBranch('packages', $branchIds);
+        $roomIds = $this->pluckIdsByBranch('rooms', $branchIds);
+        $orderIds = $this->pluckIdsByBranch('orders', $branchIds);
+        $orderItemIds = $this->pluckIdsByBranch('order_items', $branchIds);
+        $bookingIds = $this->pluckIdsByBranch('bookings', $branchIds);
+        $masseuseIds = $this->pluckIdsByBranch('masseuses', $branchIds);
+
+        $this->deleteByIds('commissions', 'order_item_id', $orderItemIds);
+        $this->deleteByIds('commissions', 'masseuse_id', $masseuseIds);
+        $this->deleteByBranchIds('commissions', $branchIds);
+
+        $this->deleteByIds('booking_services', 'booking_id', $bookingIds);
+        $this->deleteByBranchIds('booking_services', $branchIds);
+
+        $this->deleteByBranchIds('order_items', $branchIds);
+        $this->deleteByIds('order_items', 'order_id', $orderIds);
+
+        $this->deleteByBranchIds('customer_packages', $branchIds);
+        $this->deleteByIds('customer_packages', 'customer_id', $customerIds);
+        $this->deleteByIds('customer_packages', 'package_id', $packageIds);
+
+        $this->deleteByBranchIds('bookings', $branchIds);
+        $this->deleteByBranchIds('staff_attendance', $branchIds);
+        $this->deleteByIds('staff_attendance', 'masseuse_id', $masseuseIds);
+        $this->deleteByBranchIds('staff_shifts', $branchIds);
+        $this->deleteByIds('staff_shifts', 'masseuse_id', $masseuseIds);
+
+        $this->deleteByBranchIds('expenses', $branchIds);
+        $this->deleteByBranchIds('commission_configs', $branchIds);
+        $this->deleteByBranchIds('promotions', $branchIds);
+        $this->deleteByBranchIds('products', $branchIds);
+        $this->deleteByBranchIds('services', $branchIds);
+        $this->deleteByBranchIds('service_categories', $branchIds);
+        $this->deleteByBranchIds('packages', $branchIds);
+        $this->deleteByBranchIds('membership_tiers', $branchIds);
+        $this->deleteByBranchIds('orders', $branchIds);
+        $this->deleteByBranchIds('customers', $branchIds);
+        $this->deleteByBranchIds('beds', $branchIds);
+        $this->deleteByIds('beds', 'room_id', $roomIds);
+        $this->deleteByBranchIds('rooms', $branchIds);
+        $this->deleteByBranchIds('masseuses', $branchIds);
+        $this->deleteByBranchIds('users', $branchIds);
+        $this->deleteByBranchIds('staff', $branchIds);
+    }
+
+    private function getShopBranchIds(int $shopId): array
+    {
+        if (
+            !$this->tableExists('branches')
+            || !$this->hasColumn('branches', 'shop_id')
+        ) {
+            return [];
+        }
+
+        return DB::table('branches')
+            ->where('shop_id', $shopId)
+            ->pluck('id')
+            ->map(static function ($id): int {
+                return (int) $id;
+            })
+            ->all();
+    }
+
+    private function pluckIdsByBranch(string $table, array $branchIds): array
+    {
+        if (
+            empty($branchIds)
+            || !$this->tableExists($table)
+            || !$this->hasColumn($table, 'branch_id')
+        ) {
+            return [];
+        }
+
+        return DB::table($table)
+            ->whereIn('branch_id', $branchIds)
+            ->pluck('id')
+            ->map(static function ($id): int {
+                return (int) $id;
+            })
+            ->all();
+    }
+
+    private function deleteByBranchIds(string $table, array $branchIds): void
+    {
+        if (
+            empty($branchIds)
+            || !$this->tableExists($table)
+            || !$this->hasColumn($table, 'branch_id')
+        ) {
+            return;
+        }
+
+        DB::table($table)
+            ->whereIn('branch_id', $branchIds)
+            ->delete();
+    }
+
+    private function deleteByIds(string $table, string $column, array $ids): void
+    {
+        if (
+            empty($ids)
+            || !$this->tableExists($table)
+            || !$this->hasColumn($table, $column)
+        ) {
+            return;
+        }
+
+        DB::table($table)
+            ->whereIn($column, $ids)
+            ->delete();
+    }
+
+    private function normalizeNullableId($value): ?int
+    {
+        if ($value === null || $value === '' || $value === '0') {
+            return null;
+        }
+
+        $parsed = is_numeric($value) ? (int) $value : 0;
+
+        return $parsed > 0 ? $parsed : null;
     }
 
     private function assertSuperAdmin(User $user): void

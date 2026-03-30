@@ -185,6 +185,14 @@
                 <div><a href="{{ route('system.shops.index') }}" class="btn gradient-btn rounded-pill px-4">ไปพอร์ทัลร้าน</a></div>
             </div>
         </div>
+    @elseif($requiresBranchSetup ?? false)
+        <div class="col-12">
+            <div class="alert alert-info border-0 shadow-sm rounded-4 mb-0 d-flex flex-column gap-2">
+                <div class="fw-bold">ร้านนี้ยังไม่มีสาขา</div>
+                <div>กรุณาสร้างสาขาแรกก่อน แล้วค่อยกลับมาเพิ่มผู้ใช้งานของร้านนี้</div>
+                <div><a href="{{ route('branches.index') }}" class="btn gradient-btn rounded-pill px-4">ไปสร้างสาขาแรก</a></div>
+            </div>
+        </div>
     @else
         <div class="col-12">
             <div class="card hero-card border-0">

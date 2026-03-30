@@ -308,6 +308,16 @@
             </div>
         </div>
     </div>
+    @elseif($requiresBranchSetup ?? false)
+    <div class="col-12">
+        <div class="alert alert-info border-0 shadow-sm rounded-4 mb-0 d-flex flex-column gap-2">
+            <div class="fw-bold">ร้านนี้ยังไม่มีสาขา</div>
+            <div>กรุณาสร้างสาขาแรกก่อน แล้วค่อยกลับมาเพิ่มพนักงานของร้านนี้</div>
+            <div>
+                <a href="{{ route('branches.index') }}" class="btn gradient-btn rounded-pill px-4">ไปสร้างสาขาแรก</a>
+            </div>
+        </div>
+    </div>
     @else
 
     <div class="col-12">
@@ -485,7 +495,11 @@
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label small fw-bold">ตำแหน่ง</label>
-                                        <input type="text" name="position" class="form-control" value="{{ old('position') }}" placeholder="เช่น แคชเชียร์, ผู้จัดการ">
+                                        <select name="position" class="form-select">
+                                            <option value="">เลือกตำแหน่ง</option>
+                                            <option value="แคชเชียร์" {{ old('position') === 'แคชเชียร์' ? 'selected' : '' }}>แคชเชียร์</option>
+                                            <option value="ผู้จัดการ" {{ old('position') === 'ผู้จัดการ' ? 'selected' : '' }}>ผู้จัดการ</option>
+                                        </select>
                                     </div>
                                     <div class="col-12">
                                         <label class="form-label small fw-bold">สาขา</label>
@@ -573,7 +587,11 @@
                                     </div>
                                     <div class="col-12 col-md-6">
                                         <label class="form-label small fw-bold">ตำแหน่ง</label>
-                                        <input type="text" name="position" class="form-control" value="{{ $staff['position'] }}" placeholder="ตำแหน่ง">
+                                        <select name="position" class="form-select">
+                                            <option value="" {{ $staff['position'] === '' ? 'selected' : '' }}>เลือกตำแหน่ง</option>
+                                            <option value="แคชเชียร์" {{ $staff['position'] === 'แคชเชียร์' ? 'selected' : '' }}>แคชเชียร์</option>
+                                            <option value="ผู้จัดการ" {{ $staff['position'] === 'ผู้จัดการ' ? 'selected' : '' }}>ผู้จัดการ</option>
+                                        </select>
                                     </div>
                                     <div class="col-12 col-md-7">
                                         <label class="form-label small fw-bold">สาขา</label>

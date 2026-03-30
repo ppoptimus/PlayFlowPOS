@@ -29,6 +29,7 @@ class BranchService
                 'branches' => [],
                 'activeShop' => $this->shopContext->getActiveShop($user),
                 'shopSelected' => $this->shopContext->getActiveShopId($user) !== null,
+                'requiresBranchSetup' => false,
                 'canManageAllBranches' => $this->branchContext->canManageAllBranches($user),
             ];
         }
@@ -37,6 +38,7 @@ class BranchService
         $canManageAllBranches = $this->branchContext->canManageAllBranches($user);
         $activeShop = $this->shopContext->getActiveShop($user);
         $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($user, false), 'id');
+        $requiresBranchSetup = $canManageAllBranches && $activeShop !== null && empty($accessibleBranchIds);
 
         if ($canManageAllBranches && empty($accessibleBranchIds)) {
             return [
@@ -44,7 +46,8 @@ class BranchService
                 'search' => $normalizedSearch,
                 'branches' => [],
                 'activeShop' => $activeShop,
-                'shopSelected' => false,
+                'shopSelected' => $activeShop !== null,
+                'requiresBranchSetup' => $requiresBranchSetup,
                 'canManageAllBranches' => true,
             ];
         }
@@ -127,6 +130,7 @@ class BranchService
             'branches' => $branches,
             'activeShop' => $activeShop,
             'shopSelected' => !$canManageAllBranches || $activeShop !== null,
+            'requiresBranchSetup' => false,
             'canManageAllBranches' => $canManageAllBranches,
         ];
     }

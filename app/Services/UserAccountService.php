@@ -52,6 +52,7 @@ class UserAccountService
                 'supportsActiveToggle' => false,
                 'activeShop' => $activeShop,
                 'shopSelected' => !$this->branchContext->canManageAllBranches($actor) || $activeShop !== null,
+                'requiresBranchSetup' => false,
                 'canManageAllBranches' => $this->branchContext->canManageAllBranches($actor),
                 'activeShopOwnerUserId' => $activeShopOwnerUserId,
             ];
@@ -74,6 +75,7 @@ class UserAccountService
                 'supportsActiveToggle' => $this->hasColumn('users', 'is_active'),
                 'activeShop' => null,
                 'shopSelected' => false,
+                'requiresBranchSetup' => false,
                 'canManageAllBranches' => true,
                 'activeShopOwnerUserId' => null,
             ];
@@ -219,6 +221,7 @@ class UserAccountService
             'supportsActiveToggle' => $this->hasColumn('users', 'is_active'),
             'activeShop' => $activeShop,
             'shopSelected' => !$this->branchContext->canManageAllBranches($actor) || $activeShop !== null,
+            'requiresBranchSetup' => $this->branchContext->canManageAllBranches($actor) && $activeShop !== null && empty($accessibleBranchIds),
             'canManageAllBranches' => $this->branchContext->canManageAllBranches($actor),
             'activeShopOwnerUserId' => $activeShopOwnerUserId,
         ];
@@ -842,11 +845,17 @@ class UserAccountService
         if ($this->branchContext->canManageAllBranches($actor)) {
             $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($actor, false), 'id');
 
+            if (empty($accessibleBranchIds)) {
+                throw ValidationException::withMessages([
+                    'branch_id' => ['กรุณาสร้างสาขาก่อนเพิ่มผู้ใช้งานของร้าน'],
+                ]);
+            }
+
             if ($branchId !== null && in_array($branchId, $accessibleBranchIds, true)) {
                 return $branchId;
             }
 
-            return !empty($accessibleBranchIds) ? (int) $accessibleBranchIds[0] : null;
+            return (int) $accessibleBranchIds[0];
         }
 
         return $this->branchContext->resolveAuthorizedBranchId($actor);

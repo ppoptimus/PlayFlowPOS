@@ -105,6 +105,14 @@
             </div>
         </div>
     @else
+        @if($requiresBranchSetup ?? false)
+            <div class="col-12">
+                <div class="alert alert-info border-0 shadow-sm rounded-4 mb-0">
+                    <div class="fw-bold mb-1">เริ่มต้นร้านนี้ด้วยการสร้างสาขาแรก</div>
+                    <div>บัญชีเจ้าของร้านถูกผูกร้านเรียบร้อยแล้ว ขั้นตอนถัดไปคือเพิ่มสาขาแรกของร้านนี้ก่อน เพื่อใช้สร้างพนักงานและผู้ใช้งานอื่น ๆ</div>
+                </div>
+            </div>
+        @endif
         <div class="col-12">
             <div class="card border-0 shadow-sm hero-card">
                 <div class="card-body p-3 p-lg-4">

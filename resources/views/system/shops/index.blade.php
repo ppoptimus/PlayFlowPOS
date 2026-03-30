@@ -133,6 +133,101 @@
         gap: 0.5rem;
     }
 
+    .shops-page .card-tools {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 0.5rem;
+    }
+
+    .shops-page .card-tools form,
+    .shops-page .shop-actions form {
+        margin: 0;
+    }
+
+    .shops-page .shop-status-switch {
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .shops-page .shop-status-switch__input {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    .shops-page .shop-status-switch__label {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        width: 5.5rem;
+        height: 2.3rem;
+        padding: 0.25rem;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #ffe4e1, #ffd5cf);
+        border: 1px solid rgba(220, 95, 86, 0.18);
+        box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.65);
+        cursor: pointer;
+        transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+
+    .shops-page .shop-status-switch__label::before {
+        content: '';
+        position: absolute;
+        top: 0.22rem;
+        left: 0.22rem;
+        width: 1.75rem;
+        height: 1.75rem;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 6px 16px rgba(48, 72, 104, 0.18);
+        transition: transform .22s ease;
+    }
+
+    .shops-page .shop-status-switch__text {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        text-align: center;
+        font-size: 0.78rem;
+        font-weight: 800;
+        color: #cf4b4b;
+        letter-spacing: 0.01em;
+        transition: color .2s ease;
+        user-select: none;
+    }
+
+    .shops-page .shop-status-switch__input:checked + .shop-status-switch__label {
+        background: linear-gradient(135deg, rgba(45, 143, 240, 0.16), rgba(20, 184, 154, 0.22));
+        border-color: rgba(20, 184, 154, 0.24);
+    }
+
+    .shops-page .shop-status-switch__input:checked + .shop-status-switch__label::before {
+        transform: translateX(3.1rem);
+    }
+
+    .shops-page .shop-status-switch__input:checked + .shop-status-switch__label .shop-status-switch__text {
+        color: #12977f;
+    }
+
+    .shops-page .shop-status-switch__input:focus-visible + .shop-status-switch__label {
+        outline: 0;
+        box-shadow: 0 0 0 0.22rem rgba(45, 143, 240, 0.18);
+    }
+
+    .shops-page .shop-action-btn {
+        border-radius: 999px;
+        padding: 0.45rem 0.85rem;
+        font-size: 0.82rem;
+        font-weight: 700;
+    }
+
+    .shops-page .shop-action-btn.is-danger {
+        border-color: rgba(219, 74, 57, 0.24);
+        color: #c9453f;
+        background: rgba(219, 74, 57, 0.08);
+    }
+
     .shops-page .shop-badge {
         display: inline-flex;
         align-items: center;
@@ -325,9 +420,23 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="card-tools">
+                                <form method="POST" action="{{ route('system.shops.toggle', ['shopId' => $shop['id']]) }}" class="shop-status-switch">
+                                    @csrf
+                                    @method('PATCH')
+                                    <input type="checkbox"
+                                           class="shop-status-switch__input"
+                                           id="shop-toggle-{{ $shop['id'] }}"
+                                           {{ $shop['is_active'] ? 'checked' : '' }}
+                                           data-auto-submit>
+                                    <label class="shop-status-switch__label" for="shop-toggle-{{ $shop['id'] }}">
+                                        <span class="shop-status-switch__text">{{ $shop['is_active'] ? 'เปิด' : 'ปิด' }}</span>
+                                    </label>
+                                </form>
                             @if((int) $activeShopId === (int) $shop['id'])
                                 <span class="shop-badge status-ready"><i class="bi bi-check-circle-fill"></i>ร้านที่กำลังจัดการ</span>
                             @endif
+                            </div>
                         </div>
 
                         <div class="badge-row">
@@ -363,6 +472,15 @@
                                     data-bs-target="#editShopModal-{{ $shop['id'] }}">
                                 <i class="bi bi-pencil-square me-1"></i>แก้ไขร้าน
                             </button>
+                            <form method="POST"
+                                  action="{{ route('system.shops.destroy', ['shopId' => $shop['id']]) }}"
+                                  onsubmit="return confirm('ยืนยันลบร้านนี้หรือไม่? ระบบจะลบสาขา ผู้ใช้ พนักงาน และข้อมูลที่เกี่ยวข้องทั้งหมดถาวร');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="btn btn-outline-danger shop-action-btn is-danger">
+                                    <i class="bi bi-trash3 me-1"></i>ลบร้าน
+                                </button>
+                            </form>
                         </div>
                     </div>
 
@@ -603,5 +721,14 @@
     }
 
     document.querySelectorAll('[data-expiry-group]').forEach(setupExpiryGroup);
+
+    document.querySelectorAll('[data-auto-submit]').forEach(function (input) {
+        input.addEventListener('change', function () {
+            var form = input.closest('form');
+            if (form) {
+                form.submit();
+            }
+        });
+    });
 </script>
 @endpush

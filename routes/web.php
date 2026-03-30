@@ -11,7 +11,7 @@ Route::post('/logout', 'Auth\LoginController@logout')
     ->name('logout')
     ->middleware('auth');
 
-Route::middleware('auth')->group(function (): void {
+Route::middleware(['auth', 'shop.access'])->group(function (): void {
     Route::get('/', 'DashboardController@index')->name('dashboard');
     Route::get('/my-commission', 'MasseuseController@selfDashboard')
         ->name('masseuse.self')
@@ -22,6 +22,8 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/shops/{shopId}/enter', 'ShopPortalController@enter')->name('system.shops.enter');
         Route::post('/shops', 'ShopPortalController@store')->name('system.shops.store');
         Route::put('/shops/{shopId}', 'ShopPortalController@update')->name('system.shops.update');
+        Route::patch('/shops/{shopId}/toggle', 'ShopPortalController@toggle')->name('system.shops.toggle');
+        Route::delete('/shops/{shopId}', 'ShopPortalController@destroy')->name('system.shops.destroy');
     });
 
     Route::get('/home', function () {

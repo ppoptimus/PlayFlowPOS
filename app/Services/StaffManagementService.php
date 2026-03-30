@@ -43,6 +43,7 @@ class StaffManagementService
                 'branches' => $branches,
                 'activeShop' => $activeShop,
                 'shopSelected' => !$this->branchContext->canManageAllBranches($user) || $activeShop !== null,
+                'requiresBranchSetup' => false,
                 'canManageAllBranches' => $this->branchContext->canManageAllBranches($user),
             ];
         }
@@ -55,7 +56,8 @@ class StaffManagementService
                 'staffList' => [],
                 'branches' => [],
                 'activeShop' => $activeShop,
-                'shopSelected' => false,
+                'shopSelected' => $activeShop !== null,
+                'requiresBranchSetup' => $activeShop !== null,
                 'canManageAllBranches' => true,
             ];
         }
@@ -135,6 +137,7 @@ class StaffManagementService
             'branches' => $branches,
             'activeShop' => $activeShop,
             'shopSelected' => !$this->branchContext->canManageAllBranches($user) || $activeShop !== null,
+            'requiresBranchSetup' => false,
             'canManageAllBranches' => $this->branchContext->canManageAllBranches($user),
         ];
     }
@@ -151,6 +154,11 @@ class StaffManagementService
         }
 
         $branchId = $this->resolveBranchFilter($user, $this->normalizeNullableId($payload['branch_id'] ?? null));
+        if ($branchId === null) {
+            throw ValidationException::withMessages([
+                'branch_id' => ['กรุณาสร้างสาขาก่อนเพิ่มพนักงาน'],
+            ]);
+        }
 
         DB::transaction(function () use ($branchId, $name, $payload, $profileImage): void {
             $row = [
@@ -196,6 +204,11 @@ class StaffManagementService
         }
 
         $branchId = $this->resolveBranchFilter($user, $this->normalizeNullableId($payload['branch_id'] ?? null));
+        if ($branchId === null) {
+            throw ValidationException::withMessages([
+                'branch_id' => ['กรุณาเลือกสาขาที่ต้องการแก้ไขพนักงาน'],
+            ]);
+        }
 
         DB::transaction(function () use ($staffId, $branchId, $name, $payload, $profileImage): void {
             $updates = [
