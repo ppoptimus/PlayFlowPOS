@@ -33,7 +33,7 @@ Route::middleware(['auth', 'shop.access'])->group(function (): void {
     Route::get('/my-profile', 'StaffManagementController@profile')->name('profile.show');
     Route::get('/masseuse', 'MasseuseController@index')->name('masseuse');
 
-    Route::middleware('roles:super_admin,branch_manager,cashier')->group(function (): void {
+    Route::middleware('roles:super_admin,shop_owner,branch_manager,cashier')->group(function (): void {
         Route::get('/pos', 'PosController@index')->name('pos');
         Route::post('/pos/checkout', 'PosController@checkout')->name('pos.checkout');
         Route::get('/booking', 'BookingController@index')->name('booking');
@@ -137,7 +137,7 @@ Route::middleware(['auth', 'shop.access'])->group(function (): void {
     });
 
     // Reports
-    Route::middleware('roles:super_admin,branch_manager')->group(function (): void {
+    Route::middleware('roles:super_admin,shop_owner,branch_manager')->group(function (): void {
         Route::get('/reports', 'ReportController@index')->name('reports');
         Route::get('/reports/export-csv', 'ReportController@exportCsv')->name('reports.export-csv');
 

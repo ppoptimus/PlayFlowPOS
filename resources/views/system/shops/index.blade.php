@@ -447,7 +447,7 @@
                         <div class="metric-row">
                             <div class="metric-box">
                                 <div class="metric-label">จำนวนสาขา</div>
-                                <div class="metric-value">{{ number_format($shop['branch_count']) }}</div>
+                                <div class="metric-value">{{ $shop['branch_usage_label'] }}</div>
                             </div>
                             <div class="metric-box">
                                 <div class="metric-label">จำนวนผู้ใช้</div>
@@ -518,6 +518,10 @@
                                             <div class="col-12 col-md-6">
                                                 <label class="form-label small fw-bold">เบอร์โทร</label>
                                                 <input type="text" name="contact_phone" class="form-control" value="{{ $shop['contact_phone'] }}">
+                                            </div>
+                                            <div class="col-12 col-md-6">
+                                                <label class="form-label small fw-bold">จำนวนสาขาสูงสุด</label>
+                                                <input type="number" name="limit_branch" class="form-control" value="{{ $shop['limit_branch'] }}" min="1" step="1">
                                             </div>
                                             <div class="col-12">
                                                 <label class="form-label small fw-bold d-block">อายุการใช้งาน</label>
@@ -613,6 +617,10 @@
                                 <div class="col-12 col-md-6">
                                     <label class="form-label small fw-bold">เบอร์โทร</label>
                                     <input type="text" name="contact_phone" class="form-control" value="{{ old('contact_phone') }}">
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label small fw-bold">จำนวนสาขาสูงสุด</label>
+                                    <input type="number" name="limit_branch" class="form-control" value="{{ old('limit_branch', 1) }}" min="1" step="1">
                                 </div>
                                 <div class="col-12">
                                     <div class="section-card owner-highlight">

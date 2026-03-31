@@ -1,8 +1,7 @@
 @php
     $mobileSidebarRole = (string) (auth()->user()->role ?? '');
     $isSuperAdminMobileSidebar = $mobileSidebarRole === 'super_admin';
-    $isShopOwnerMobileSidebar = $mobileSidebarRole === 'shop_owner';
-    $isAdminMobileSidebar = in_array($mobileSidebarRole, ['super_admin', 'branch_manager'], true);
+    $isAdminMobileSidebar = in_array($mobileSidebarRole, ['super_admin', 'shop_owner', 'branch_manager'], true);
     $isMasseuseMobileSidebar = $mobileSidebarRole === 'masseuse';
 
     if ($isMasseuseMobileSidebar) {
@@ -46,37 +45,6 @@
                 'subtitle' => 'จัดการบัญชีผู้ใช้ของร้านที่เลือก',
             ],
         ];
-    } elseif ($isShopOwnerMobileSidebar) {
-        $mobileMenus = [
-            [
-                'route' => 'branches.index',
-                'active' => ['branches.*'],
-                'icon' => 'bi-building-fill',
-                'title' => 'สาขา',
-                'subtitle' => 'จัดการสาขาภายในร้านของตัวเอง',
-            ],
-            [
-                'route' => 'staff.index',
-                'active' => ['staff.*'],
-                'icon' => 'bi-person-badge',
-                'title' => 'พนักงาน',
-                'subtitle' => 'จัดการข้อมูลพนักงานของร้าน',
-            ],
-            [
-                'route' => 'masseuse',
-                'active' => ['masseuse', 'masseuse.*'],
-                'icon' => 'bi-people-fill',
-                'title' => 'หมอนวด',
-                'subtitle' => 'จัดการข้อมูลหมอนวดของร้าน',
-            ],
-            [
-                'route' => 'users.index',
-                'active' => ['users.*'],
-                'icon' => 'bi-shield-check',
-                'title' => 'ผู้ใช้งานระบบ',
-                'subtitle' => 'สร้างผู้จัดการสาขาและบัญชีผู้ใช้ในร้าน',
-            ],
-        ];
     } else {
         $mobileMenus = [
             [
@@ -105,7 +73,7 @@
                 'active' => ['masseuse', 'masseuse.*'],
                 'icon' => 'bi-person-badge',
                 'title' => 'หมอนวด',
-                'subtitle' => $isAdminMobileSidebar ? 'จัดการข้อมูลหมอนวด' : 'ดูแดชบอร์ดหมอนวด',
+                'subtitle' => $isAdminMobileSidebar ? 'จัดการข้อมูลหมอนวด' : 'ดูข้อมูลหมอนวด',
             ],
         ];
 
@@ -123,7 +91,7 @@
                     'active' => ['customers*'],
                     'icon' => 'bi-people',
                     'title' => 'ลูกค้า',
-                    'subtitle' => 'แก้ไขข้อมูลลูกค้า',
+                    'subtitle' => 'แก้ไขข้อมูลลูกค้าและประวัติการใช้บริการ',
                 ],
                 [
                     'route' => 'membership-levels',
@@ -151,21 +119,21 @@
                     'active' => ['products*'],
                     'icon' => 'bi-box-seam-fill',
                     'title' => 'สินค้าและสต็อก',
-                    'subtitle' => 'จัดการสินค้าและสต็อก',
+                    'subtitle' => 'ดูแลสินค้า จำนวนคงเหลือ และหมวดหมู่',
                 ],
                 [
                     'route' => 'massage-rooms',
                     'active' => ['massage-rooms*'],
                     'icon' => 'bi-door-open',
                     'title' => 'ห้องนวด',
-                    'subtitle' => 'จัดการเตียงและห้องนวด',
+                    'subtitle' => 'จัดการห้อง เตียง และความพร้อมใช้งาน',
                 ],
                 [
                     'route' => 'reports',
                     'active' => ['reports*'],
                     'icon' => 'bi-bar-chart-line-fill',
                     'title' => 'รายงานวิเคราะห์',
-                    'subtitle' => 'ยอดขาย บริการ หมอนวด สินค้า',
+                    'subtitle' => 'ติดตามยอดขาย บริการ หมอนวด และสินค้า',
                 ],
                 [
                     'route' => 'financial',
@@ -179,7 +147,7 @@
                     'active' => ['admin.commission.*'],
                     'icon' => 'bi-percent',
                     'title' => 'ค่าคอมมิชชั่น',
-                    'subtitle' => 'กำหนดค่าคอมมิชชั่น',
+                    'subtitle' => 'กำหนดค่าคอมมิชชั่นของร้าน',
                 ],
                 [
                     'route' => 'branches.index',
@@ -200,7 +168,7 @@
                     'active' => ['users.*'],
                     'icon' => 'bi-shield-check',
                     'title' => 'ผู้ใช้งานระบบ',
-                    'subtitle' => 'จัดการบัญชีและสิทธิ์เข้าใช้',
+                    'subtitle' => 'จัดการบัญชีและสิทธิ์เข้าใช้งาน',
                 ],
             ];
 

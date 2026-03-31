@@ -22,21 +22,31 @@ class BranchService
 
     public function getPageData(User $user, string $search = ''): array
     {
-        if (!$this->tableExists('branches')) {
-            return [
-                'moduleReady' => false,
-                'search' => trim($search),
-                'branches' => [],
-                'activeShop' => $this->shopContext->getActiveShop($user),
-                'shopSelected' => $this->shopContext->getActiveShopId($user) !== null,
-                'requiresBranchSetup' => false,
-                'canManageAllBranches' => $this->branchContext->canManageAllBranches($user),
-            ];
-        }
-
         $normalizedSearch = trim($search);
         $canManageAllBranches = $this->branchContext->canManageAllBranches($user);
         $activeShop = $this->shopContext->getActiveShop($user);
+        $activeShopId = isset($activeShop->id) ? (int) $activeShop->id : null;
+        $branchLimit = $this->resolveBranchLimit($activeShop, $activeShopId);
+        $branchTotalCount = $this->countBranchesForShop($activeShopId);
+        $branchQuotaLabel = $this->formatBranchQuota($branchTotalCount, $branchLimit);
+        $branchLimitReached = $activeShopId !== null && $branchTotalCount >= $branchLimit;
+
+        if (!$this->tableExists('branches')) {
+            return [
+                'moduleReady' => false,
+                'search' => $normalizedSearch,
+                'branches' => [],
+                'activeShop' => $activeShop,
+                'shopSelected' => $activeShopId !== null,
+                'requiresBranchSetup' => false,
+                'canManageAllBranches' => $canManageAllBranches,
+                'branchLimit' => $branchLimit,
+                'branchTotalCount' => $branchTotalCount,
+                'branchQuotaLabel' => $branchQuotaLabel,
+                'branchLimitReached' => $branchLimitReached,
+            ];
+        }
+
         $accessibleBranchIds = array_column($this->branchContext->getAccessibleBranches($user, false), 'id');
         $requiresBranchSetup = $canManageAllBranches && $activeShop !== null && empty($accessibleBranchIds);
 
@@ -49,6 +59,10 @@ class BranchService
                 'shopSelected' => $activeShop !== null,
                 'requiresBranchSetup' => $requiresBranchSetup,
                 'canManageAllBranches' => true,
+                'branchLimit' => $branchLimit,
+                'branchTotalCount' => $branchTotalCount,
+                'branchQuotaLabel' => $branchQuotaLabel,
+                'branchLimitReached' => $branchLimitReached,
             ];
         }
 
@@ -132,6 +146,10 @@ class BranchService
             'shopSelected' => !$canManageAllBranches || $activeShop !== null,
             'requiresBranchSetup' => false,
             'canManageAllBranches' => $canManageAllBranches,
+            'branchLimit' => $branchLimit,
+            'branchTotalCount' => $branchTotalCount,
+            'branchQuotaLabel' => $branchQuotaLabel,
+            'branchLimitReached' => $branchLimitReached,
         ];
     }
 
@@ -146,6 +164,8 @@ class BranchService
                 'shop' => ['กรุณาเลือกร้านจากพอร์ทัลก่อนเพิ่มสาขา'],
             ]);
         }
+
+        $this->assertBranchLimitAvailable($activeShopId);
 
         $name = trim((string) ($payload['name'] ?? ''));
         if ($name === '') {
@@ -326,6 +346,70 @@ class BranchService
         throw ValidationException::withMessages([
             'branches' => ['ยังไม่พบตาราง branches ในฐานข้อมูล'],
         ]);
+    }
+
+    private function assertBranchLimitAvailable(int $shopId): void
+    {
+        $branchLimit = $this->resolveBranchLimit(null, $shopId);
+        $branchTotalCount = $this->countBranchesForShop($shopId);
+
+        if ($branchTotalCount < $branchLimit) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'branch_limit' => ['à¸ˆà¸³à¸™à¸§à¸™à¸ªà¸²à¸‚à¸²à¸„à¸£à¸šà¸•à¸²à¸¡à¹‚à¸„à¸§à¸•à¹‰à¸²à¸‚à¸­à¸‡à¸£à¹‰à¸²à¸™à¹à¸¥à¹‰à¸§ (' . $branchTotalCount . '/' . $branchLimit . ')'],
+        ]);
+    }
+
+    private function resolveBranchLimit(?object $activeShop, ?int $shopId): int
+    {
+        if ($activeShop !== null && isset($activeShop->limit_branch)) {
+            return $this->normalizeLimitBranch($activeShop->limit_branch);
+        }
+
+        if (
+            $shopId !== null
+            && $shopId > 0
+            && $this->tableExists('shops')
+            && $this->hasColumn('shops', 'limit_branch')
+        ) {
+            $limit = DB::table('shops')
+                ->where('id', $shopId)
+                ->value('limit_branch');
+
+            return $this->normalizeLimitBranch($limit);
+        }
+
+        return 1;
+    }
+
+    private function countBranchesForShop(?int $shopId): int
+    {
+        if (
+            $shopId === null
+            || $shopId <= 0
+            || !$this->tableExists('branches')
+            || !$this->hasColumn('branches', 'shop_id')
+        ) {
+            return 0;
+        }
+
+        return (int) DB::table('branches')
+            ->where('shop_id', $shopId)
+            ->count();
+    }
+
+    private function formatBranchQuota(int $branchTotalCount, int $branchLimit): string
+    {
+        return $branchTotalCount . '/' . $branchLimit;
+    }
+
+    private function normalizeLimitBranch($value): int
+    {
+        $limit = is_numeric($value) ? (int) $value : 1;
+
+        return $limit > 0 ? $limit : 1;
     }
 
     private function tableExists(string $table): bool

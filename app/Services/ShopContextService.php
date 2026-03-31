@@ -56,7 +56,7 @@ class ShopContextService
         }
 
         $columns = ['id', 'name'];
-        foreach (['code', 'contact_name', 'contact_phone', 'notes', 'is_active', 'expires_on', 'owner_user_id'] as $column) {
+        foreach (['code', 'contact_name', 'contact_phone', 'notes', 'is_active', 'expires_on', 'owner_user_id', 'limit_branch'] as $column) {
             if ($this->hasColumn('shops', $column)) {
                 $columns[] = $column;
             }

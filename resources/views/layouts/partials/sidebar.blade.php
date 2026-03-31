@@ -30,9 +30,7 @@
 @php
     $sidebarRole = (string) (auth()->user()->role ?? '');
     $isSuperAdminSidebar = $sidebarRole === 'super_admin';
-    $isShopOwnerSidebar = $sidebarRole === 'shop_owner';
-    $isAdminSidebar = in_array($sidebarRole, ['super_admin', 'branch_manager'], true);
-    $isCashierSidebar = $sidebarRole === 'cashier';
+    $isAdminSidebar = in_array($sidebarRole, ['super_admin', 'shop_owner', 'branch_manager'], true);
     $isMasseuseSidebar = $sidebarRole === 'masseuse';
 @endphp
 
@@ -58,20 +56,6 @@
             </a>
             <a href="{{ route('staff.index') }}" class="nav-link {{ request()->routeIs('staff.*') ? 'active' : 'link-dark' }}">
                 <i class="bi bi-person-badge-fill me-2"></i> พนักงาน
-            </a>
-            <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : 'link-dark' }}">
-                <i class="bi bi-shield-lock-fill me-2"></i> ผู้ใช้งานระบบ
-            </a>
-        @elseif($isShopOwnerSidebar)
-            <small class="text-muted fw-bold mb-2 px-2" style="font-size: 0.75rem;">เจ้าของร้าน</small>
-            <a href="{{ route('branches.index') }}" class="nav-link {{ request()->routeIs('branches.*') ? 'active' : 'link-dark' }}">
-                <i class="bi bi-building-fill me-2"></i> สาขา
-            </a>
-            <a href="{{ route('staff.index') }}" class="nav-link {{ request()->routeIs('staff.*') ? 'active' : 'link-dark' }}">
-                <i class="bi bi-person-badge-fill me-2"></i> พนักงาน
-            </a>
-            <a href="{{ route('masseuse') }}" class="nav-link {{ request()->routeIs('masseuse*') ? 'active' : 'link-dark' }}">
-                <i class="bi bi-people-fill me-2"></i> หมอนวด
             </a>
             <a href="{{ route('users.index') }}" class="nav-link {{ request()->routeIs('users.*') ? 'active' : 'link-dark' }}">
                 <i class="bi bi-shield-lock-fill me-2"></i> ผู้ใช้งานระบบ

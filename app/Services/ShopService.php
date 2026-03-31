@@ -63,7 +63,7 @@ class ShopService
         }
 
         $columns = ['sh.id', 'sh.name'];
-        foreach (['code', 'contact_name', 'contact_phone', 'notes', 'is_active', 'expires_on', 'created_at', 'owner_user_id'] as $column) {
+        foreach (['code', 'contact_name', 'contact_phone', 'notes', 'is_active', 'expires_on', 'created_at', 'owner_user_id', 'limit_branch'] as $column) {
             if ($this->hasColumn('shops', $column)) {
                 $columns[] = 'sh.' . $column;
             }
@@ -92,6 +92,7 @@ class ShopService
                 'created_at' => $row->created_at ?? null,
                 'owner_user_id' => isset($row->owner_user_id) && $row->owner_user_id !== null ? (int) $row->owner_user_id : null,
                 'owner_username' => (string) ($row->owner_username ?? ''),
+                'limit_branch' => $this->normalizeLimitBranch($row->limit_branch ?? null),
             ];
         })->all();
 
@@ -133,6 +134,8 @@ class ShopService
             $shopId = $shop['id'];
             $shop['branch_count'] = (int) ($branchCounts[$shopId] ?? 0);
             $shop['user_count'] = (int) ($userCounts[$shopId] ?? 0) + (int) ($ownerCounts[$shopId] ?? 0);
+            $shop['branch_usage_label'] = $shop['branch_count'] . '/' . $shop['limit_branch'];
+            $shop['branch_limit_reached'] = $shop['branch_count'] >= $shop['limit_branch'];
         }
         unset($shop);
 
@@ -180,8 +183,9 @@ class ShopService
 
         $code = $this->resolveUniqueCode(trim((string) ($payload['code'] ?? '')), $name);
         $expiresOn = $this->normalizeExpiresOn($payload['expires_on'] ?? null);
+        $limitBranch = $this->normalizeLimitBranch($payload['limit_branch'] ?? null);
 
-        DB::transaction(function () use ($name, $code, $expiresOn, $payload, $ownerUsername, $ownerPassword): void {
+        DB::transaction(function () use ($name, $code, $expiresOn, $limitBranch, $payload, $ownerUsername, $ownerPassword): void {
             $shopRow = [
                 'name' => $name,
                 'code' => $code,
@@ -192,6 +196,10 @@ class ShopService
                 'expires_on' => $expiresOn,
                 'owner_user_id' => null,
             ];
+
+            if ($this->hasColumn('shops', 'limit_branch')) {
+                $shopRow['limit_branch'] = $limitBranch;
+            }
 
             if ($this->hasColumn('shops', 'created_at')) {
                 $shopRow['created_at'] = now();
@@ -249,6 +257,7 @@ class ShopService
 
         $code = $this->resolveUniqueCode(trim((string) ($payload['code'] ?? '')), $name, $shopId);
         $expiresOn = $this->normalizeExpiresOn($payload['expires_on'] ?? null);
+        $limitBranch = $this->normalizeLimitBranch($payload['limit_branch'] ?? null);
 
         $updates = [
             'name' => $name,
@@ -259,6 +268,10 @@ class ShopService
             'is_active' => !empty($payload['is_active']),
             'expires_on' => $expiresOn,
         ];
+
+        if ($this->hasColumn('shops', 'limit_branch')) {
+            $updates['limit_branch'] = $limitBranch;
+        }
 
         if ($this->hasColumn('shops', 'updated_at')) {
             $updates['updated_at'] = now();
@@ -450,6 +463,13 @@ class ShopService
         }
 
         return Carbon::parse($normalized)->format('Y-m-d');
+    }
+
+    private function normalizeLimitBranch($value): int
+    {
+        $limit = is_numeric($value) ? (int) $value : 1;
+
+        return $limit > 0 ? $limit : 1;
     }
 
     private function resolveUniqueCode(string $requestedCode, string $name, ?int $ignoreShopId = null): string
