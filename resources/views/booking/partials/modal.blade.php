@@ -11,6 +11,14 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body pt-3">
+                @php
+                    $modalBranchOpenTime = $branchOpenTime ?? '10:00';
+                    $modalBranchCloseTime = $branchCloseTime ?? '20:00';
+                    $modalOpenMinutes = ((int) substr($modalBranchOpenTime, 0, 2) * 60) + (int) substr($modalBranchOpenTime, 3, 2);
+                    $modalCloseMinutes = ((int) substr($modalBranchCloseTime, 0, 2) * 60) + (int) substr($modalBranchCloseTime, 3, 2);
+                    $modalDefaultEndMinutes = min($modalCloseMinutes, $modalOpenMinutes + 60);
+                    $modalDefaultEndTime = sprintf('%02d:%02d', intdiv($modalDefaultEndMinutes, 60), $modalDefaultEndMinutes % 60);
+                @endphp
                 <form id="booking-form" class="row g-3">
                     <div class="col-12 col-md-6">
                         <label class="form-label small fw-bold">ค้นหาลูกค้าจากเบอร์โทร</label>
@@ -46,11 +54,11 @@
                     </div>
                     <div class="col-6">
                         <label class="form-label small fw-bold">เวลาเริ่ม</label>
-                        <input type="time" class="form-control rounded-3 shadow-none" id="start-time" value="10:00" required>
+                        <input type="time" class="form-control rounded-3 shadow-none" id="start-time" value="{{ $modalBranchOpenTime }}" min="{{ $modalBranchOpenTime }}" max="{{ $modalBranchCloseTime }}" required>
                     </div>
                     <div class="col-6">
                         <label class="form-label small fw-bold">เวลาสิ้นสุด</label>
-                        <input type="time" class="form-control rounded-3 shadow-none" id="end-time" value="11:00" required>
+                        <input type="time" class="form-control rounded-3 shadow-none" id="end-time" value="{{ $modalDefaultEndTime }}" min="{{ $modalBranchOpenTime }}" max="{{ $modalBranchCloseTime }}" required>
                     </div>
                     <div class="col-12 col-md-6">
                         <label class="form-label small fw-bold">สถานะคิว</label>

@@ -21,6 +21,7 @@ class BookingService
     private BranchContextService $branchContext;
     private StaffAttendanceService $staffAttendanceService;
     private array $tableExistsCache = [];
+    private array $columnExistsCache = [];
 
     public function __construct(StaffAttendanceService $staffAttendanceService, BranchContextService $branchContext)
     {
@@ -32,10 +33,13 @@ class BookingService
     {
         $branchId = $this->resolveAuthorizedBranchId($user, $requestedBranchId);
         $selectedDate = $this->normalizeDate($date);
+        $branchHours = $this->getBranchOperatingHours($branchId);
 
         return [
             'activeBranchId' => $branchId,
             'selectedDate' => $selectedDate,
+            'branchOpenTime' => $branchHours['open_time'],
+            'branchCloseTime' => $branchHours['close_time'],
             'staff' => $this->getStaff($branchId, $selectedDate, true),
             'serviceItems' => $this->getServiceItems($branchId),
             'customers' => $this->getCustomers($branchId),
@@ -151,6 +155,7 @@ class BookingService
         $this->ensureCustomerExists($customerId, $branchId);
         $this->ensureMasseuseInBranch($masseuseId, $branchId);
         $this->ensureBedInBranch($bedId, $branchId);
+        $this->ensureWithinOperatingHours($branchId, $startAt, $endAt);
         $this->ensureNoTimeConflict($branchId, $startAt, $endAt, $masseuseId, $bedId, $bookingId);
 
         $data = [
@@ -828,6 +833,19 @@ class BookingService
             ]);
         }
     }
+    private function ensureWithinOperatingHours(int $branchId, Carbon $startAt, Carbon $endAt): void
+    {
+        $branchHours = $this->getBranchOperatingHours($branchId);
+        $openAt = Carbon::createFromFormat('Y-m-d H:i', $startAt->toDateString() . ' ' . $branchHours['open_time']);
+        $closeAt = Carbon::createFromFormat('Y-m-d H:i', $startAt->toDateString() . ' ' . $branchHours['close_time']);
+
+        if ($startAt->lt($openAt) || $endAt->gt($closeAt)) {
+            throw ValidationException::withMessages([
+                'start_time' => ['เวลาจองต้องอยู่ในช่วงเวลาเปิดร้าน ' . $branchHours['open_time'] . ' - ' . $branchHours['close_time']],
+            ]);
+        }
+    }
+
     private function normalizeServiceIdsFromPayload(array $payload): array
     {
         $rawIds = [];
@@ -934,6 +952,16 @@ class BookingService
         return $this->tableExistsCache[$table];
     }
 
+    private function hasColumn(string $table, string $column): bool
+    {
+        $cacheKey = $table . '.' . $column;
+        if (!array_key_exists($cacheKey, $this->columnExistsCache)) {
+            $this->columnExistsCache[$cacheKey] = $this->tableExists($table) && Schema::hasColumn($table, $column);
+        }
+
+        return $this->columnExistsCache[$cacheKey];
+    }
+
     private function ensureMasseuseInBranch(?int $masseuseId, int $branchId): void
     {
         if ($masseuseId === null) {
@@ -1000,6 +1028,36 @@ class BookingService
         }
 
         return 1;
+    }
+
+    private function getBranchOperatingHours(int $branchId): array
+    {
+        $columns = ['id'];
+        if ($this->hasColumn('branches', 'open_time')) {
+            $columns[] = 'open_time';
+        }
+        if ($this->hasColumn('branches', 'close_time')) {
+            $columns[] = 'close_time';
+        }
+
+        $row = DB::table('branches')
+            ->where('id', $branchId)
+            ->first($columns);
+
+        return [
+            'open_time' => $this->normalizeBranchTimeForDisplay($row->open_time ?? null, '10:00'),
+            'close_time' => $this->normalizeBranchTimeForDisplay($row->close_time ?? null, '20:00'),
+        ];
+    }
+
+    private function normalizeBranchTimeForDisplay($value, string $fallback): string
+    {
+        $normalized = trim((string) $value);
+        if ($normalized === '') {
+            return $fallback;
+        }
+
+        return substr($normalized, 0, 5);
     }
 
     private function normalizeDate(string $date): string

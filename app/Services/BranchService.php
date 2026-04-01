@@ -96,6 +96,8 @@ class BranchService
             'b.name',
             'b.address',
             'b.phone',
+            'b.open_time',
+            'b.close_time',
             'b.is_active',
             'b.created_at',
             'b.shop_id',
@@ -106,6 +108,8 @@ class BranchService
                 'name' => (string) ($row->name ?? ''),
                 'address' => (string) ($row->address ?? ''),
                 'phone' => (string) ($row->phone ?? ''),
+                'open_time' => self::normalizeDisplayTime($row->open_time ?? null, '10:00'),
+                'close_time' => self::normalizeDisplayTime($row->close_time ?? null, '20:00'),
                 'is_active' => (bool) ($row->is_active ?? true),
                 'created_at' => $row->created_at ?? null,
                 'shop_id' => isset($row->shop_id) ? (int) $row->shop_id : null,
@@ -193,6 +197,14 @@ class BranchService
             'is_active' => true,
         ];
 
+        $hours = $this->normalizeBranchHours($payload);
+        if ($this->hasColumn('branches', 'open_time')) {
+            $row['open_time'] = $hours['open_time'];
+        }
+        if ($this->hasColumn('branches', 'close_time')) {
+            $row['close_time'] = $hours['close_time'];
+        }
+
         if ($this->hasColumn('branches', 'created_at')) {
             $row['created_at'] = now();
         }
@@ -243,6 +255,14 @@ class BranchService
             'phone' => trim((string) ($payload['phone'] ?? '')),
             'is_active' => !empty($payload['is_active']),
         ];
+
+        $hours = $this->normalizeBranchHours($payload);
+        if ($this->hasColumn('branches', 'open_time')) {
+            $updates['open_time'] = $hours['open_time'];
+        }
+        if ($this->hasColumn('branches', 'close_time')) {
+            $updates['close_time'] = $hours['close_time'];
+        }
 
         if ($this->hasColumn('branches', 'updated_at')) {
             $updates['updated_at'] = now();
@@ -360,6 +380,43 @@ class BranchService
         throw ValidationException::withMessages([
             'branch_limit' => ['à¸ˆà¸³à¸™à¸§à¸™à¸ªà¸²à¸‚à¸²à¸„à¸£à¸šà¸•à¸²à¸¡à¹‚à¸„à¸§à¸•à¹‰à¸²à¸‚à¸­à¸‡à¸£à¹‰à¸²à¸™à¹à¸¥à¹‰à¸§ (' . $branchTotalCount . '/' . $branchLimit . ')'],
         ]);
+    }
+
+    private function normalizeBranchHours(array $payload): array
+    {
+        $openTime = $this->normalizeStorageTime($payload['open_time'] ?? null, '10:00:00');
+        $closeTime = $this->normalizeStorageTime($payload['close_time'] ?? null, '20:00:00');
+
+        if (strtotime($closeTime) <= strtotime($openTime)) {
+            throw ValidationException::withMessages([
+                'close_time' => ['เวลาเปิดและปิดร้านไม่ถูกต้อง เวลาปิดต้องมากกว่าเวลาเปิด'],
+            ]);
+        }
+
+        return [
+            'open_time' => $openTime,
+            'close_time' => $closeTime,
+        ];
+    }
+
+    private function normalizeStorageTime($value, string $fallback): string
+    {
+        $normalized = trim((string) $value);
+        if ($normalized === '') {
+            return $fallback;
+        }
+
+        return strlen($normalized) === 5 ? $normalized . ':00' : $normalized;
+    }
+
+    private static function normalizeDisplayTime($value, string $fallback): string
+    {
+        $normalized = trim((string) $value);
+        if ($normalized === '') {
+            return $fallback;
+        }
+
+        return substr($normalized, 0, 5);
     }
 
     private function resolveBranchLimit(?object $activeShop, ?int $shopId): int

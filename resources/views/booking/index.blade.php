@@ -5,9 +5,18 @@
 
 @section('content')
 @php
-    $startHour = 10;
-    $endHour = 20;
-    $slotCount = ($endHour - $startHour) + 1;
+    $branchOpenTime = $branchOpenTime ?? '10:00';
+    $branchCloseTime = $branchCloseTime ?? '20:00';
+    $startMinutes = ((int) substr($branchOpenTime, 0, 2) * 60) + (int) substr($branchOpenTime, 3, 2);
+    $endMinutes = ((int) substr($branchCloseTime, 0, 2) * 60) + (int) substr($branchCloseTime, 3, 2);
+    $slotTimes = [];
+    for ($minutes = $startMinutes; $minutes < $endMinutes; $minutes += 60) {
+        $slotTimes[] = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+    }
+    if (empty($slotTimes)) {
+        $slotTimes[] = $branchOpenTime;
+    }
+    $slotCount = count($slotTimes);
 @endphp
 
 <div class="booking-page booking-mobile-safe">
@@ -17,6 +26,9 @@
                 <div class="d-flex flex-wrap gap-2 align-items-center w-100" style="max-width: 100%;">
                     <input type="date" id="queue-date" class="form-control rounded-pill px-3 shadow-none border-secondary-subtle flex-grow-1" value="{{ $selectedDate }}" style="width: auto; max-width: 160px;">
                     <button class="btn btn-primary rounded-pill px-4 flex-shrink-0" onclick="openModal()"><i class="bi bi-plus-lg me-2"></i> เพิ่มคิว</button>
+                    <span class="badge text-bg-light border rounded-pill px-3 py-2 fw-semibold">
+                        <i class="bi bi-clock me-1"></i> {{ $branchOpenTime }} - {{ $branchCloseTime }}
+                    </span>
                 </div>
                 <span class="badge text-bg-light border rounded-3 px-3 py-2 fw-semibold text-wrap text-start lh-base d-block w-100 w-md-auto">
                     <i class="bi bi-info-circle me-1"></i> กดแทบคิวเพื่อแก้บริการ/เวลา/หมอ และชำระเงิน
@@ -42,9 +54,9 @@
                 <div id="queue-board" class="queue-board bg-white" style="--slot-count: {{ $slotCount }};">
                     <div class="queue-grid-row queue-head-row">
                         <div class="queue-cell queue-staff-head">หมอนวด</div>
-                        @for($h = $startHour; $h <= $endHour; $h++)
-                        <div class="queue-cell queue-time-head">{{ sprintf('%02d:00', $h) }}</div>
-                        @endfor
+                        @foreach($slotTimes as $slotTime)
+                        <div class="queue-cell queue-time-head">{{ $slotTime }}</div>
+                        @endforeach
                     </div>
 
                     @foreach($staff as $s)
@@ -62,11 +74,11 @@
                                 @endif
                             </div>
                         </div>
-                        @for($h = $startHour; $h <= $endHour; $h++)
+                        @foreach($slotTimes as $slotTime)
                         <div class="queue-cell queue-slot-cell"
-                            data-time="{{ sprintf('%02d:00', $h) }}"
-                            onclick="openModal({staffId:'{{ $s['id'] }}', time:'{{ sprintf('%02d:00', $h) }}'})"></div>
-                        @endfor
+                            data-time="{{ $slotTime }}"
+                            onclick="openModal({staffId:'{{ $s['id'] }}', time:'{{ $slotTime }}'})"></div>
+                        @endforeach
                         <div class="booking-row-layer" id="layer-{{ $s['id'] }}" data-staff-id="{{ $s['id'] }}"></div>
                     </div>
                     @endforeach
@@ -412,8 +424,10 @@
 
 @push('scripts')
 <script>
-    const START_HOUR = {{ $startHour }};
-    const END_HOUR_EXCLUSIVE = {{ $endHour + 1 }};
+    const BRANCH_OPEN_TIME = @json($branchOpenTime);
+    const BRANCH_CLOSE_TIME = @json($branchCloseTime);
+    const START_MINUTES = {{ $startMinutes }};
+    const END_MINUTES = {{ $endMinutes }};
     const activeBranchId = @json($activeBranchId);
     const staffData = @json($staff);
     const customerData = @json($customers);
@@ -475,6 +489,8 @@
     const defaultServiceId = serviceData.length ? normalizeId(serviceData[0].id) : '';
     const defaultStaffId = staffData.length ? normalizeId(staffData[0].id) : '';
     const defaultDate = queueDateEl ? queueDateEl.value : "{{ $selectedDate }}";
+    const DEFAULT_START_TIME = BRANCH_OPEN_TIME;
+    const DEFAULT_END_TIME = toHHMM(Math.min(END_MINUTES, START_MINUTES + 60));
 
     let bookings = (Array.isArray(initialBookings) ? initialBookings : []).map(normalizeBooking);
     let bookingModal = null;
@@ -485,7 +501,7 @@
     let pendingZoomRestore = null;
     let pendingZoomFrame = null;
 
-    function normalizeTimeValue(rawValue, fallback = '10:00') {
+    function normalizeTimeValue(rawValue, fallback = DEFAULT_START_TIME) {
         const value = String(rawValue || '').trim();
         if (value === '') {
             return fallback;
@@ -629,8 +645,8 @@
             serviceIds: normalizedServiceIds,
             staffId: normalizeId(input.staffId || input.masseuse_id),
             bedId: normalizeId(input.bedId || input.bed_id),
-            start: normalizeTimeValue(input.start || input.startTime || input.start_time || '10:00', '10:00'),
-            end: normalizeTimeValue(input.end || input.endTime || input.end_time || '11:00', '11:00'),
+            start: normalizeTimeValue(input.start || input.startTime || input.start_time || DEFAULT_START_TIME, DEFAULT_START_TIME),
+            end: normalizeTimeValue(input.end || input.endTime || input.end_time || DEFAULT_END_TIME, DEFAULT_END_TIME),
             status: input.status || 'waiting',
             paid: Boolean(input.paid || input.isPaid),
             cancelReason: input.cancelReason || input.cancel_reason || null,
@@ -648,9 +664,15 @@
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     }
 
+    function isWithinOperatingHours(startTime, endTime) {
+        const start = toMinutes(startTime);
+        const end = toMinutes(endTime);
+        return start >= START_MINUTES && end <= END_MINUTES && end > start;
+    }
+
     function clampMinutes(totalMinutes) {
-        const min = START_HOUR * 60;
-        const max = END_HOUR_EXCLUSIVE * 60;
+        const min = START_MINUTES;
+        const max = END_MINUTES;
         return Math.max(min, Math.min(max, totalMinutes));
     }
 
@@ -778,6 +800,15 @@
             return;
         }
 
+        if (!isWithinOperatingHours(start, end)) {
+            setAvailabilityHint(staffAvailabilityHintEl, `คิวต้องอยู่ในช่วงเวลาเปิดร้าน ${BRANCH_OPEN_TIME}-${BRANCH_CLOSE_TIME}`, 'warning');
+            setAvailabilityHint(bedAvailabilityHintEl, `เลือกเวลาในช่วง ${BRANCH_OPEN_TIME}-${BRANCH_CLOSE_TIME}`, 'warning');
+            if (saveBookingBtn) {
+                saveBookingBtn.disabled = true;
+            }
+            return;
+        }
+
         const { staffConflict, bedConflict } = getBookingConflicts(start, end, staffId, bedId);
 
         if (staffId) {
@@ -842,8 +873,8 @@
     window.removeService = removeService;
 
     function ensureEndAfterStart() {
-        const normalizedStart = normalizeTimeValue(startTimeEl.value, '10:00');
-        const normalizedEnd = normalizeTimeValue(endTimeEl.value, '11:00');
+        const normalizedStart = normalizeTimeValue(startTimeEl.value, DEFAULT_START_TIME);
+        const normalizedEnd = normalizeTimeValue(endTimeEl.value, DEFAULT_END_TIME);
         startTimeEl.value = normalizedStart;
         endTimeEl.value = normalizedEnd;
         const start = toMinutes(normalizedStart);
@@ -870,7 +901,7 @@
         customerSelectEl.value = booking.customerId || defaultCustomerId;
         staffSelectEl.value = normalizeId(booking.staffId || defaultStaffId);
         if (bedSelectEl) bedSelectEl.value = normalizeId(booking.bedId || '');
-        startTimeEl.value = normalizeTimeValue(booking.start || '10:00', '10:00');
+        startTimeEl.value = normalizeTimeValue(booking.start || DEFAULT_START_TIME, DEFAULT_START_TIME);
         endTimeEl.value = normalizeTimeValue(booking.end || addMinutes(startTimeEl.value, getTotalDuration(booking.serviceIds)), addMinutes(startTimeEl.value, getTotalDuration(booking.serviceIds)));
         statusSelectEl.value = booking.status || 'waiting';
         selectedServiceIds = [...(booking.serviceIds || [])].map(normalizeId).slice(0, MAX_BOOKING_SERVICES);
@@ -890,7 +921,7 @@
 
     function renderBookings() {
         document.querySelectorAll('.booking-row-layer').forEach(l => l.innerHTML = '');
-        const totalMinutes = (END_HOUR_EXCLUSIVE - START_HOUR) * 60;
+        const totalMinutes = END_MINUTES - START_MINUTES;
 
         bookings.forEach(b => {
             const layer = document.getElementById(`layer-${normalizeId(b.staffId)}`);
@@ -900,8 +931,8 @@
             const layerHeight = layer.clientHeight;
             if (!layerWidth || !layerHeight) return;
 
-            let startOffset = toMinutes(b.start) - (START_HOUR * 60);
-            let endOffset = toMinutes(b.end) - (START_HOUR * 60);
+            let startOffset = toMinutes(b.start) - START_MINUTES;
+            let endOffset = toMinutes(b.end) - START_MINUTES;
 
             startOffset = Math.max(0, Math.min(totalMinutes - 15, startOffset));
             endOffset = Math.max(startOffset + 15, Math.min(totalMinutes, endOffset));
@@ -1006,6 +1037,11 @@
 
         if (toMinutes(end) <= toMinutes(start)) {
             notifyError('เวลาสิ้นสุดต้องมากกว่าเวลาเริ่ม');
+            return null;
+        }
+
+        if (!isWithinOperatingHours(start, end)) {
+            notifyError(`เวลาจองต้องอยู่ในช่วง ${BRANCH_OPEN_TIME}-${BRANCH_CLOSE_TIME}`);
             return null;
         }
 
@@ -1209,7 +1245,7 @@
         }
 
         editingBookingId = null;
-        const startTime = normalizeTimeValue(data.time || '10:00', '10:00');
+        const startTime = normalizeTimeValue(data.time || DEFAULT_START_TIME, DEFAULT_START_TIME);
         const initialServices = defaultServiceId ? [defaultServiceId] : [];
         const duration = getTotalDuration(initialServices);
 
@@ -1241,7 +1277,7 @@
                 const row = slot.closest('.queue-data-row');
                 openModal({
                     staffId: (row && row.dataset.staffId) || defaultStaffId,
-                    time: slot.dataset.time || '10:00'
+                    time: slot.dataset.time || DEFAULT_START_TIME
                 });
                 return;
             }
@@ -1250,9 +1286,9 @@
             if (layer && e.target === layer) {
                 const rect = layer.getBoundingClientRect();
                 const relativeX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-                const totalMinutes = (END_HOUR_EXCLUSIVE - START_HOUR) * 60;
+                const totalMinutes = END_MINUTES - START_MINUTES;
                 const offsetMinutes = Math.floor((relativeX / Math.max(rect.width, 1)) * totalMinutes / 60) * 60;
-                const time = toHHMM((START_HOUR * 60) + offsetMinutes);
+                const time = toHHMM(START_MINUTES + offsetMinutes);
                 openModal({
                     staffId: layer.dataset.staffId || defaultStaffId,
                     time

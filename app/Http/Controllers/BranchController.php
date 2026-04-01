@@ -30,6 +30,8 @@ class BranchController extends Controller
             'shop_id' => ['nullable', 'integer'],
             'address' => ['nullable', 'string', 'max:1000'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'open_time' => ['nullable', 'date_format:H:i'],
+            'close_time' => ['nullable', 'date_format:H:i'],
         ]);
 
         $this->branchService->createBranch($request->user(), $payload);
@@ -46,6 +48,8 @@ class BranchController extends Controller
             'shop_id' => ['nullable', 'integer'],
             'address' => ['nullable', 'string', 'max:1000'],
             'phone' => ['nullable', 'string', 'max:50'],
+            'open_time' => ['nullable', 'date_format:H:i'],
+            'close_time' => ['nullable', 'date_format:H:i'],
             'is_active' => ['nullable'],
         ]);
 

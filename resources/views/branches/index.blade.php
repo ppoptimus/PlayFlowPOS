@@ -335,6 +335,8 @@
                                     <th>ชื่อสาขา</th>
                                     <th>ที่อยู่</th>
                                     <th>เบอร์โทร</th>
+                                    <th>เปิด</th>
+                                    <th>ปิด</th>
                                     <th>พนักงาน</th>
                                     <th>สถานะ</th>
                                     <th class="text-end">จัดการ</th>
@@ -353,6 +355,8 @@
                                         </td>
                                         <td><input form="branch-form-{{ $branch['id'] }}" type="text" name="address" class="form-control" value="{{ $branch['address'] }}"></td>
                                         <td><input form="branch-form-{{ $branch['id'] }}" type="text" name="phone" class="form-control" value="{{ $branch['phone'] }}"></td>
+                                        <td><input form="branch-form-{{ $branch['id'] }}" type="time" name="open_time" class="form-control" value="{{ $branch['open_time'] }}"></td>
+                                        <td><input form="branch-form-{{ $branch['id'] }}" type="time" name="close_time" class="form-control" value="{{ $branch['close_time'] }}"></td>
                                         <td>{{ $branch['staff_count'] + $branch['user_count'] }}</td>
                                         <td>
                                             <div class="form-check form-switch">
@@ -374,7 +378,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="text-center text-muted py-4">ยังไม่มีข้อมูลสาขาในร้านนี้</td>
+                                        <td colspan="9" class="text-center text-muted py-4">ยังไม่มีข้อมูลสาขาในร้านนี้</td>
                                     </tr>
                                 @endforelse
                             </tbody>
@@ -403,6 +407,7 @@
                                 <div class="mobile-branch-stats">
                                     <span class="mobile-stat-pill"><i class="bi bi-people-fill"></i> {{ $branchPeopleCount }} คน</span>
                                     <span class="mobile-stat-pill"><i class="bi bi-telephone-fill"></i> {{ $branch['phone'] !== '' ? $branch['phone'] : 'ยังไม่ระบุ' }}</span>
+                                    <span class="mobile-stat-pill"><i class="bi bi-clock"></i> {{ $branch['open_time'] }} - {{ $branch['close_time'] }}</span>
                                 </div>
 
                                 <form id="branch-mobile-form-{{ $branch['id'] }}" method="POST" action="{{ route('branches.update', ['branchId' => $branch['id']]) }}">
@@ -423,6 +428,16 @@
                                         <div>
                                             <label class="form-label fw-bold">เบอร์โทร</label>
                                             <input type="tel" name="phone" class="form-control" value="{{ $branch['phone'] }}" placeholder="ระบุเบอร์โทรสาขา">
+                                        </div>
+
+                                        <div>
+                                            <label class="form-label fw-bold">เวลาเปิดร้าน</label>
+                                            <input type="time" name="open_time" class="form-control" value="{{ $branch['open_time'] }}">
+                                        </div>
+
+                                        <div>
+                                            <label class="form-label fw-bold">เวลาปิดร้าน</label>
+                                            <input type="time" name="close_time" class="form-control" value="{{ $branch['close_time'] }}">
                                         </div>
 
                                         <div class="mobile-switch-row">
@@ -491,6 +506,14 @@
                                 <div class="col-12">
                                     <label class="form-label small fw-bold">เบอร์โทร</label>
                                     <input type="text" name="phone" class="form-control" value="{{ old('phone') }}" {{ $branchLimitIsReached ? 'disabled' : '' }}>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label small fw-bold">เวลาเปิดร้าน</label>
+                                    <input type="time" name="open_time" class="form-control" value="{{ old('open_time', '10:00') }}" {{ $branchLimitIsReached ? 'disabled' : '' }}>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label small fw-bold">เวลาปิดร้าน</label>
+                                    <input type="time" name="close_time" class="form-control" value="{{ old('close_time', '20:00') }}" {{ $branchLimitIsReached ? 'disabled' : '' }}>
                                 </div>
                             </div>
                         </div>
