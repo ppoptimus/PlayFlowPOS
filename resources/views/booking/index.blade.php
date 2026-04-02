@@ -869,6 +869,7 @@
     function removeService(serviceId) {
         selectedServiceIds = selectedServiceIds.filter(id => normalizeId(id) !== normalizeId(serviceId));
         renderSelectedServices();
+        recalculateEndTime();
     }
     window.removeService = removeService;
 
@@ -882,6 +883,13 @@
         if (end <= start) {
             endTimeEl.value = addMinutes(normalizedStart, getTotalDuration(selectedServiceIds));
         }
+        updateAvailabilityIndicators();
+    }
+
+    function recalculateEndTime() {
+        if (!startTimeEl || !endTimeEl) return;
+        const normalizedStart = normalizeTimeValue(startTimeEl.value, DEFAULT_START_TIME);
+        endTimeEl.value = addMinutes(normalizedStart, getTotalDuration(selectedServiceIds));
         updateAvailabilityIndicators();
     }
 
@@ -1316,7 +1324,7 @@
 
             selectedServiceIds = [...selectedServiceIds, serviceId];
             renderSelectedServices();
-            ensureEndAfterStart();
+            recalculateEndTime();
         });
     }
 
