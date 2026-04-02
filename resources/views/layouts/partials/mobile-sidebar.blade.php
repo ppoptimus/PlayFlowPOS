@@ -135,13 +135,7 @@
                     'title' => 'รายงานวิเคราะห์',
                     'subtitle' => 'ติดตามยอดขาย บริการ หมอนวด และสินค้า',
                 ],
-                [
-                    'route' => 'financial',
-                    'active' => ['financial*'],
-                    'icon' => 'bi-wallet2',
-                    'title' => 'การเงินและ P&L',
-                    'subtitle' => 'ดูภาพรวมรายได้และกำไรขาดทุน',
-                ],
+
                 [
                     'route' => 'admin.commission.index',
                     'active' => ['admin.commission.*'],

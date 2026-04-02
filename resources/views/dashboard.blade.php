@@ -724,8 +724,12 @@
 @endpush
 
 @section('content')
+@php
+    $isShopOwnerDashboard = (string) (auth()->user()->role ?? '') === 'shop_owner';
+@endphp
 <div class="dashboard-page">
     <div class="row g-3 g-xl-4">
+        @if(!$isShopOwnerDashboard)
         <div class="col-12">
             <section class="dash-card focus-shell">
                 <div class="focus-grid">
@@ -893,7 +897,9 @@
             </section>
         </div>
 
-        <div class="col-12 col-xl-7">
+        @endif
+
+        <div class="col-12 {{ $isShopOwnerDashboard ? '' : 'col-xl-7' }}">
             <section class="service-card">
                 <div class="section-head">
                     <div>

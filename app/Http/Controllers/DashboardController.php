@@ -23,9 +23,7 @@ class DashboardController extends Controller
             return redirect()->route('system.shops.index');
         }
 
-        if ($role === 'shop_owner') {
-            return redirect()->route('branches.index');
-        }
+
 
         if ($role === 'masseuse') {
             return redirect()->route('masseuse.self');
