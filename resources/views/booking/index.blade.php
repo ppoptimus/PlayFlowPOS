@@ -428,6 +428,8 @@
     const BRANCH_CLOSE_TIME = @json($branchCloseTime);
     const START_MINUTES = {{ $startMinutes }};
     const END_MINUTES = {{ $endMinutes }};
+    const USER_ROLE = @json(auth()->user() ? auth()->user()->role : 'staff');
+    const CAN_EDIT_PAID = USER_ROLE === 'shop_owner' || USER_ROLE === 'branch_manager';
     const activeBranchId = @json($activeBranchId);
     const staffData = @json($staff);
     const customerData = @json($customers);
@@ -837,7 +839,7 @@
 
         hasConflict = Boolean(staffConflict || bedConflict || !staffId);
         if (saveBookingBtn) {
-            saveBookingBtn.disabled = Boolean(isPaidBooking || hasConflict);
+            saveBookingBtn.disabled = Boolean((isPaidBooking && !CAN_EDIT_PAID) || hasConflict);
         }
     }
 
@@ -920,10 +922,10 @@
             ? '<i class="bi bi-check2-circle me-1"></i> ชำระแล้ว'
             : '<i class="bi bi-wallet2 me-1"></i> ชำระเงิน';
         payBookingBtn.disabled = Boolean(booking.paid);
-        saveBookingBtn.disabled = Boolean(booking.paid);
+        saveBookingBtn.disabled = Boolean(booking.paid) && !CAN_EDIT_PAID;
         payBookingBtn.classList.toggle('btn-success', booking.paid);
         payBookingBtn.classList.toggle('btn-outline-success', !booking.paid);
-        deleteBookingBtn.classList.toggle('d-none', !isEditing || Boolean(booking.paid));
+        deleteBookingBtn.classList.toggle('d-none', !isEditing || (Boolean(booking.paid) && !CAN_EDIT_PAID));
         updateAvailabilityIndicators();
     }
 

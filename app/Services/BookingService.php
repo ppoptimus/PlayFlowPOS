@@ -223,7 +223,7 @@ class BookingService
             ]);
         }
 
-        if ((string) $booking->status === 'completed') {
+        if ((string) $booking->status === 'completed' && !in_array($user->role, ['shop_owner', 'branch_manager'])) {
             throw ValidationException::withMessages([
                 'booking' => ['คิวที่ชำระเงินแล้วไม่สามารถยกเลิกหรือลบได้'],
             ]);
