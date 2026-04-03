@@ -47,6 +47,7 @@ class PosController extends Controller
             'booking_context.service_ids.*' => 'integer|exists:services,id',
             'booking_context.bed_id' => 'nullable|integer',
             'booking_context.is_paid' => 'nullable|boolean',
+            'booking_context.re_checkout' => 'nullable|boolean',
         ]);
 
         $result = $this->posService->checkout($request->user(), $payload);

@@ -918,14 +918,35 @@
         if (!selectedServiceIds.length && defaultServiceId) selectedServiceIds = [defaultServiceId];
         renderSelectedServices();
         setModalMode(isEditing);
-        payBookingBtn.innerHTML = booking.paid
-            ? '<i class="bi bi-check2-circle me-1"></i> ชำระแล้ว'
-            : '<i class="bi bi-wallet2 me-1"></i> ชำระเงิน';
-        payBookingBtn.disabled = Boolean(booking.paid);
-        saveBookingBtn.disabled = Boolean(booking.paid) && !CAN_EDIT_PAID;
-        payBookingBtn.classList.toggle('btn-success', booking.paid);
-        payBookingBtn.classList.toggle('btn-outline-success', !booking.paid);
-        deleteBookingBtn.classList.toggle('d-none', !isEditing || (Boolean(booking.paid) && !CAN_EDIT_PAID));
+
+        const isPaid = Boolean(booking.paid);
+
+        // ปุ่มชำระเงิน: ถ้าชำระแล้ว + เป็น manager/owner → ให้กดเพื่อชำระใหม่ได้
+        if (isPaid && CAN_EDIT_PAID) {
+            payBookingBtn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i> ชำระใหม่';
+            payBookingBtn.disabled = false;
+            payBookingBtn.className = 'btn btn-warning rounded-pill px-3 shadow-sm';
+        } else if (isPaid) {
+            payBookingBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> ชำระแล้ว';
+            payBookingBtn.disabled = true;
+            payBookingBtn.className = 'btn btn-success rounded-pill px-3 opacity-75';
+        } else {
+            payBookingBtn.innerHTML = '<i class="bi bi-wallet2 me-1"></i> ชำระเงิน';
+            payBookingBtn.disabled = false;
+            payBookingBtn.className = 'btn btn-outline-success rounded-pill px-3';
+        }
+
+        // ปุ่มบันทึก: ถ้าชำระแล้ว + ไม่ใช่ manager/owner → disabled + สีจาง
+        saveBookingBtn.disabled = isPaid && !CAN_EDIT_PAID;
+        if (isPaid && !CAN_EDIT_PAID) {
+            saveBookingBtn.className = 'btn btn-secondary rounded-pill px-4 opacity-50';
+        } else {
+            saveBookingBtn.className = 'btn btn-primary rounded-pill px-4 shadow-sm';
+        }
+
+        // ปุ่มลบ: แสดงเฉพาะ editing + (ยังไม่ชำระ หรือ เป็น manager/owner)
+        deleteBookingBtn.classList.toggle('d-none', !isEditing || (isPaid && !CAN_EDIT_PAID));
+
         updateAvailabilityIndicators();
     }
 
@@ -1163,6 +1184,12 @@
         const payload = collectBookingPayload();
         if (!payload) return;
 
+        // ตรวจสอบว่าเป็นการชำระใหม่ (re-checkout) ของ booking ที่ชำระแล้ว
+        const currentBooking = editingBookingId
+            ? bookings.find(b => normalizeId(b.id) === normalizeId(editingBookingId))
+            : null;
+        const isReCheckout = Boolean(currentBooking && currentBooking.paid && CAN_EDIT_PAID);
+
         const params = new URLSearchParams({
             from_booking: '1',
             queue_date: payload.queue_date,
@@ -1184,6 +1211,11 @@
 
         if (editingBookingId) {
             params.set('booking_id', String(editingBookingId));
+        }
+
+        if (isReCheckout) {
+            params.set('re_checkout', '1');
+            params.set('is_paid', '1');
         }
 
         window.location.href = `${bookingApi.pos}?${params.toString()}`;

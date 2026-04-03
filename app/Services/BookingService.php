@@ -20,13 +20,15 @@ class BookingService
 
     private BranchContextService $branchContext;
     private StaffAttendanceService $staffAttendanceService;
+    private CommissionService $commissionService;
     private array $tableExistsCache = [];
     private array $columnExistsCache = [];
 
-    public function __construct(StaffAttendanceService $staffAttendanceService, BranchContextService $branchContext)
+    public function __construct(StaffAttendanceService $staffAttendanceService, BranchContextService $branchContext, CommissionService $commissionService)
     {
         $this->staffAttendanceService = $staffAttendanceService;
         $this->branchContext = $branchContext;
+        $this->commissionService = $commissionService;
     }
 
     public function getPageData(User $user, ?int $requestedBranchId, string $date): array
@@ -136,6 +138,7 @@ class BookingService
         $status = (string) $payload['status'];
         $cancelReason = isset($payload['cancel_reason']) ? (string) $payload['cancel_reason'] : null;
 
+        $existingOrderId = null;
         if ($bookingId !== null) {
             $existing = DB::table('bookings')
                 ->where('id', $bookingId)
@@ -146,6 +149,14 @@ class BookingService
                 throw ValidationException::withMessages([
                     'booking' => ['ไม่พบคิวที่ต้องการแก้ไขในสาขานี้'],
                 ]);
+            }
+
+            // เก็บ order_id ของ booking เดิมไว้สำหรับอัปเดต order เมื่อแก้ไข
+            if ($this->hasColumn('bookings', 'order_id')) {
+                $existingOrderId = isset($existing->order_id) ? (int) $existing->order_id : null;
+                if ($existingOrderId <= 0) {
+                    $existingOrderId = null;
+                }
             }
         }
 
@@ -170,7 +181,7 @@ class BookingService
             'cancel_reason' => $status === 'cancelled' ? $cancelReason : null,
         ];
 
-        DB::transaction(function () use (&$bookingId, $data, $serviceIds): void {
+        DB::transaction(function () use (&$bookingId, $data, $serviceIds, $existingOrderId, $branchId, $masseuseId): void {
             if ($bookingId === null) {
                 $bookingId = (int) DB::table('bookings')->insertGetId($data);
             } else {
@@ -180,6 +191,11 @@ class BookingService
             }
 
             $this->syncBookingServices($bookingId, $serviceIds);
+
+            // อัปเดต order ที่เชื่อมโยงเมื่อแก้ไข booking ที่ชำระเงินแล้ว
+            if ($existingOrderId !== null) {
+                $this->recalculateLinkedOrder($existingOrderId, $branchId, $serviceIds, $masseuseId);
+            }
         });
 
         return $this->findBookingById($bookingId, $branchId);
@@ -229,7 +245,16 @@ class BookingService
             ]);
         }
 
-        DB::transaction(function () use ($bookingId): void {
+        DB::transaction(function () use ($bookingId, $booking): void {
+            // ลบ order ที่เชื่อมโยงกับ booking นี้ เพื่อให้ยอดใน Dashboard อัปเดตตาม
+            $linkedOrderId = $this->hasColumn('bookings', 'order_id')
+                ? (isset($booking->order_id) ? (int) $booking->order_id : null)
+                : null;
+
+            if ($linkedOrderId !== null && $linkedOrderId > 0) {
+                $this->deleteLinkedOrder($linkedOrderId);
+            }
+
             if ($this->tableExists('booking_services')) {
                 DB::table('booking_services')
                     ->where('booking_id', $bookingId)
@@ -586,6 +611,7 @@ class BookingService
             ->selectRaw(
                 "b.id, b.customer_id, b.service_id, b.masseuse_id, b.bed_id, " .
                 "b.start_time, b.end_time, b.status, b.cancel_reason, " .
+                ($this->hasColumn('bookings', 'order_id') ? "b.order_id, " : "") .
                 "c.name as customer_name, s.name as service_name, s.price as service_price, " .
                 "COALESCE(NULLIF(m.full_name, ''), NULLIF(m.nickname, ''), '') as staff_name, " .
                 "bed.name as bed_name, room.name as room_name"
@@ -756,6 +782,7 @@ class BookingService
             'status' => (string) $row->status,
             'cancelReason' => $row->cancel_reason !== null ? (string) $row->cancel_reason : null,
             'paid' => (string) $row->status === 'completed',
+            'orderId' => isset($row->order_id) ? (int) $row->order_id : null,
         ];
     }
 
@@ -1067,5 +1094,117 @@ class BookingService
         } catch (\Throwable $e) {
             return Carbon::today()->toDateString();
         }
+    }
+
+    /**
+     * อัปเดต order ที่เชื่อมโยงกับ booking เมื่อแก้ไขบริการ/หมอนวด
+     * → ยอดใน Dashboard จะอัปเดตตาม
+     */
+    private function recalculateLinkedOrder(int $orderId, int $branchId, array $serviceIds, ?int $masseuseId): void
+    {
+        $order = DB::table('orders')->where('id', $orderId)->first();
+        if ($order === null) {
+            return;
+        }
+
+        // ลบ commissions เก่าของ service items
+        $oldServiceItemIds = DB::table('order_items')
+            ->where('order_id', $orderId)
+            ->where('item_type', 'service')
+            ->pluck('id');
+
+        if ($this->tableExists('commissions') && $oldServiceItemIds->isNotEmpty()) {
+            DB::table('commissions')
+                ->whereIn('order_item_id', $oldServiceItemIds->all())
+                ->delete();
+        }
+
+        // ลบ order_items ประเภท service เก่า
+        DB::table('order_items')
+            ->where('order_id', $orderId)
+            ->where('item_type', 'service')
+            ->delete();
+
+        // สร้าง order_items ใหม่ตามบริการที่แก้ไข
+        $newServiceTotal = 0.0;
+        foreach ($serviceIds as $svcId) {
+            $service = DB::table('services')
+                ->where('id', (int) $svcId)
+                ->first(['id', 'price']);
+
+            if ($service === null) {
+                continue;
+            }
+
+            $unitPrice = (float) $service->price;
+            DB::table('order_items')->insert([
+                'branch_id' => $branchId,
+                'order_id' => $orderId,
+                'item_type' => 'service',
+                'item_id' => (int) $service->id,
+                'qty' => 1,
+                'unit_price' => $unitPrice,
+                'masseuse_id' => $masseuseId,
+            ]);
+            $newServiceTotal += $unitPrice;
+        }
+
+        // ยอดรวม non-service items ที่ยังอยู่ (product, package)
+        $nonServiceTotal = (float) DB::table('order_items')
+            ->where('order_id', $orderId)
+            ->where('item_type', '!=', 'service')
+            ->sum(DB::raw('qty * unit_price'));
+
+        $subtotal = $newServiceTotal + $nonServiceTotal;
+        $discount = (float) $order->discount_amount;
+        $grandTotal = max(0.0, $subtotal - $discount);
+
+        DB::table('orders')
+            ->where('id', $orderId)
+            ->update([
+                'total_amount' => $subtotal,
+                'grand_total' => $grandTotal,
+            ]);
+
+        // คำนวณคอมมิชชันใหม่
+        $this->commissionService->processOrderCommissions($orderId);
+    }
+
+    /**
+     * ลบ order ที่เชื่อมโยงกับ booking (พร้อม order_items + commissions)
+     * → ยอดใน Dashboard จะลดลงตาม
+     */
+    private function deleteLinkedOrder(int $orderId): void
+    {
+        // ลบ commissions
+        if ($this->tableExists('commissions')) {
+            $itemIds = DB::table('order_items')
+                ->where('order_id', $orderId)
+                ->pluck('id');
+
+            if ($itemIds->isNotEmpty()) {
+                DB::table('commissions')
+                    ->whereIn('order_item_id', $itemIds->all())
+                    ->delete();
+            }
+        }
+
+        // ลบ order_items
+        DB::table('order_items')
+            ->where('order_id', $orderId)
+            ->delete();
+
+        // ลบ order
+        DB::table('orders')
+            ->where('id', $orderId)
+            ->delete();
+    }
+
+    /**
+     * Public wrapper สำหรับ PosService เรียกใช้เมื่อชำระเงินใหม่ (re-checkout)
+     */
+    public function deleteLinkedOrderPublic(int $orderId): void
+    {
+        $this->deleteLinkedOrder($orderId);
     }
 }

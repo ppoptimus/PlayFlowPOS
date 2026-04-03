@@ -134,9 +134,24 @@ class PosService
             $booking = null;
             if ($bookingContext !== null) {
                 if (!empty($bookingContext['is_paid'])) {
-                    throw ValidationException::withMessages([
-                        'booking_context' => ['คิวนี้ชำระเงินแล้ว ไม่สามารถชำระซ้ำได้'],
-                    ]);
+                    $isReCheckout = !empty($bookingContext['re_checkout']);
+                    $canReCheckout = in_array($user->role ?? '', ['shop_owner', 'branch_manager'], true);
+
+                    if (!$isReCheckout || !$canReCheckout) {
+                        throw ValidationException::withMessages([
+                            'booking_context' => ['คิวนี้ชำระเงินแล้ว ไม่สามารถชำระซ้ำได้'],
+                        ]);
+                    }
+
+                    // ลบ order เก่าที่ผูกกับ booking นี้ก่อนชำระใหม่
+                    if ($this->hasColumn('bookings', 'order_id') && !empty($bookingContext['booking_id'])) {
+                        $oldOrderId = DB::table('bookings')
+                            ->where('id', (int) $bookingContext['booking_id'])
+                            ->value('order_id');
+                        if ($oldOrderId) {
+                            $this->bookingService->deleteLinkedOrderPublic((int) $oldOrderId);
+                        }
+                    }
                 }
 
                 $requiredBookingFields = ['queue_date', 'start_time', 'end_time'];
@@ -167,6 +182,13 @@ class PosService
                     ],
                     $user
                 );
+
+                // เชื่อมโยง booking กับ order เพื่อให้แก้ไข/ลบ booking แล้วยอดใน Dashboard อัปเดตตาม
+                if ($booking !== null && isset($booking['id']) && $this->hasColumn('bookings', 'order_id')) {
+                    DB::table('bookings')
+                        ->where('id', (int) $booking['id'])
+                        ->update(['order_id' => $orderId]);
+                }
             }
 
             return [
@@ -762,6 +784,33 @@ class PosService
                 $branchId
             );
             $context['fromBooking'] = true;
+
+            // Override with values from query if provided (to support editing before checkout)
+            $serviceIds = $this->normalizeBookingServiceIds($query);
+            if (!empty($serviceIds)) {
+                $context['serviceIds'] = $serviceIds;
+                $context['serviceId'] = $serviceIds[0];
+            }
+            if (isset($query['start_time'])) {
+                $context['startTime'] = (string) $query['start_time'];
+            }
+            if (isset($query['end_time'])) {
+                $context['endTime'] = (string) $query['end_time'];
+            }
+            if (isset($query['staff_id'])) {
+                $context['staffId'] = $query['staff_id'] !== '' ? (int) $query['staff_id'] : null;
+            }
+            if (isset($query['bed_id'])) {
+                $context['bedId'] = $query['bed_id'] !== '' ? (int) $query['bed_id'] : null;
+            }
+            if (isset($query['queue_date'])) {
+                $context['queueDate'] = (string) $query['queue_date'];
+            }
+
+            // ส่ง re_checkout flag เพื่อให้หน้า POS รู้ว่าเป็น manager/owner ชำระใหม่
+            if (isset($query['re_checkout']) && ((string) $query['re_checkout'] === '1' || $query['re_checkout'] === 1)) {
+                $context['reCheckout'] = true;
+            }
             return $context;
         }
 

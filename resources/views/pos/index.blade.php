@@ -724,6 +724,7 @@
             service_ids: Array.isArray(bookingContext.serviceIds) ? bookingContext.serviceIds : (bookingContext.serviceId ? [bookingContext.serviceId] : []),
             bed_id: bookingContext.bedId || null,
             is_paid: Boolean(bookingContext.isPaid),
+            re_checkout: Boolean(bookingContext.reCheckout),
         };
     }
 
@@ -1019,8 +1020,15 @@
         }
 
         if (bookingContext.isPaid === true && checkoutBtn) {
-            checkoutBtn.disabled = true;
-            checkoutBtn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i> คิวนี้ชำระแล้ว';
+            if (bookingContext.reCheckout === true) {
+                // manager/owner re-checkout: ให้กดชำระได้
+                checkoutBtn.disabled = false;
+                checkoutBtn.innerHTML = '<i class="bi bi-arrow-repeat me-2"></i> ชำระเงินใหม่';
+                checkoutBtn.style.background = 'linear-gradient(135deg, #e67e22, #d35400)';
+            } else {
+                checkoutBtn.disabled = true;
+                checkoutBtn.innerHTML = '<i class="bi bi-check-circle-fill me-2"></i> คิวนี้ชำระแล้ว';
+            }
         }
     }
 
